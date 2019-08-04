@@ -55,9 +55,17 @@ struct cs_spec {
 	int (*spdif_sw_put)(struct snd_kcontrol *kcontrol,
 			    struct snd_ctl_elem_value *ucontrol);
 
+
+	int use_data;
+
 	// new item to limit times we redo unmute/play
 	struct timespec last_play_time;
 	int play_init;
+	// record the first play time - we have a problem there
+	// some initial plays that I dont understand - so skip any setup
+	// till sometime after the first play
+	struct timespec first_play_time;
+	int playing;
 
 };
 
@@ -367,6 +375,10 @@ static int cs_build_controls(struct hda_codec *codec)
 }
 
 #define cs_free		snd_hda_gen_free
+
+// attempt at an explicit setup ie not generic
+//#include "patch_cirrus_explicit.h"
+
 
 static const struct hda_codec_ops cs_patch_ops = {
 	.build_controls = cs_build_controls,
@@ -1271,11 +1283,65 @@ enum {
        CS8409_GPIO,
 };
 
+
+static void cs_8409_pcm_playback_pre_prepare_hook(struct hda_pcm_stream *hinfo, struct hda_codec *codec, struct snd_pcm_substream *substream,
+                               int action);
+
+// this is a copy from playback_pcm_prepare in hda_generic.c
+// we need to do the Apple setup BEFORE the snd_hda_multi_out_analog_prepare
+// NOTA BENE - if playback_pcm_prepare is changed in hda_generic.c then
+// those changes must be re-implemented here
+// we need this order because snd_hda_multi_out_analog_prepare writes the
+// the format and stream id's to the audio nodes
+// so far we have left the Apple setup of the nodes format and stream id's
+// in
+// now Apples is very specifically S24_3LE (24 bit), 4 channel, 44.1 kHz
+// S24_3LE seems to be very difficult to create so best Ive done is
+// S24_LE (24 in 32 bits) or S32_LE
+// it seems the digital setup is able to handle this with the Apple TDM
+// setup but if we use the normal prepare hook order this overrwites
+// the node linux 0x2, 0x3 setup with the Apple setup which leads to noise
+// (the HDA specs say the node format setup must match the data)
+// if we do the Apple setup and then the snd_hda_multi_out_analog_prepare
+// the nodes will have the slightly different but working format
+static int cs_8409_playback_pcm_prepare(struct hda_pcm_stream *hinfo,
+                                struct hda_codec *codec,
+                                unsigned int stream_tag,
+                                unsigned int format,
+                                struct snd_pcm_substream *substream)
+{
+        struct hda_gen_spec *spec = codec->spec;
+        int err;
+        codec_dbg(codec, "cs_8409_playback_pcm_prepare\n");
+
+        cs_8409_pcm_playback_pre_prepare_hook(hinfo, codec, substream,
+                               HDA_GEN_PCM_ACT_PREPARE);
+
+        err = snd_hda_multi_out_analog_prepare(codec, &spec->multiout,
+                                               stream_tag, format, substream);
+
+	// we cant call directly as call_pcm_playback_hook is local to hda_generic.c
+        //if (!err)
+        //        call_pcm_playback_hook(hinfo, codec, substream,
+        //                               HDA_GEN_PCM_ACT_PREPARE);
+	// but its a trivial function - at least for the moment!!
+	if (err)
+                codec_dbg(codec, "cs_8409_playback_pcm_prepare err %d\n", err);
+        if (!err)
+                if (spec->pcm_playback_hook)
+                        spec->pcm_playback_hook(hinfo, codec, substream, HDA_GEN_PCM_ACT_PREPARE);
+        return err;
+}
+
+static void cs_8409_set_extended_codec_verb(void);
+
 static int cs_8409_init(struct hda_codec *codec)
 {
-	//struct cs_spec *spec = codec->spec;
+	struct hda_pcm *info = NULL;
+	struct hda_pcm_stream *hinfo = NULL;
+	struct cs_spec *spec = NULL;
 
-        printk("snd_hda_intel: cs_8409_init");
+        printk("snd_hda_intel: cs_8409_init\n");
 
 	//if (spec->vendor_nid == CS420X_VENDOR_NID) {
 	//	/* init_verb sequence for C0/C1/C2 errata*/
@@ -1286,6 +1352,48 @@ static int cs_8409_init(struct hda_codec *codec)
 	//}
 
 	snd_hda_gen_init(codec);
+
+	// dump the rates/format of the afg node
+	// so analog_playback_stream is still NULL here - maybe only defined when doing actual playback
+	// the info stream is now defined
+	spec = codec->spec;
+        hinfo = spec->gen.stream_analog_playback;
+	if (hinfo != NULL)
+	{
+		codec_dbg(codec, "playback stream nid 0x%02x rates 0x%08x formats 0x%016llx\n",hinfo->nid,hinfo->rates,hinfo->formats);
+	}
+	else
+		codec_dbg(codec, "playback stream NULL\n");
+	info = spec->gen.pcm_rec[0];
+	if (info != NULL)
+	{
+		hinfo = &(info->stream[SNDRV_PCM_STREAM_PLAYBACK]);
+		if (hinfo != NULL)
+			codec_dbg(codec, "playback info stream nid 0x%02x rates 0x%08x formats 0x%016llx\n",hinfo->nid,hinfo->rates,hinfo->formats);
+		else
+			codec_dbg(codec, "playback info stream NULL\n");
+	}
+	else
+		codec_dbg(codec, "playback info NULL\n");
+
+	if (info != NULL)
+	{
+		hinfo = &(info->stream[SNDRV_PCM_STREAM_PLAYBACK]);
+		if (hinfo != NULL)
+		{
+			// so now we need to force the rates and formats to the single one Apple defines ie 44.1 kHz and S24_LE
+			// probably can leave S32_LE
+			// we can still handle 2/4 channel (what about 1 channel?)
+			hinfo->rates = SNDRV_PCM_RATE_44100;
+			hinfo->formats = SNDRV_PCM_FMTBIT_S32_LE | SNDRV_PCM_FMTBIT_S24_LE;
+			codec_dbg(codec, "playback info stream forced nid 0x%02x rates 0x%08x formats 0x%016llx\n",hinfo->nid,hinfo->rates,hinfo->formats);
+
+			// update the playback function
+			hinfo->ops.prepare = cs_8409_playback_pcm_prepare;
+
+		}
+	}
+
 
 	//if (spec->gpio_mask) {
 	//	snd_hda_codec_write(codec, 0x01, 0, AC_VERB_SET_GPIO_MASK,
@@ -1301,7 +1409,10 @@ static int cs_8409_init(struct hda_codec *codec)
 	//	init_digital_coef(codec);
 	//}
 
-        printk("snd_hda_intel: end cs_8409_init");
+	cs_8409_set_extended_codec_verb();
+
+
+        printk("snd_hda_intel: end cs_8409_init\n");
 
 	return 0;
 }
@@ -1310,23 +1421,30 @@ static int cs_8409_build_controls(struct hda_codec *codec)
 {
 	int err;
 
-        printk("snd_hda_intel: cs_8409_build_controls");
+        printk("snd_hda_intel: cs_8409_build_controls\n");
 
 	err = snd_hda_gen_build_controls(codec);
 	if (err < 0)
 		return err;
 	snd_hda_apply_fixup(codec, HDA_FIXUP_ACT_BUILD);
 
-        printk("snd_hda_intel: end cs_8409_build_controls");
+        printk("snd_hda_intel: end cs_8409_build_controls\n");
 	return 0;
 }
 
 int cs_8409_build_pcms(struct hda_codec *codec)
 {
 	int retval;
-        printk("snd_hda_intel: cs_8409_build_pcms");
+	//struct cs_spec *spec = codec->spec;
+	//struct hda_pcm *info = NULL;
+	//struct hda_pcm_stream *hinfo = NULL;
+        printk("snd_hda_intel: cs_8409_build_pcms\n");
 	retval =  snd_hda_gen_build_pcms(codec);
-        printk("snd_hda_intel: end cs_8409_build_pcms");
+	// we still dont have the pcm streams defined by here
+	// ah this is all done in snd_hda_codec_build_pcms
+	// which calls this patch routine or snd_hda_gen_build_pcms
+	// but the query supported pcms is only done after this
+        printk("snd_hda_intel: end cs_8409_build_pcms\n");
 	return retval;
 }
 
@@ -1350,277 +1468,6 @@ void cs_8409_jack_unsol_event(struct hda_codec *codec, unsigned int res)
 // cs_free is just a definition
 #define cs_8409_free		snd_hda_gen_free
 
-static int cs_8409_init_explicit(struct hda_codec *codec)
-{
-	//struct cs_spec *spec = codec->spec;
-
-        printk("snd_hda_intel: cs_8409_init_explicit enter");
-
-        printk("snd_hda_intel: cs_8409_init snd_hda_gen_init NOT CALLED");
-
-        printk("snd_hda_intel: cs_8409_init_explicit end");
-
-	return 0;
-}
-
-static void cs_8409_free_explicit(struct hda_codec *codec)
-{
-        kfree(codec->spec);
-}
-
-static int cs_8409_build_controls_explicit(struct hda_codec *codec)
-{
-	int err;
-
-        printk("snd_hda_intel: cs_8409_build_controls_explicit");
-
-
-        printk("snd_hda_intel: end cs_8409_build_controls_explicit");
-	return 0;
-}
-
-
-static int cs_8409_playback_pcm_prepare(struct hda_pcm_stream *hinfo,
-                                        struct hda_codec *codec,
-                                        unsigned int stream_tag,
-                                        unsigned int format,
-                                        struct snd_pcm_substream *substream)
-{
-	struct cs_spec *spec = codec->spec;
-
-	codec_dbg(codec, "cs_8409_playback_pcm_prepare enter\n");
-
-        snd_hda_codec_setup_stream(codec, hinfo->nid,
-                                   stream_tag, 0, format);
-
-	if (spec->gen.pcm_playback_hook)
-        	spec->gen.pcm_playback_hook(hinfo, codec, substream, HDA_GEN_PCM_ACT_PREPARE);
-
-	codec_dbg(codec, "cs_8409_playback_pcm_prepare end\n");
-
-        return 0;
-}
-
-static int cs_8409_playback_pcm_cleanup(struct hda_pcm_stream *hinfo,
-                                        struct hda_codec *codec,
-                                        struct snd_pcm_substream *substream)
-{
-	struct cs_spec *spec = codec->spec;
-
-	codec_dbg(codec, "cs_8409_playback_pcm_cleanup enter\n");
-
-        snd_hda_codec_cleanup_stream(codec, hinfo->nid);
-
-	codec_dbg(codec, "cs_8409_playback_pcm_cleanup exit\n");
-
-        return 0;
-}
-
-static int cs_8409_playback_pcm_open(struct hda_pcm_stream *hinfo,
-                                     struct hda_codec *codec,
-                                     struct snd_pcm_substream *substream)
-{
-
-        struct cs_spec *spec = codec->spec;
-        struct hda_gen_spec *gen_spec = &(spec->gen);
-        int err;
-        codec_dbg(codec, "playback_pcm_open nid 0x%02x rates 0x%08x formats 0x%016llx\n",hinfo->nid,hinfo->rates,hinfo->formats);
-
-        //call_pcm_playback_hook(hinfo, codec, substream, HDA_GEN_PCM_ACT_OPEN);
-
-        //mutex_lock(&gen_spec->pcm_mutex);
-        //err = snd_hda_multi_out_analog_open(codec,
-        //                                    &spec->multiout, substream,
-        //                                     hinfo);
-        //if (!err) {
-        //        spec->active_streams |= 1 << STREAM_MULTI_OUT;
-        //        call_pcm_playback_hook(hinfo, codec, substream,
-        //                               HDA_GEN_PCM_ACT_OPEN);
-        //}
-        //mutex_unlock(&gen_spec->pcm_mutex);
-	return 0;
-}
-
-static const struct hda_pcm_stream cs8409_pcm_analog_playback = {
-        .substreams = 1,
-        .channels_min = 2,
-        .channels_max = 4,
-        .rates = SNDRV_PCM_RATE_44100,
-        .formats = SNDRV_PCM_FMTBIT_S24_LE|SNDRV_PCM_FMTBIT_S32_LE,
-        .maxbps = 32,
-        .ops = {
-                .open = cs_8409_playback_pcm_open,
-                .prepare = cs_8409_playback_pcm_prepare,
-                .cleanup = cs_8409_playback_pcm_cleanup,
-        },
-};
-
-
-// suspend/resume is a very complicated call stack
-// the prime structure is dev_pm_ops which is stored in the driver struct
-// drv->core.driver.pm = &hda_codec_driver_pm (I cant figure out where to get this from at the moment)
-// hda_codec_runtime_suspend and hda_codec_runtime_resume are the primary calls
-// these functions call hda_call_codec_suspend and hda_call_codec_resume respectively
-// among others - these seem to be the functions which will perform HDA functions
-// hda_call_codec_suspend or hda_call_codec_resume will call patch ops override functions
-// .suspend or .resume if defined - BUT they do set the power state independently
-// whats interesting is that hda_call_codec_resume will call the .init function
-// if the .resume function is not defined - this may be the issue
-
-
-static int cs_8409_codec_suspend(struct device *dev)
-{
-        struct hda_codec *codec = dev_to_hda_codec(dev);
-        struct hda_pcm *pcm;
-        unsigned int state;
-
-        codec_dbg(codec, "cs_8409_codec_suspend enter\n");
-
-	// code from hda_codec_runtime_suspend(struct device *dev)
-
-        //cancel_delayed_work_sync(&codec->jackpoll_work);
-        //list_for_each_entry(pcm, &codec->pcm_list_head, list)
-        //        snd_pcm_suspend_all(pcm->pcm);
-        //state = hda_call_codec_suspend(codec);
-        //if (codec->link_down_at_suspend ||
-        //    (codec_has_clkstop(codec) && codec_has_epss(codec) &&
-        //     (state & AC_PWRST_CLK_STOP_OK)))
-        //        snd_hdac_codec_link_down(&codec->core);
-        //snd_hdac_link_power(&codec->core, false);
-
-
-	// code from hda_call_codec_suspend(struct hda_codec *codec)
-
-        //unsigned int state;
-
-        //atomic_inc(&codec->core.in_pm);
-
-        //if (codec->patch_ops.suspend)
-        //        codec->patch_ops.suspend(codec);
-        //hda_cleanup_all_streams(codec);
-        //state = hda_set_power_state(codec, AC_PWRST_D3);
-        //update_power_acct(codec, true);
-        //atomic_dec(&codec->core.in_pm);
-        //return state;
-
-
-        codec_dbg(codec, "cs_8409_codec_suspend exit\n");
-
-        return 0;
-}
-
-static int cs_8409_runtime_resume(struct device *dev)
-{
-        struct hda_codec *codec = dev_to_hda_codec(dev);
-
-        codec_dbg(codec, "cs_8409_runtime_resume enter\n");
-
-	// code from hda_codec_runtime_resume(struct device *dev)
-
-        //snd_hdac_link_power(&codec->core, true);
-        //snd_hdac_codec_link_up(&codec->core);
-        //hda_call_codec_resume(codec);
-        //pm_runtime_mark_last_busy(dev);
-
-	// code from hda_call_codec_resume(struct hda_codec *codec)
-
-        //atomic_inc(&codec->core.in_pm);
-
-        //if (codec->core.regmap)
-        //        regcache_mark_dirty(codec->core.regmap);
-
-        //codec->power_jiffies = jiffies;
-
-        //hda_set_power_state(codec, AC_PWRST_D0);
-        //restore_shutup_pins(codec);
-        //hda_exec_init_verbs(codec);
-        //snd_hda_jack_set_dirty_all(codec);
-        //if (codec->patch_ops.resume)
-        //        codec->patch_ops.resume(codec);
-        //else {
-        //        if (codec->patch_ops.init)
-        //                codec->patch_ops.init(codec);
-        //        if (codec->core.regmap)
-        //                regcache_sync(codec->core.regmap);
-        //}
-
-        //if (codec->jackpoll_interval)
-        //        hda_jackpoll_work(&codec->jackpoll_work.work);
-        //else
-        //        snd_hda_jack_report_sync(codec);
-        //atomic_dec(&codec->core.in_pm);
-
-
-        codec_dbg(codec, "cs_8409_runtime_resume exit\n");
-        return 0;
-}
-
-
-static void cs_8409_fill_pcm_stream_name(char *str, size_t len, const char *sfx,
-                                         const char *chip_name)
-{
-        char *p;
-
-        if (*str)
-                return;
-        strlcpy(str, chip_name, len);
-
-        /* drop non-alnum chars after a space */
-        for (p = strchr(str, ' '); p; p = strchr(p + 1, ' ')) {
-                if (!isalnum(p[1])) {
-                        *p = 0;
-                        break;
-                }
-        }
-        strlcat(str, sfx, len);
-}
-
-int cs_8409_build_pcms_explicit(struct hda_codec *codec)
-{
-	int retval;
-
-        struct cs_spec *spec = codec->spec;
-        struct hda_gen_spec *gen_spec = &(spec->gen);
-
-	struct hda_pcm *info;
-
-        printk("snd_hda_intel: cs_8409_build_pcms_explicit");
-
-	//retval =  snd_hda_gen_build_pcms(codec);
-
-        cs_8409_fill_pcm_stream_name(gen_spec->stream_name_analog,
-                                     sizeof(gen_spec->stream_name_analog),
-                                     " Analog", codec->core.chip_name);
-        info = snd_hda_codec_pcm_new(codec, "%s", gen_spec->stream_name_analog);
-        if (!info)
-                return -ENOMEM;
-        gen_spec->pcm_rec[0] = info;
-
-        info->stream[SNDRV_PCM_STREAM_PLAYBACK] = cs8409_pcm_analog_playback;
-        info->stream[SNDRV_PCM_STREAM_PLAYBACK].nid = 0x02;
-        info->stream[SNDRV_PCM_STREAM_PLAYBACK].channels_max = 4;
-
-	info->pcm_type = HDA_PCM_TYPE_AUDIO;
-
-	retval = 0;
-
-        printk("snd_hda_intel: end cs_8409_build_pcms_explicit");
-	return retval;
-}
-
-// real def is CONFIG_PM
-static const struct hda_codec_ops cs_8409_patch_ops_explicit = {
-	.build_controls = cs_8409_build_controls_explicit,
-	.build_pcms = cs_8409_build_pcms_explicit,
-	.init = cs_8409_init_explicit,
-	.free = cs_8409_free_explicit,
-	.unsol_event = cs_8409_jack_unsol_event,
-#ifdef UNDEF_CONFIG_PM
-	.suspend = cs_8409_suspend,
-	.resume = cs_8409_resume,
-#endif
-};
-
 
 // note this must come after any function definitions used
 
@@ -1639,7 +1486,7 @@ static int cs_8409_parse_auto_config(struct hda_codec *codec)
 	int err;
 	int i;
 
-        printk("snd_hda_intel: cs_8409_parse_auto_config");
+        printk("snd_hda_intel: cs_8409_parse_auto_config\n");
 
 	err = snd_hda_parse_pin_defcfg(codec, &spec->gen.autocfg, NULL, 0);
 	if (err < 0)
@@ -1663,7 +1510,7 @@ static int cs_8409_parse_auto_config(struct hda_codec *codec)
 		}
 	}
 
-        printk("snd_hda_intel: end cs_8409_parse_auto_config");
+        printk("snd_hda_intel: end cs_8409_parse_auto_config\n");
 
 	return 0;
 }
@@ -1672,7 +1519,7 @@ static int cs_8409_parse_auto_config(struct hda_codec *codec)
 static void cs_8409_fixup_gpio(struct hda_codec *codec,
                                const struct hda_fixup *fix, int action)
 {
-       printk("snd_hda_intel: cs_8409_fixup_gpio");
+       printk("snd_hda_intel: cs_8409_fixup_gpio\n");
 
        // allowable states
        // HDA_FIXUP_ACT_PRE_PROBE,
@@ -1684,11 +1531,11 @@ static void cs_8409_fixup_gpio(struct hda_codec *codec,
        // so inspection suggests no eapd usage on macs - no 0xf0c or 0x70c commands sent
 
        if (action == HDA_FIXUP_ACT_PRE_PROBE) {
-               struct cs_spec *spec = codec->spec;
+               //struct cs_spec *spec = codec->spec;
 
-               printk("snd_hda_intel: cs_8409_fixup_gpio pre probe");
+               printk("snd_hda_intel: cs_8409_fixup_gpio pre probe\n");
 
-               //printk("fixup gpio hp=0x%x speaker=0x%x", hp_out_mask, speaker_out_mask);
+               //printk("fixup gpio hp=0x%x speaker=0x%x\n", hp_out_mask, speaker_out_mask);
                //spec->gpio_eapd_hp = hp_out_mask;
                //spec->gpio_eapd_speaker = speaker_out_mask;
                //spec->gpio_mask = 0xff;
@@ -1697,18 +1544,18 @@ static void cs_8409_fixup_gpio(struct hda_codec *codec,
                //  spec->gpio_eapd_hp | spec->gpio_eapd_speaker;
        }
        else if (action == HDA_FIXUP_ACT_PROBE) {
-               printk("snd_hda_intel: cs_8409_fixup_gpio probe");
+               printk("snd_hda_intel: cs_8409_fixup_gpio probe\n");
        }
        else if (action == HDA_FIXUP_ACT_INIT) {
-               printk("snd_hda_intel: cs_8409_fixup_gpio init");
+               printk("snd_hda_intel: cs_8409_fixup_gpio init\n");
        }
        else if (action == HDA_FIXUP_ACT_BUILD) {
-               printk("snd_hda_intel: cs_8409_fixup_gpio build");
+               printk("snd_hda_intel: cs_8409_fixup_gpio build\n");
        }
        else if (action == HDA_FIXUP_ACT_FREE) {
-               printk("snd_hda_intel: cs_8409_fixup_gpio free");
+               printk("snd_hda_intel: cs_8409_fixup_gpio free\n");
        }
-       printk("snd_hda_intel: end cs_8409_fixup_gpio");
+       printk("snd_hda_intel: end cs_8409_fixup_gpio\n");
 }
 
 static const struct hda_model_fixup cs8409_models[] = {
@@ -1754,23 +1601,27 @@ static const struct hda_fixup cs8409_fixups[] = {
        },
 };
 
-static int cs_8409_explicit_config(struct hda_codec *codec);
 
-void cs_8409_playback_pcm_hook(struct hda_pcm_stream *hinfo,
-                               struct hda_codec *codec,
-                               struct snd_pcm_substream *substream,
-                               int action);
+static int cs_8409_boot_setup(struct hda_codec *codec);
+
+static void cs_8409_playback_pcm_hook(struct hda_pcm_stream *hinfo,
+                                      struct hda_codec *codec,
+                                      struct snd_pcm_substream *substream,
+                                      int action);
 
 
 static int patch_cs8409(struct hda_codec *codec)
 {
        struct cs_spec *spec;
        int err;
-       hda_nid_t *dac_nids_ptr = NULL;
+       //hda_nid_t *dac_nids_ptr = NULL;
 
        int explicit = 0;
 
-       printk("snd_hda_intel: Patching for CS8409 explicit %d", explicit);
+       //struct hda_pcm *info = NULL;
+       //struct hda_pcm_stream *hinfo = NULL;
+
+       printk("snd_hda_intel: Patching for CS8409 explicit %d\n", explicit);
        dev_info(hda_codec_dev(codec), "Patching for CS8409 %d\n", explicit);
 
        //dump_stack();
@@ -1781,8 +1632,12 @@ static int patch_cs8409(struct hda_codec *codec)
 
        spec->beep_nid = CS8409_BEEP_NID;
 
+       spec->use_data = 0;
+
        if (explicit)
-              codec->patch_ops = cs_8409_patch_ops_explicit;
+	      {
+              //codec->patch_ops = cs_8409_patch_ops_explicit;
+	      }
        else
               codec->patch_ops = cs_8409_patch_ops;
 
@@ -1794,10 +1649,10 @@ static int patch_cs8409(struct hda_codec *codec)
        // note that if the pinconfigs lists are empty the pin config fixup
        // is effectively ignored
 
-       //printk("cs8409 - 1");
+       //printk("cs8409 - 1\n");
        //snd_hda_pick_fixup(codec, cs8409_models, cs8409_fixup_tbl,
        //                   cs8409_fixups);
-       //printk("cs8409 - 2");
+       //printk("cs8409 - 2\n");
        //snd_hda_apply_fixup(codec, HDA_FIXUP_ACT_PRE_PROBE);
 
        //      cs8409_pinmux_init(codec);
@@ -1883,9 +1738,19 @@ static int patch_cs8409(struct hda_codec *codec)
 
        // dump the rates/format of the afg node
        // still havent figured out how the user space gets the allowed formats
-       //codec_dbg(codec, "patch_cs8409 nid 0x%02x rates 0x%08x formats 0x%016llx\n",hinfo->nid,hinfo->rates,hinfo->formats);
-
-
+       // ah - may have figured this
+       // except that at this point this is NULL - we need to be after build pcms
+       //info = spec->gen.pcm_rec[0];
+       //if (info != NULL)
+       //{
+       //       hinfo = &(info->stream[SNDRV_PCM_STREAM_PLAYBACK]);
+       //       if (hinfo != NULL)
+       //              codec_dbg(codec, "playback info stream nid 0x%02x rates 0x%08x formats 0x%016llx\n",hinfo->nid,hinfo->rates,hinfo->formats);
+       //       else
+       //              codec_dbg(codec, "playback info stream NULL\n");
+       //}
+       //else
+       //	       codec_dbg(codec, "playback info NULL\n");
 
 
        // try removing the unused nodes
@@ -1916,20 +1781,18 @@ static int patch_cs8409(struct hda_codec *codec)
        //spec->gen.multiout.dac_nids[0] = 0x03;
        //spec->gen.multiout.dac_nids[1] = 0x00;
 
-       printk("snd_hda_intel: pre cs_8409_explicit_config\n");
-
-       err = cs_8409_explicit_config(codec);
+       err = cs_8409_boot_setup(codec);
        if (err < 0)
-               goto error;
+	       goto error;
 
        spec->play_init = 0;
 
        // init the last play time
        getnstimeofday(&(spec->last_play_time));
 
-       printk("snd_hda_intel: cs_8409_init post cs_8409_explicit_config\n");
+       getnstimeofday(&(spec->first_play_time));
 
-       printk("snd_hda_intel: Post Patching for CS8409");
+       //printk("snd_hda_intel: Post Patching for CS8409\n");
        //dev_info(codec->dev, "Post Patching for CS8409\n");
 
        return 0;
@@ -1942,6 +1805,63 @@ static int patch_cs8409(struct hda_codec *codec)
 // for the moment split the new code into an include file
 
 #include "patch_cirrus_new84.h"
+
+
+// new function to use "vendor" defined commands to run
+// a specific code
+// has to be here to use functions defined in patch_cirrus_new84.h
+
+static unsigned int
+cs_8409_extended_codec_verb(struct hda_codec *codec, hda_nid_t nid,
+                                int flags,
+                                unsigned int verb, unsigned int parm)
+{
+	//static inline unsigned int cs_8409_vendor_i2cRead(struct hda_codec *codec, unsigned int i2c_address,
+        //                                    unsigned int i2c_reg, unsigned int paged)
+	unsigned int retval1 = 0;
+	unsigned int retval2 = 0;
+	unsigned int retval3 = 0;
+	unsigned int retval4 = 0;
+	unsigned int retval = 0;
+
+        printk("snd_hda_intel: cs_8409_extended_codec_verb nid 0x%02x flags 0x%x verb 0x%03x parm 0x%04x\n", nid, flags, verb, parm);
+
+	if ((verb & 0x0ff8) == 0xf78)
+	{
+		retval1 = cs_8409_vendor_i2cWrite(codec, 0x64, 0x2d, parm, 0);
+		retval2 = cs_8409_vendor_i2cWrite(codec, 0x62, 0x2d, parm, 0);
+		retval3 = cs_8409_vendor_i2cWrite(codec, 0x74, 0x2d, parm, 0);
+		retval4 = cs_8409_vendor_i2cWrite(codec, 0x72, 0x2d, parm, 0);
+
+		printk("snd_hda_intel: cs_8409_extended_codec_verb wr ret 1 0x%x\n",retval1);
+		printk("snd_hda_intel: cs_8409_extended_codec_verb wr ret 2 0x%x\n",retval2);
+		printk("snd_hda_intel: cs_8409_extended_codec_verb wr ret 3 0x%x\n",retval3);
+		printk("snd_hda_intel: cs_8409_extended_codec_verb wr ret 4 0x%x\n",retval4);
+	}
+	else if ((verb & 0x0ff8) == 0xff8)
+	{
+		retval1 = cs_8409_vendor_i2cRead(codec, 0x64, 0x2d, 0);
+		retval2 = cs_8409_vendor_i2cRead(codec, 0x62, 0x2d, 0);
+		retval3 = cs_8409_vendor_i2cRead(codec, 0x74, 0x2d, 0);
+		retval4 = cs_8409_vendor_i2cRead(codec, 0x72, 0x2d, 0);
+
+		printk("snd_hda_intel: cs_8409_extended_codec_verb rd ret 1 0x%x\n",retval1);
+		printk("snd_hda_intel: cs_8409_extended_codec_verb rd ret 2 0x%x\n",retval2);
+		printk("snd_hda_intel: cs_8409_extended_codec_verb rd ret 3 0x%x\n",retval3);
+		printk("snd_hda_intel: cs_8409_extended_codec_verb rd ret 4 0x%x\n",retval4);
+	}
+
+
+	retval = retval1;
+
+	return retval;
+}
+
+static void cs_8409_set_extended_codec_verb(void)
+{
+	snd_hda_set_extended_codec_verb(cs_8409_extended_codec_verb);
+}
+
 
 /*
  * patch entries

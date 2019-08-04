@@ -5,7 +5,7 @@
 //hda_set_power_state(codec, AC_PWRST_D0);
 
 // this checks the node has reached the requested power state
-//state = hda_sync_power_state(codec, fg, power_state);
+//state = hda_sync_power_state(codec, nid, power_state);
 //
 
 
@@ -15,7 +15,7 @@
  * wait until the state is reached, returns the current state
  */
 static unsigned int hda_sync_power_state_8409(struct hda_codec *codec,
-                                         hda_nid_t fg,
+                                         hda_nid_t nid,
                                          unsigned int power_state)
 {
         unsigned long end_time = jiffies + msecs_to_jiffies(500);
@@ -23,7 +23,7 @@ static unsigned int hda_sync_power_state_8409(struct hda_codec *codec,
 	dev_info(hda_codec_dev(codec), "hda_sync_power_state_8409 to 0x%04x\n",power_state);
 
         for (;;) {
-                state = snd_hda_codec_read(codec, fg, 0,
+                state = snd_hda_codec_read(codec, nid, 0,
                                            AC_VERB_GET_POWER_STATE, 0);
                 if (state & AC_PWRST_ERROR)
                         break;
@@ -48,8 +48,8 @@ static unsigned int hda_set_node_power_state(struct hda_codec *codec, hda_nid_t 
 {
         unsigned int wcaps = get_wcaps(codec, nid);
         unsigned int state = power_state;
-	unsigned int current_state;
-	dev_info(hda_codec_dev(codec), "hda_set_node_power_state     power %d\n",power_state);
+	//unsigned int current_state;
+	dev_info(hda_codec_dev(codec), "hda_set_node_power_state  nid 0x%02x power %d\n",nid,power_state);
         state = snd_hda_codec_read(codec, nid, 0, AC_VERB_GET_POWER_STATE, 0);
         if (!(state & AC_PWRST_ERROR)) {
 	        if (state != power_state) {
@@ -84,7 +84,7 @@ static unsigned int hda_set_node_power_state(struct hda_codec *codec, hda_nid_t 
 static unsigned int hda_set_node_power_state_simple(struct hda_codec *codec, hda_nid_t nid, unsigned int power_state)
 {
         unsigned int state = power_state;
-	unsigned int current_state;
+	//unsigned int current_state;
 	dev_info(hda_codec_dev(codec), "hda_set_node_power_state_simple     power %d\n",power_state);
         state = snd_hda_codec_read(codec, nid, 0, AC_VERB_GET_POWER_STATE, 0);
         if (!(state & AC_PWRST_ERROR)) {
@@ -96,6 +96,14 @@ static unsigned int hda_set_node_power_state_simple(struct hda_codec *codec, hda
 	dev_info(hda_codec_dev(codec), "hda_set_node_power_state_simple end power %d\n",state);
 
         return state;
+}
+
+
+static void hda_check_power_state(struct hda_codec *codec, hda_nid_t nid, int flagint)
+{
+        unsigned int state;
+        state = snd_hda_codec_read(codec, nid, 0, AC_VERB_GET_POWER_STATE, 0);
+	dev_info(hda_codec_dev(codec), "hda_check_power_state power 0x%04x %d\n",state, flagint);
 }
 
 
@@ -137,7 +145,7 @@ static inline unsigned int cs_8409_vendor_coef_set_mask(struct hda_codec *codec,
 {
         struct cs_spec *spec = codec->spec;
         unsigned int retval;
-        unsigned int mask_coef;
+        //unsigned int mask_coef;
         snd_hda_codec_read(codec, spec->vendor_nid, 0,
                             AC_VERB_GET_COEF_INDEX, 0);
         snd_hda_codec_write(codec, spec->vendor_nid, 0,
@@ -186,7 +194,7 @@ static inline void cs_8409_vendor_enableI2Cclock(struct hda_codec *codec, unsign
 
 // define i2cRead and i2cWrite functions
 // following Apple
-static inline unsigned int cs_8409_vendor_i2cRead(struct hda_codec *codec, unsigned int i2c_address,
+static unsigned int cs_8409_vendor_i2cRead(struct hda_codec *codec, unsigned int i2c_address,
                                             unsigned int i2c_reg, unsigned int paged)
 {
 	// AppleHDAFunctionGroupCS8409::_i2cRead(bool, unsigned short, unsigned short, unsigned int*)
@@ -195,7 +203,9 @@ static inline unsigned int cs_8409_vendor_i2cRead(struct hda_codec *codec, unsig
 	unsigned int retval;
 	int rdcnt;
 
-	hda_set_node_power_state(codec, CS8409_VENDOR_NID, AC_PWRST_D0);
+        printk("snd_hda_intel: i2cRead 0x%04x 0x%04x: %d",i2c_address,i2c_reg,paged);
+
+	hda_set_node_power_state(codec, codec->core.afg, AC_PWRST_D0);
 	// exit on error
 
 	snd_hda_codec_write(codec, CS8409_VENDOR_NID, 0, AC_VERB_SET_PROC_STATE, 0x00000001);
@@ -275,14 +285,16 @@ sleep2:
 	cs_8409_vendor_enableI2Cclock(codec, 0x0);
 	// exit on error
 
-	hda_set_node_power_state(codec, CS8409_VENDOR_NID, AC_PWRST_D3);
+        printk("snd_hda_intel: i2cRead 0x%04x 0x%04x:  0x%04x end",i2c_address,i2c_reg,retval);
+
+	//hda_set_node_power_state(codec, codec->core.afg, AC_PWRST_D3);
 	// exit on error
 
 	return retval;
 
 }
 
-static inline void cs_8409_vendor_i2cWrite(struct hda_codec *codec, unsigned int i2c_address,
+static unsigned int cs_8409_vendor_i2cWrite(struct hda_codec *codec, unsigned int i2c_address,
                                       unsigned int i2c_reg, unsigned int i2c_data, unsigned int paged)
 {
 	// AppleHDAFunctionGroupCS8409::_i2cWrite(bool, unsigned short, unsigned short, unsigned short)
@@ -290,7 +302,9 @@ static inline void cs_8409_vendor_i2cWrite(struct hda_codec *codec, unsigned int
 	unsigned int i2c_reg_data;
 	int rdcnt;
 
-	hda_set_node_power_state(codec, CS8409_VENDOR_NID, AC_PWRST_D0);
+        printk("snd_hda_intel: i2cWrite 0x%04x 0x%04x: 0x%04x %d",i2c_address,i2c_reg,i2c_data,paged);
+
+	hda_set_node_power_state(codec, codec->core.afg, AC_PWRST_D0);
 	// exit on error
 
 	snd_hda_codec_write(codec, CS8409_VENDOR_NID, 0, AC_VERB_SET_PROC_STATE, 0x00000001);
@@ -366,9 +380,12 @@ sleep2:
 	cs_8409_vendor_enableI2Cclock(codec, 0x0);
 	// exit on error
 
-	hda_set_node_power_state(codec, CS8409_VENDOR_NID, AC_PWRST_D3);
+        printk("snd_hda_intel: i2cWrite 0x%04x 0x%04x: 0x%04x %d end",i2c_address,i2c_reg,i2c_data,paged);
+
+	//hda_set_node_power_state(codec, codec->core.afg, AC_PWRST_D3);
 	// exit on error
 
+	return retval;
 }
 
 
@@ -495,135 +512,232 @@ static void read_coefs_all_loop(struct hda_codec *codec)
 	dev_info(hda_codec_dev(codec), "end   read_coefs_all\n");
 }
 
+// this is very hacky but until get more understanding of what we can do with the 8409 setup
+// re-define these from hda_codec.c here
+// NOTA BENE - need to check this is consistent with any hda_codec.c updates!!
+
+/*
+ * audio-converter setup caches
+ */
+struct hda_cvt_setup {
+        hda_nid_t nid;
+        u8 stream_tag;
+        u8 channel_id;
+        u16 format_id;
+        unsigned char active;   /* cvt is currently used */
+        unsigned char dirty;    /* setups should be cleared */
+};
+
+
+/* get or create a cache entry for the given audio converter NID */
+static struct hda_cvt_setup *
+get_hda_cvt_setup_8409(struct hda_codec *codec, hda_nid_t nid)
+{
+        struct hda_cvt_setup *p;
+        int i;
+
+        for (i = 0; i < codec->cvt_setups.used; i++) {
+                p = snd_array_elem(&codec->cvt_setups, i);
+                if (p->nid == nid)
+                        return p;
+        }
+        p = snd_array_new(&codec->cvt_setups);
+        if (p)
+                p->nid = nid;
+        return p;
+}
+
 
 #include "patch_cirrus_data84.h"
 
+#include "patch_cirrus_mb141_data84.h"
 
-void cs_8409_playback_pcm_hook(struct hda_pcm_stream *hinfo, struct hda_codec *codec, struct snd_pcm_substream *substream, int action)
+#include "patch_cirrus_real84.h"
+
+
+// macbook pro subsystem ids
+// 14,1 0x106b3300
+// 14,3 0x106b3900
+
+static int cs_8409_data_config(struct hda_codec *codec);
+static int cs_8409_real_config(struct hda_codec *codec);
+
+static int cs_8409_boot_setup(struct hda_codec *codec)
+{
+	int err = 0;
+        struct cs_spec *spec = codec->spec;
+
+        // so it appears we break up the subsystem_id into 2 parts
+        // a codec vendor id (16 bits) and a subvendor id (8 bits) plus an assembly id
+        // so here the codec vendor is 0x106b, the subvendor id is 0x39 and the assembly id is 0x00
+        if (codec->core.subsystem_id == 0x106b3900) {
+                if (spec->use_data) {
+                        printk("snd_hda_intel: pre cs_8409_data_config\n");
+
+                        err = cs_8409_data_config(codec);
+
+                        printk("snd_hda_intel: cs_8409_init post cs_8409_data_config\n");
+                } else {
+                        printk("snd_hda_intel: pre cs_8409_real_config\n");
+
+                        err = cs_8409_real_config(codec);
+
+                        printk("snd_hda_intel: cs_8409_init post cs_8409_real_config\n");
+                }
+	}
+        else if (codec->core.subsystem_id == 0x106b3300) {
+                setup_node_alpha_ssm3(codec);
+        }
+        else {
+                printk("snd_hda_intel: UNKNOWN subsystem id 0x%08x",codec->core.subsystem_id);
+                err = -1;
+        }
+
+	return err;
+}
+
+static void cs_8409_play_data(struct hda_codec *codec);
+static void cs_8409_play_real(struct hda_codec *codec);
+
+void cs_8409_play_setup(struct hda_codec *codec)
+{
+        struct cs_spec *spec = codec->spec;
+        if (codec->core.subsystem_id == 0x106b3900) {
+		if (spec->use_data) {
+                        //cs_8409_unmute_data(codec);
+                        //cs_8409_volup_data(codec);
+                        cs_8409_play_data(codec);
+		} else {
+		        cs_8409_play_real(codec);
+                }
+	}
+	else if (codec->core.subsystem_id == 0x106b3300) {
+		cs_8409_play_ssm3(codec);
+	}
+	else {
+                printk("snd_hda_intel: UNKNOWN subsystem id 0x%08x",codec->core.subsystem_id);
+	}
+}
+
+static void cs_8409_playstop_data(struct hda_codec *codec);
+static void cs_8409_playstop_real(struct hda_codec *codec);
+
+void cs_8409_play_cleanup(struct hda_codec *codec)
+{
+        struct cs_spec *spec = codec->spec;
+        if (codec->core.subsystem_id == 0x106b3900) {
+		if (spec->use_data) {
+                       cs_8409_playstop_data(codec);
+		} else {
+                       cs_8409_playstop_real(codec);
+                }
+	}
+	else if (codec->core.subsystem_id == 0x106b3300) {
+	}
+	else {
+                printk("snd_hda_intel: UNKNOWN subsystem id 0x%08x",codec->core.subsystem_id);
+	}
+
+}
+
+static void cs_8409_pcm_playback_pre_prepare_hook(struct hda_pcm_stream *hinfo, struct hda_codec *codec, struct snd_pcm_substream *substream,
+                               int action)
+{
+	struct cs_spec *spec = codec->spec;
+
+	if (action == HDA_GEN_PCM_ACT_PREPARE) {
+		struct timespec curtim;
+		getnstimeofday(&curtim);
+		printk("snd_hda_intel: command nid cs_8409_pcm_playback_pre_prepare_hook BAD HOOK PREPARE init %d last %ld cur %ld",spec->play_init,spec->last_play_time.tv_sec,curtim.tv_sec);
+		//if (!spec->play_init) {
+		if (1) {
+			//int power_chk = 0;
+			struct timespec curtim;
+			getnstimeofday(&curtim);
+			spec->first_play_time.tv_sec = curtim.tv_sec;
+			cs_8409_play_setup(codec);
+			printk("snd_hda_intel: command nid cs_8409_playback_pcm_hook BAD setup play called");
+			spec->play_init = 1;
+			spec->playing = 0;
+		}
+	}
+}
+
+
+static void cs_8409_playback_pcm_hook(struct hda_pcm_stream *hinfo, struct hda_codec *codec, struct snd_pcm_substream *substream, int action)
 {
 
 	struct cs_spec *spec = codec->spec;
 
+	// so finally getting a handle on ordering here
+	// we need to do the OSX setup in the OPEN section
+	// as the generic hda format and stream setup is done BEFORE the PREPARE hook
+	// (theres a good chance we only need to do this once at least as long as machine doesnt sleep)
+	// (or we could just override the prepare function completely)
+	// I now think the noise was caused by mis-match between the stream format and the nid setup format
+	// (because the generic setup was done before the OSX setup and the actual streamed format is slightly different)
+	// (the hda documentation says these really need to match)
+	// It appears the 8409 setup can handle at least some differences in the stream format
+	// certainly seems to handle S24_LE or S32_LE differences
+
 
 	if (action == HDA_GEN_PCM_ACT_OPEN) {
+		//struct hda_cvt_setup *p = NULL;
 		printk("snd_hda_intel: command nid cs_8409_playback_pcm_hook open");
-		printk("snd_hda_intel: command nid end cs_8409_playback_pcm_hook");
+
+		printk("snd_hda_intel: command nid cs_8409_playback_pcm_hook open end");
 	} else if (action == HDA_GEN_PCM_ACT_PREPARE) {
 		struct timespec curtim;
 		getnstimeofday(&curtim);
-		printk("snd_hda_intel: command nid cs_8409_playback_pcm_hook prepare init %d last %ld cur %ld",spec->play_init,spec->last_play_time.tv_sec,curtim.tv_sec);
-		// not clear if need to redo the setup eg if amps power themselves down or something - so far maybe not
-		// and if do redo setup the sound transforms to noise in a few seconds for 2nd play
-		// OSX does do this setup just before play when do first play - have not logged multiple plays
-		// could be the unmute section causing the problem - not tested
-		//if (!spec->play_init || curtim.tv_sec > (spec->last_play_time.tv_sec + 3600))
-		if (!spec->play_init)
-		{
-			cs_8409_unmute(codec);
-			//cs_8409_volup(codec);
-			cs_8409_play(codec);
+		printk("snd_hda_intel: command nid cs_8409_playback_pcm_hook BAD HOOK PREPARE init %d last %ld cur %ld",spec->play_init,spec->last_play_time.tv_sec,curtim.tv_sec);
+		//if (spec->play_init && curtim.tv_sec > (spec->first_play_time.tv_sec + 0))
+		//if (spec->play_init) {
+		if (1) {
+			int power_chk = 0;
+        		power_chk = snd_hda_codec_read(codec, codec->core.afg, 0, AC_VERB_GET_POWER_STATE, 0);
+			printk("snd_hda_intel: command nid cs_8409_playback_pcm_hook BAD power check 0x01 2 %d", power_chk);
 			spec->last_play_time.tv_sec = curtim.tv_sec;
-			spec->play_init = 1;
+			spec->playing = 1;
 		}
 
-		// this is only input defined - see if turning off removes feedback
-		printk("snd_hda_intel: command nid cs_8409_playback_pcm_hook clear nid 0x44");
-		snd_hda_codec_write(codec, 0x44, 0, AC_VERB_SET_PIN_WIDGET_CONTROL, 0x00000000);
-
-		printk("snd_hda_intel: command nid end cs_8409_playback_pcm_hook");
+		printk("snd_hda_intel: command nid cs_8409_playback_pcm_hook BAD HOOK PREPARE end");
+	} else if (action == HDA_GEN_PCM_ACT_CLEANUP) {
+		int power_chk = 0;
+		printk("snd_hda_intel: command nid cs_8409_playback_pcm_hook BAD HOOK CLEANUP");
+        	power_chk = snd_hda_codec_read(codec, codec->core.afg, 0, AC_VERB_GET_POWER_STATE, 0);
+		printk("snd_hda_intel: command nid cs_8409_playback_pcm_hook BAD power check 0x01 3 %d", power_chk);
+		//if (spec->playing) {
+			cs_8409_play_cleanup(codec);
+			printk("snd_hda_intel: command nid cs_8409_playback_pcm_hook BAD done play down");
+			spec->playing = 0;
+		//}
+		//cs_8409_play_cleanup(codec);
+        	power_chk = snd_hda_codec_read(codec, codec->core.afg, 0, AC_VERB_GET_POWER_STATE, 0);
+		printk("snd_hda_intel: command nid cs_8409_playback_pcm_hook BAD power check 0x01 4 %d", power_chk);
+		printk("snd_hda_intel: command nid cs_8409_playback_pcm_hook BAD HOOK CLEANUP end");
+	} else if (action == HDA_GEN_PCM_ACT_CLOSE) {
+		printk("snd_hda_intel: command nid cs_8409_playback_pcm_hook close");
+		printk("snd_hda_intel: command nid cs_8409_playback_pcm_hook close end");
 	}
 
 }
 
 
-static int cs_8409_explicit_config_nouse(struct hda_codec *codec)
-{
-	struct cs_spec *spec = codec->spec;
-	hda_nid_t beep_nid = spec->beep_nid;
-
-	unsigned int tmpstate1 = -1;
-	unsigned int tmpstate2 = -1;
-	unsigned int tmpstate3 = -1;
-	unsigned int tmpstate4 = -1;
-
-	printk("snd_hda_intel: cs8409_explicit_config");
-
-	hda_set_node_power_state(codec, codec->core.afg, AC_PWRST_D0);
-
-	snd_hda_double_reset(codec);
-
-	hda_set_node_power_state(codec, codec->core.afg, AC_PWRST_D0);
-
-	// so apple reads parameters from all nodes
-	// but setting pin nodes SET_PIN_WIDGET_CONTROL to 0
-
-	clear_pins(codec);
-
-	dev_info(hda_codec_dev(codec),"snd_hda_intel: beep nid 0x%02x",beep_nid);
-
-	//if (beep_nid == 0x46)
-	//	snd_hda_codec_write(codec, beep_nid, 0, AC_VERB_SET_BEEP_CONTROL, 0);
-
-	hda_set_node_power_state(codec, codec->core.afg, AC_PWRST_D0);
-
-	snd_hda_codec_write(codec, 0x46, 0, AC_VERB_SET_BEEP_CONTROL, 0);
-
-	// this sequentially reads a load of coeficients from the vendor node
-        // note that all these reads are done without a AC_VERB_SET_PROC_STATE to 1
-	read_coefs_all(codec);
-
-        //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_POWER_STATE, 0x00000000);
-
-        snd_hda_codec_write(codec, CS8409_VENDOR_NID, 0, AC_VERB_SET_PROC_STATE, 0x00000001);
-
-	// Apple now reads from nodes outside the number of nodes defined!!
-	// 0x48, 0x49, 0x4a, 0x4b
-        read_hidden_feature_widgets(codec);
-
-	// check what power state of these nodes is - Apple does not do this
-	tmpstate1 = hda_sync_power_state_8409(codec, 0x48, AC_PWRST_D0);
-	tmpstate2 = hda_sync_power_state_8409(codec, 0x49, AC_PWRST_D0);
-	tmpstate3 = hda_sync_power_state_8409(codec, 0x4a, AC_PWRST_D0);
-	tmpstate4 = hda_sync_power_state_8409(codec, 0x4b, AC_PWRST_D0);
-
-	printk("snd_hda_intel: cs8409_explicit_config power 0x48 %d 0x49 %d 0x4a %d 0x4b %d\n",tmpstate1,tmpstate2,tmpstate3,tmpstate4);
-
-
-	setup_node_alpha(codec);
-
-
-
-	printk("snd_hda_intel: end cs8409_explicit_config");
-
-	return 0;
-}
-
 // this version runs all explicit commands as logged on OSX
-static int cs_8409_explicit_config(struct hda_codec *codec)
+static int cs_8409_data_config(struct hda_codec *codec)
 {
-	struct cs_spec *spec = codec->spec;
-	hda_nid_t beep_nid = spec->beep_nid;
+	//struct cs_spec *spec = codec->spec;
+	//hda_nid_t beep_nid = spec->beep_nid;
 
 	unsigned int tmpstate1 = -1;
 	unsigned int tmpstate2 = -1;
 	unsigned int tmpstate3 = -1;
 	unsigned int tmpstate4 = -1;
 
-	printk("snd_hda_intel: cs8409_explicit_config");
+	printk("snd_hda_intel: cs8409_data_config");
 
-	setup_node_alpha_reset_and_clear(codec);
 
-	// this sequentially reads a load of coeficients from the vendor node
-        // note that all these reads are done without a AC_VERB_SET_PROC_STATE to 1
-	read_coefs_all(codec);
-
-        //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_POWER_STATE, 0x00000000);
-
-        snd_hda_codec_write(codec, CS8409_VENDOR_NID, 0, AC_VERB_SET_PROC_STATE, 0x00000001);
-
-	// Apple now reads from nodes outside the number of nodes defined!!
-	// 0x48, 0x49, 0x4a, 0x4b
-        read_hidden_feature_widgets(codec);
+	cs_8409_boot_setup_data(codec);
 
 
 	// check what power state of these nodes is - Apple does not do this
@@ -632,15 +746,43 @@ static int cs_8409_explicit_config(struct hda_codec *codec)
 	tmpstate3 = hda_sync_power_state_8409(codec, 0x4a, AC_PWRST_D0);
 	tmpstate4 = hda_sync_power_state_8409(codec, 0x4b, AC_PWRST_D0);
 
-	printk("snd_hda_intel: cs8409_explicit_config power 0x48 %d 0x49 %d 0x4a %d 0x4b %d\n",tmpstate1,tmpstate2,tmpstate3,tmpstate4);
-
-	setup_node_alpha(codec);
-
-	// this is only input defined - see if turning off removes feedback
-	snd_hda_codec_write(codec, 0x44, 0, AC_VERB_SET_PIN_WIDGET_CONTROL, 0x00000000);
+	printk("snd_hda_intel: cs8409_data_config power 0x48 %d 0x49 %d 0x4a %d 0x4b %d\n",tmpstate1,tmpstate2,tmpstate3,tmpstate4);
 
 
-	printk("snd_hda_intel: end cs8409_explicit_config");
+	printk("snd_hda_intel: cs8409_data_config end");
 
 	return 0;
 }
+
+
+// this version runs the setup using functions based on the setup using the logged data
+static int cs_8409_real_config(struct hda_codec *codec)
+{
+	//struct cs_spec *spec = codec->spec;
+	//hda_nid_t beep_nid = spec->beep_nid;
+
+	unsigned int tmpstate1 = -1;
+	unsigned int tmpstate2 = -1;
+	unsigned int tmpstate3 = -1;
+	unsigned int tmpstate4 = -1;
+
+	printk("snd_hda_intel: cs8409_real_config");
+
+
+	cs_8409_boot_setup_real(codec);
+
+
+	// check what power state of these nodes is - Apple does not do this
+	tmpstate1 = hda_sync_power_state_8409(codec, 0x48, AC_PWRST_D0);
+	tmpstate2 = hda_sync_power_state_8409(codec, 0x49, AC_PWRST_D0);
+	tmpstate3 = hda_sync_power_state_8409(codec, 0x4a, AC_PWRST_D0);
+	tmpstate4 = hda_sync_power_state_8409(codec, 0x4b, AC_PWRST_D0);
+
+	printk("snd_hda_intel: cs8409_real_config power 0x48 %d 0x49 %d 0x4a %d 0x4b %d\n",tmpstate1,tmpstate2,tmpstate3,tmpstate4);
+
+
+	printk("snd_hda_intel: cs8409_real_config end");
+
+	return 0;
+}
+

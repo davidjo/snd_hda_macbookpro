@@ -1,33 +1,20 @@
 # snd_hda_macbookpro
 
-Raw patch files for experimenting with sound on MacBookPro 14,3 running Ubuntu 18.04.
 Last kernel tested was 4.15.0-54.
 
-This gives me sound on a MacBookPro 14,3 if given sound at 44.1 kHz, 24 bit (S24_LE) 2 or 4 channel
-(which is the format set by OSX) using aplay.
-It is from a log of the hda commands sent by the OSX kernel.
-Useful info was taken from kernel bugs 110561 and 195671.
+This is a working sound system for linux on a Macbook Pro 14,3.
+The hardware device sound format is limited to 2/4 channel 44.1 kHz S24_LE S32_LE.
+Alsa handles 2 channel input by copying onto node 0x3.
+As long as use the default or plughw device volume control, other formats, frequencies work.
 
-This may work for a MacBookPro 13,2 or 13,3 given the very similar hardware.
-
-
-This is NOT a working sound system for linux - at the moment it is a simple replay
-of the hda commands.
-
-BUGS:
-This is a replay of the OSX commands - this means it does not test status returns
-- see cs_8409_vendor_i2cRead and cs_8409_vendor_i2cWrite for attempts at code to replace
-to the i2cReads, i2cWrites with correct status checks - very untested.
-
-There is no volume control - at the moment the volume is hard coded into the output amplifiers
-to be relatively quiet while testing because first tests lead to very loud distorted sound.
-(To change see amp register 0x2d setting in lines similar to
- snd_hda_coef_item(codec, 1, CS8409_VENDOR_NID, 0x005d, 0x2d6f, 0x00000000, 7145 ); // i2cWrite  coef write 
- 0x6f is low - OSX value is (loud) 0x2d01 cf. low volume 0x2d6f).
+NOTA BENE: The direct hardware device (hw:0,0) has NO volume control so will be loud!
 
 Power down/sleep completely unknown and untested.
 
 The hda auto config is force updated to just deal with speaker output, all other nodes disabled.
+
+
+Some initial coding exists for the Macbook Pro 14,1 with SSM3515 amps - not complete yet.
 
 
 Comments on what OSX seems to be doing.
@@ -48,9 +35,6 @@ which ends up as 44.1 kHz, 24 bit 4 channel audio which is output by the 8409 wi
 
 Issues:
 
-Because the format is fixed at 44.1 kHz, 24 bit 4 channel and the format is set by undocumented vendor node
+Because the format is fixed at 44.1 kHz, 24 bit (S24_3LE) 4 channel and the format is set by undocumented vendor node
 commands its not clear if other formats can be supported in the 8409 itself.
-I have little knowledge of Alsa so my assumption is at the moment it does not do software processing and only
-hardware processing can be changed which in this case is nothing.
-So the Alsa device would have to be set to this fixed format and then eg pulseaudio used to do volume processing etc.
-so far I do not know how to set this up.
+It appears now that Apples set up can take eg S24_LE format and S32_LE format.
