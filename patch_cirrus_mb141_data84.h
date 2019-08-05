@@ -2953,6 +2953,12 @@ static void putative_setup_mic2_ssm3(struct hda_codec *codec)
         //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_POWER_STATE, 0x00000003); // 0x00170503
         //hda_set_node_power_state(codec, codec->core.afg, AC_PWRST_D3);
 
+}
+
+
+static void setup_amps_reset_ssm3(struct hda_codec *codec)
+{
+
         //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_POWER_STATE, 0x00000000); // 0x00170500
         //hda_set_node_power_state(codec, codec->core.afg, AC_PWRST_D0);
 
@@ -3035,7 +3041,7 @@ static void putative_setup_mic2_ssm3(struct hda_codec *codec)
 
 }
 
-static void putative_gpio_mic3_ssm3(struct hda_codec *codec)
+static void putative_gpio_ssm3(struct hda_codec *codec)
 {
         int retval;
 
@@ -5575,7 +5581,7 @@ static void setup_mic_vol6_ssm3(struct hda_codec *codec)
 // cant decide if to have this at end or beginning
 // I think end is better - also means dont have extra forward function definitions
 
-static void setup_node_alpha_ssm3(struct hda_codec *codec)
+static void cs_8409_boot_setup_data_ssm3(struct hda_codec *codec)
 {
 
         // so now really dont know whay I skipped all this - maybe because they
@@ -5611,7 +5617,11 @@ static void setup_node_alpha_ssm3(struct hda_codec *codec)
 
         putative_setup_mic2_ssm3(codec);
 
-        putative_gpio_mic3_ssm3(codec);
+
+        setup_amps_reset_ssm3(codec);
+
+        putative_gpio_ssm3(codec);
+
 
         putative_setup_mic3_ssm3(codec);
 
@@ -5683,11 +5693,13 @@ static void setup_node_alpha_ssm3(struct hda_codec *codec)
 
         setup_mic_vol3_ssm3(codec);
 
+
         read_gpio_status1_ssm3(codec);
 
         read_gpio_status2_ssm3(codec);
 
         read_gpio_status3_ssm3(codec);
+
 
         setup_mic3_ssm3(codec);
 
@@ -5702,6 +5714,7 @@ static void setup_node_alpha_ssm3(struct hda_codec *codec)
         setup_mic_vol6_ssm3(codec);
 
 }
+
 
 static void play_start_ssm3(struct hda_codec *codec)
 {
@@ -6408,12 +6421,12 @@ static void play_sync_converters_ssm3(struct hda_codec *codec)
 }
 
 
-static void cs_8409_play_ssm3(struct hda_codec *codec)
+static void cs_8409_play_data_ssm3(struct hda_codec *codec)
 {
         //int retval1;
         //int retval2;
 
-        printk("snd_hda_intel: command nid start cs_8409_play_ssm3");
+        printk("snd_hda_intel: command nid start cs_8409_play_data_ssm3");
 
 
         play_start_ssm3(codec);
@@ -6433,9 +6446,9 @@ static void cs_8409_play_ssm3(struct hda_codec *codec)
         // dont think its power - only node 0x22 is power capable
         //retval1 = snd_hda_codec_read(codec, 0x02, 0, AC_VERB_GET_POWER_STATE, 0);
         //retval2 = snd_hda_codec_read(codec, 0x03, 0, AC_VERB_GET_POWER_STATE, 0);
-        //printk("snd_hda_intel: command nid BAD nodes 0x02 0x03 power %d %d", retval1, retval2);
+        //printk("snd_hda_intel: command nid nodes 0x02 0x03 power %d %d", retval1, retval2);
 
-        printk("snd_hda_intel: command nid cs_8409_play_ssm3 end");
+        printk("snd_hda_intel: command nid cs_8409_play_data_ssm3 end");
 
 }
 

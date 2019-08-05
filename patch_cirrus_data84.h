@@ -1967,7 +1967,7 @@ static void enable_i2c(struct hda_codec *codec)
 }
 
 
-static void enable_GPIforUR(struct hda_codec *codec)
+static void enable_GPIforUR_max(struct hda_codec *codec)
 {
         int retval;
 
@@ -2004,10 +2004,10 @@ static void enable_GPIforUR(struct hda_codec *codec)
 }
 
 
-static void external_control_GPIO_clear_2(struct hda_codec *codec);
-static void external_control_GPIO_set_2(struct hda_codec *codec);
+static void external_control_GPIO_clear_2_max(struct hda_codec *codec);
+static void external_control_GPIO_set_2_max(struct hda_codec *codec);
 
-static void external_control_GPIO(struct hda_codec *codec)
+static void external_control_GPIO_max(struct hda_codec *codec)
 {
 
         // possibly AppleHDAPathSet::initPathSetFromXML
@@ -2035,14 +2035,14 @@ static void external_control_GPIO(struct hda_codec *codec)
 
         // this clearing then setting gpio bit 2
 
-        external_control_GPIO_clear_2(codec);
+        external_control_GPIO_clear_2_max(codec);
 
-        external_control_GPIO_set_2(codec);
+        external_control_GPIO_set_2_max(codec);
 
 }
 
 
-static void external_control_GPIO_clear_2(struct hda_codec *codec)
+static void external_control_GPIO_clear_2_max(struct hda_codec *codec)
 {
 
         //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_POWER_STATE, 0x00000000); // 0x00170500
@@ -2065,7 +2065,7 @@ static void external_control_GPIO_clear_2(struct hda_codec *codec)
 
 }
 
-static void external_control_GPIO_set_2(struct hda_codec *codec)
+static void external_control_GPIO_set_2_max(struct hda_codec *codec)
 {
 
         //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_POWER_STATE, 0x00000000); // 0x00170500
@@ -2337,7 +2337,7 @@ static void putative_setup_mic(struct hda_codec *codec)
 
 }
 
-static void external_control_GPIO2_clear_2(struct hda_codec *codec)
+static void external_control_GPIO2_clear_2_max(struct hda_codec *codec)
 {
 
 
@@ -2361,7 +2361,7 @@ static void external_control_GPIO2_clear_2(struct hda_codec *codec)
 
 }
 
-static void external_control_GPIO2_set_2(struct hda_codec *codec)
+static void external_control_GPIO2_set_2_max(struct hda_codec *codec)
 {
 
         // plausibly AppleHDAFunctionGroupExternalControl_GPIO::publicSetExternalControlState(bool)
@@ -7609,15 +7609,15 @@ static void cs_8409_boot_setup_data(struct hda_codec *codec)
 
         enable_i2c(codec);
 
-        enable_GPIforUR(codec);
+        enable_GPIforUR_max(codec);
 
-        external_control_GPIO(codec);
+        external_control_GPIO_max(codec);
 
         putative_setup_mic(codec);
 
-        external_control_GPIO2_clear_2(codec);
+        external_control_GPIO2_clear_2_max(codec);
 
-        external_control_GPIO2_set_2(codec);
+        external_control_GPIO2_set_2_max(codec);
 
         putative_setup_mic2(codec);
 
@@ -12184,7 +12184,7 @@ static void cs_8409_play_data(struct hda_codec *codec)
         // dont think its power - only nodes 0x22 and 0x23 are power capable
         //retval1 = snd_hda_codec_read(codec, 0x02, 0, AC_VERB_GET_POWER_STATE, 0);
         //retval2 = snd_hda_codec_read(codec, 0x03, 0, AC_VERB_GET_POWER_STATE, 0);
-        //printk("snd_hda_intel: command nid BAD nodes 0x02 0x03 power %d %d", retval1, retval2);
+        //printk("snd_hda_intel: command nid nodes 0x02 0x03 power %d %d", retval1, retval2);
 
         printk("snd_hda_intel: command nid cs_8409_play_data end");
 

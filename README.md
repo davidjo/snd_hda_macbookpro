@@ -14,7 +14,7 @@ Power down/sleep completely unknown and untested.
 The hda auto config is force updated to just deal with speaker output, all other nodes disabled.
 
 
-Some initial coding exists for the Macbook Pro 14,1 with SSM3515 amps - not complete yet.
+Macbook Pro 14,1 with SSM3515 amps is now complete but NOT tested at all.
 
 
 Comments on what OSX seems to be doing.

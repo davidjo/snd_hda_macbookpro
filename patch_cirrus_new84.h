@@ -234,7 +234,8 @@ sleep1:
 				if (rdcnt < 0)
 				{
 					rdcnt++;
-					//sleep(0x2);
+					// need 0x2 according to Apple
+					usleep_range(2000,4000);
 					goto sleep1;
 				}
 			}
@@ -336,7 +337,8 @@ sleep1:
 				if (rdcnt < 0)
 				{
 					rdcnt++;
-					//sleep(0x2);
+					// need 0x2 according to Apple
+					usleep_range(2000,4000);
 					goto sleep1;
 				}
 			}
@@ -371,7 +373,8 @@ sleep2:
 			if (rdcnt < 0)
 			{
 				rdcnt++;
-				//sleep(0x2);
+				// need 0x2 according to Apple
+				usleep_range(2000,4000);
 				goto sleep2;
 			}
 		}
@@ -554,6 +557,8 @@ get_hda_cvt_setup_8409(struct hda_codec *codec, hda_nid_t nid)
 
 #include "patch_cirrus_real84.h"
 
+#include "patch_cirrus_mb141_real84.h"
+
 
 // macbook pro subsystem ids
 // 14,1 0x106b3300
@@ -561,6 +566,7 @@ get_hda_cvt_setup_8409(struct hda_codec *codec, hda_nid_t nid)
 
 static int cs_8409_data_config(struct hda_codec *codec);
 static int cs_8409_real_config(struct hda_codec *codec);
+
 
 static int cs_8409_boot_setup(struct hda_codec *codec)
 {
@@ -586,7 +592,10 @@ static int cs_8409_boot_setup(struct hda_codec *codec)
                 }
 	}
         else if (codec->core.subsystem_id == 0x106b3300) {
-                setup_node_alpha_ssm3(codec);
+                if (spec->use_data)
+                        cs_8409_boot_setup_data_ssm3(codec);
+                else
+                        cs_8409_boot_setup_real_ssm3(codec);
         }
         else {
                 printk("snd_hda_intel: UNKNOWN subsystem id 0x%08x",codec->core.subsystem_id);
@@ -612,7 +621,11 @@ void cs_8409_play_setup(struct hda_codec *codec)
                 }
 	}
 	else if (codec->core.subsystem_id == 0x106b3300) {
-		cs_8409_play_ssm3(codec);
+		if (spec->use_data) {
+                       cs_8409_play_data_ssm3(codec);
+		} else {
+                       cs_8409_play_real_ssm3(codec);
+		}
 	}
 	else {
                 printk("snd_hda_intel: UNKNOWN subsystem id 0x%08x",codec->core.subsystem_id);
@@ -621,6 +634,9 @@ void cs_8409_play_setup(struct hda_codec *codec)
 
 static void cs_8409_playstop_data(struct hda_codec *codec);
 static void cs_8409_playstop_real(struct hda_codec *codec);
+
+//static void cs_8409_playstop_data_ssm3(struct hda_codec *codec);
+static void cs_8409_playstop_real_ssm3(struct hda_codec *codec);
 
 void cs_8409_play_cleanup(struct hda_codec *codec)
 {
@@ -633,6 +649,11 @@ void cs_8409_play_cleanup(struct hda_codec *codec)
                 }
 	}
 	else if (codec->core.subsystem_id == 0x106b3300) {
+		if (spec->use_data) {
+                       //cs_8409_playstop_data_ssm3(codec);
+		} else {
+                       cs_8409_playstop_real_ssm3(codec);
+                }
 	}
 	else {
                 printk("snd_hda_intel: UNKNOWN subsystem id 0x%08x",codec->core.subsystem_id);
@@ -648,7 +669,7 @@ static void cs_8409_pcm_playback_pre_prepare_hook(struct hda_pcm_stream *hinfo, 
 	if (action == HDA_GEN_PCM_ACT_PREPARE) {
 		struct timespec curtim;
 		getnstimeofday(&curtim);
-		printk("snd_hda_intel: command nid cs_8409_pcm_playback_pre_prepare_hook BAD HOOK PREPARE init %d last %ld cur %ld",spec->play_init,spec->last_play_time.tv_sec,curtim.tv_sec);
+		printk("snd_hda_intel: command nid cs_8409_pcm_playback_pre_prepare_hook HOOK PREPARE init %d last %ld cur %ld",spec->play_init,spec->last_play_time.tv_sec,curtim.tv_sec);
 		//if (!spec->play_init) {
 		if (1) {
 			//int power_chk = 0;
@@ -656,7 +677,7 @@ static void cs_8409_pcm_playback_pre_prepare_hook(struct hda_pcm_stream *hinfo, 
 			getnstimeofday(&curtim);
 			spec->first_play_time.tv_sec = curtim.tv_sec;
 			cs_8409_play_setup(codec);
-			printk("snd_hda_intel: command nid cs_8409_playback_pcm_hook BAD setup play called");
+			printk("snd_hda_intel: command nid cs_8409_playback_pcm_hook setup play called");
 			spec->play_init = 1;
 			spec->playing = 0;
 		}
@@ -689,32 +710,32 @@ static void cs_8409_playback_pcm_hook(struct hda_pcm_stream *hinfo, struct hda_c
 	} else if (action == HDA_GEN_PCM_ACT_PREPARE) {
 		struct timespec curtim;
 		getnstimeofday(&curtim);
-		printk("snd_hda_intel: command nid cs_8409_playback_pcm_hook BAD HOOK PREPARE init %d last %ld cur %ld",spec->play_init,spec->last_play_time.tv_sec,curtim.tv_sec);
+		printk("snd_hda_intel: command nid cs_8409_playback_pcm_hook HOOK PREPARE init %d last %ld cur %ld",spec->play_init,spec->last_play_time.tv_sec,curtim.tv_sec);
 		//if (spec->play_init && curtim.tv_sec > (spec->first_play_time.tv_sec + 0))
 		//if (spec->play_init) {
 		if (1) {
 			int power_chk = 0;
         		power_chk = snd_hda_codec_read(codec, codec->core.afg, 0, AC_VERB_GET_POWER_STATE, 0);
-			printk("snd_hda_intel: command nid cs_8409_playback_pcm_hook BAD power check 0x01 2 %d", power_chk);
+			printk("snd_hda_intel: command nid cs_8409_playback_pcm_hook power check 0x01 2 %d", power_chk);
 			spec->last_play_time.tv_sec = curtim.tv_sec;
 			spec->playing = 1;
 		}
 
-		printk("snd_hda_intel: command nid cs_8409_playback_pcm_hook BAD HOOK PREPARE end");
+		printk("snd_hda_intel: command nid cs_8409_playback_pcm_hook HOOK PREPARE end");
 	} else if (action == HDA_GEN_PCM_ACT_CLEANUP) {
 		int power_chk = 0;
-		printk("snd_hda_intel: command nid cs_8409_playback_pcm_hook BAD HOOK CLEANUP");
+		printk("snd_hda_intel: command nid cs_8409_playback_pcm_hook HOOK CLEANUP");
         	power_chk = snd_hda_codec_read(codec, codec->core.afg, 0, AC_VERB_GET_POWER_STATE, 0);
-		printk("snd_hda_intel: command nid cs_8409_playback_pcm_hook BAD power check 0x01 3 %d", power_chk);
+		printk("snd_hda_intel: command nid cs_8409_playback_pcm_hook power check 0x01 3 %d", power_chk);
 		//if (spec->playing) {
 			cs_8409_play_cleanup(codec);
-			printk("snd_hda_intel: command nid cs_8409_playback_pcm_hook BAD done play down");
+			printk("snd_hda_intel: command nid cs_8409_playback_pcm_hook done play down");
 			spec->playing = 0;
 		//}
 		//cs_8409_play_cleanup(codec);
         	power_chk = snd_hda_codec_read(codec, codec->core.afg, 0, AC_VERB_GET_POWER_STATE, 0);
-		printk("snd_hda_intel: command nid cs_8409_playback_pcm_hook BAD power check 0x01 4 %d", power_chk);
-		printk("snd_hda_intel: command nid cs_8409_playback_pcm_hook BAD HOOK CLEANUP end");
+		printk("snd_hda_intel: command nid cs_8409_playback_pcm_hook power check 0x01 4 %d", power_chk);
+		printk("snd_hda_intel: command nid cs_8409_playback_pcm_hook HOOK CLEANUP end");
 	} else if (action == HDA_GEN_PCM_ACT_CLOSE) {
 		printk("snd_hda_intel: command nid cs_8409_playback_pcm_hook close");
 		printk("snd_hda_intel: command nid cs_8409_playback_pcm_hook close end");

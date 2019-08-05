@@ -37,9 +37,10 @@ static int tdm_in_use(struct hda_codec *codec, int where_flag)
 
 }
 
+
 static void init_for_node_vendor(struct hda_codec *codec)
 {
-	int retval;
+	//int retval;
         int coef_idx = 0x1a;
         //int coef_ret = 0;
 
@@ -85,22 +86,167 @@ static void init_for_node_vendor(struct hda_codec *codec)
         snd_hda_coef_item(codec, 1, CS8409_VENDOR_NID, 0x006c, 0x001f, 0x00000000, 1663 ); //   coef write 1663
         snd_hda_coef_item(codec, 1, CS8409_VENDOR_NID, 0x0082, 0x0000, 0x00000000, 1667 ); //   coef write 1667
 
+
+	dev_info(hda_codec_dev(codec), "command init_for_node_vendor end\n");
+
+}
+
+static void determine_speaker_id(struct hda_codec *codec, int mask)
+{
+        int retval;
+
         // this is determineSpeakerID
         // this does not make sense - this just checks a GPIO pin??
 
+	dev_info(hda_codec_dev(codec), "command determine_speaker_id start\n");
+
         // this is call AppleHDAFunctionGroup::setGPIOEnable in determineSpeakerID
-        snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_GPIO_MASK, 0x00000004); // 0x00171604
+        //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_GPIO_MASK, 0x00000004); // 0x00171604
+        snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_GPIO_MASK, mask); // 0x00171604
 //      snd_hda:     gpio enable 1 0x04
 
         //retval = snd_hda_codec_read_check(codec, codec->core.afg, 0, AC_VERB_GET_GPIO_DATA, 0x00000000, 0x00000004, 1672); // 0x001f1500
         retval = snd_hda_codec_read(codec, codec->core.afg, 0, AC_VERB_GET_GPIO_DATA, 0x00000000); // 0x001f1500
-	dev_info(hda_codec_dev(codec), "command init_for_node_vendor gpio data 0x%08x\n", retval);
+	dev_info(hda_codec_dev(codec), "command determine_speaker_id gpio data 0x%08x\n", retval);
 //      snd_hda:     gpio data 1 0x04
+
+	dev_info(hda_codec_dev(codec), "command determine_speaker_id end\n");
+
+}
+
+
+static void enable_GPIforUR(struct hda_codec *codec, int mask)
+{
+        int retval;
+
+
+        // AppleHDAFunctionGroupCS8409::enableGPIforUR
+
+	dev_info(hda_codec_dev(codec), "command enable_GPIforUR start\n");
+
+        //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_POWER_STATE, 0x00000000); // 0x00170500
+        //hda_set_node_power_state(codec, codec->core.afg, AC_PWRST_D0);
+
+
+        // this is AppleHDAFunctionGroup::setGPIOEnable in AppleHDAFunctionGroup::enableGPIforUR
+        //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_GPIO_MASK, 0x00000005); // 0x00171605
+        snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_GPIO_MASK, mask); // 0x00171605
+//      snd_hda:     gpio enable 1 0x05
+
+        // this is AppleHDAFunctionGroup::setGPIODirection in AppleHDAFunctionGroup::enableGPIforUR
+        snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_GPIO_DIRECTION, 0x00000000); // 0x00171700
+//      snd_hda:     gpio direction 1 0x00 in in in in in in in in
+
+        retval = snd_hda_codec_read_check(codec, codec->core.afg, 0, AC_VERB_GET_GPIO_WAKE_MASK, 0x00000000, 0x00000000, 1735); // 0x001f1800
+//      snd_hda:     gpio wake enable 1 0x00
+        snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_GPIO_WAKE_MASK, 0x00000001); // 0x00171801
+//      snd_hda:     gpio wake enable 1 0x01
+        retval = snd_hda_codec_read_check(codec, codec->core.afg, 0, AC_VERB_GET_GPIO_UNSOLICITED_RSP_MASK, 0x00000000, 0x00000000, 1737); // 0x001f1900
+//      snd_hda:     gpio unsol enable 1 0x00
+        snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_GPIO_UNSOLICITED_RSP_MASK, 0x00000001); // 0x00171901
+//      snd_hda:     gpio unsol enable 1 0x01
+
+
+        // likely last runVerb of AppleHDAFunctionGroupCS8409::enableGPIforUR
+        snd_hda_codec_write(codec, codec->core.afg, 0, 0x7f0, 0x000000b7);
 
         //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_POWER_STATE, 0x00000003); // 0x00170503
         //hda_set_node_power_state(codec, codec->core.afg, AC_PWRST_D3);
 
-	dev_info(hda_codec_dev(codec), "command init_for_node_vendor end\n");
+	dev_info(hda_codec_dev(codec), "command enable_GPIforUR end\n");
+
+}
+
+
+static void external_control_GPIO_clear_2(struct hda_codec *codec,int mask);
+static void external_control_GPIO_set_2(struct hda_codec *codec,int mask);
+
+static void external_control_GPIO(struct hda_codec *codec,int mask)
+{
+
+        // possibly AppleHDAPathSet::initPathSetFromXML
+        // or AppleHDAPathSet::enable and AppleHDAPathSet::disable
+
+        // forward call trace
+        // AppleHDAPathSet::initPathSetFromXML
+        // calls AppleHDAFunctionGroup::setExternalControlForDefaultDeviceTypeAndTag
+        // AppleHDAFunctionGroup::setExternalControlForDefaultDeviceTypeAndTag
+        // calls AppleHDAFunctionGroupExternalControl::setExternalControlState
+        // AppleHDAFunctionGroupExternalControl::setExternalControlState
+        // calls AppleHDAFunctionGroupExternalControl::publicSetExternalControlState
+        // this appears to be virtual - the definition just asserts
+        // good candidate is AppleHDAFunctionGroupExternalControl_GPIO::publicSetExternalControlState
+        // AppleHDAFunctionGroupExternalControl_GPIO::publicSetExternalControlState
+        // is the function which does the external_control_GPIO_clear0 or external_control_GPIO_set1
+        // functions below
+
+        // note that AppleHDAFunctionGroupExternalControl::setExternalControlState
+        // has an IOSleep() as the first call depending on a value - if non-zero time to sleep
+        // if 0 IOSleep() call ignored 
+
+	dev_info(hda_codec_dev(codec), "command external_control_GPIO start\n");
+
+        // this clearing then setting gpio bit 2
+
+        //usleep_range(2000,4000);
+
+        external_control_GPIO_clear_2(codec,mask);
+
+        //usleep_range(2000,4000);
+
+        external_control_GPIO_set_2(codec,mask);
+
+
+	dev_info(hda_codec_dev(codec), "command external_control_GPIO end\n");
+
+}
+
+
+static void external_control_GPIO_clear_2(struct hda_codec *codec,int mask)
+{
+
+        //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_POWER_STATE, 0x00000000); // 0x00170500
+        //hda_set_node_power_state(codec, codec->core.afg, AC_PWRST_D0);
+
+        // plausibly AppleHDAFunctionGroupExternalControl_GPIO::publicSetExternalControlState(bool)
+
+        // AppleHDAFunctionGroup::setGPIODirection
+        snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_GPIO_DIRECTION, 0x00000002); // 0x00171702
+//      snd_hda:     gpio direction 1 0x02 in in in in in in out in
+        // AppleHDAFunctionGroup::setGPIOData
+        snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_GPIO_DATA, 0x00000000); // 0x00171500
+//      snd_hda:     gpio data 1 0x00
+        // AppleHDAFunctionGroup::setGPIOEnable
+        //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_GPIO_MASK, 0x00000007); // 0x00171607
+        snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_GPIO_MASK, mask); // 0x00171607
+//      snd_hda:     gpio enable 1 0x07
+
+        //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_POWER_STATE, 0x00000003); // 0x00170503
+        //hda_set_node_power_state(codec, codec->core.afg, AC_PWRST_D3);
+
+}
+
+static void external_control_GPIO_set_2(struct hda_codec *codec,int mask)
+{
+
+        //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_POWER_STATE, 0x00000000); // 0x00170500
+        //hda_set_node_power_state(codec, codec->core.afg, AC_PWRST_D0);
+
+        // plausibly AppleHDAFunctionGroupExternalControl_GPIO::publicSetExternalControlState(bool)
+
+        // AppleHDAFunctionGroup::setGPIODirection
+        snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_GPIO_DIRECTION, 0x00000002); // 0x00171702
+//      snd_hda:     gpio direction 1 0x02 in in in in in in out in
+        // AppleHDAFunctionGroup::setGPIOData
+        snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_GPIO_DATA, 0x00000002); // 0x00171502
+//      snd_hda:     gpio data 1 0x02
+        // AppleHDAFunctionGroup::setGPIOEnable
+        //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_GPIO_MASK, 0x00000007); // 0x00171607
+        snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_GPIO_MASK, mask); // 0x00171607
+//      snd_hda:     gpio enable 1 0x07
+
+        //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_POWER_STATE, 0x00000003); // 0x00170503
+        //hda_set_node_power_state(codec, codec->core.afg, AC_PWRST_D3);
 
 }
 
@@ -108,6 +254,8 @@ static void setup_gpio_set_20(struct hda_codec *codec)
 {
 
         // plausibly AppleHDAFunctionGroupExternalControl_GPIO::publicSetExternalControlState(bool)
+
+	dev_info(hda_codec_dev(codec), "command setup_gpio_set_20 start\n");
 
         //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_POWER_STATE, 0x00000000); // 0x00170500
         //hda_set_node_power_state(codec, codec->core.afg, AC_PWRST_D0);
@@ -118,6 +266,8 @@ static void setup_gpio_set_20(struct hda_codec *codec)
 //      snd_hda:     gpio data 1 0x22
         snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_GPIO_MASK, 0x00000027); // 0x00171627
 //      snd_hda:     gpio enable 1 0x27
+
+	dev_info(hda_codec_dev(codec), "command setup_gpio_set_20 end\n");
 
         //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_POWER_STATE, 0x00000003); // 0x00170503
         //hda_set_node_power_state(codec, codec->core.afg, AC_PWRST_D3);
@@ -144,7 +294,7 @@ static int read_gpio_status_check(struct hda_codec *codec)
 }
 
 
-static void setup_amps_reset_i2c(struct hda_codec *codec)
+static void setup_amps_reset_i2c_max(struct hda_codec *codec)
 {
         // based on info from bugs 195671 and 110561
         // and that writing to coef index 0x59 seems to be the i2c address hence the i2c address following are
@@ -172,7 +322,6 @@ static void setup_amps_reset_i2c(struct hda_codec *codec)
 
 //      snd_hda i2cWrite      i2c address 0x72 i2c            reg 0x5101 i2c data 0x0001   reg anal: SoftwareReset           : Reset
         cs_8409_vendor_i2cWrite(codec, 0x72, 0x0051, 0x0001, 0); // snd_hda
-
 
 }
 
@@ -209,23 +358,39 @@ static int cs_8409_boot_setup_real(struct hda_codec *codec)
 
         read_virtual_widgets(codec);
 
-
 	init_for_node_vendor(codec);
+
+        // this is determineSpeakerID
+        // this does not make sense - this just checks a GPIO pin??
+
+        determine_speaker_id(codec, 0x4);
+
+        //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_POWER_STATE, 0x00000003); // 0x00170503
+        //hda_set_node_power_state(codec, codec->core.afg, AC_PWRST_D3);
 
 
         //setup_jack_pin_config(codec);
 
         enable_i2c(codec);
 
-        enable_GPIforUR(codec);
+        enable_GPIforUR(codec, 0x5);
 
-        external_control_GPIO(codec);
+
+        snd_hda_codec_write(codec, CS8409_VENDOR_NID, 0, AC_VERB_SET_PROC_STATE, 0x00000001); // 0x04770301
+        snd_hda_codec_write(codec, CS8409_VENDOR_NID, 0, AC_VERB_SET_PROC_STATE, 0x00000001); // 0x04770301
+
+
+        external_control_GPIO(codec, 0x7);
+
 
         //putative_setup_mic(codec);
 
-        external_control_GPIO2_clear_2(codec);
 
-        external_control_GPIO2_set_2(codec);
+        //external_control_GPIO2_clear_2(codec);
+        //external_control_GPIO2_set_2(codec);
+
+        external_control_GPIO(codec, 0x7);
+
 
         //putative_setup_mic2(codec);
 
@@ -236,7 +401,7 @@ static int cs_8409_boot_setup_real(struct hda_codec *codec)
 
 
         //setup_amps_reset(codec);
-	setup_amps_reset_i2c(codec);
+	setup_amps_reset_i2c_max(codec);
 
 
         //read_gpio_status(codec);
@@ -485,6 +650,7 @@ static void play_setup_TDM_amps12(struct hda_codec *codec, int setrate)
 
 }
 
+static void play_setup_amp_ssm3(struct hda_codec *codec, int amp_address, int amp_volume);
 
 static void play_setup_amps12(struct hda_codec *codec)
 {
@@ -495,6 +661,8 @@ static void play_setup_amps12(struct hda_codec *codec)
         }
         else if (codec->core.subsystem_id == 0x106b3300) {
                 //setup_node_alpha_ssm3(codec);
+                play_setup_amp_ssm3(codec, 0x28, 0x48);
+                play_setup_amp_ssm3(codec, 0x2a, 0x48);
         }
         else {
                 printk("snd_hda_intel: UNKNOWN subsystem id 0x%08x",codec->core.subsystem_id);
@@ -561,6 +729,8 @@ static void play_setup_amps34(struct hda_codec *codec)
         }
         else if (codec->core.subsystem_id == 0x106b3300) {
                 //setup_node_alpha_ssm3(codec);
+                play_setup_amp_ssm3(codec, 0x2c, 0x48);
+                play_setup_amp_ssm3(codec, 0x2e, 0x48);
         }
         else {
                 printk("snd_hda_intel: UNKNOWN subsystem id 0x%08x",codec->core.subsystem_id);
@@ -652,7 +822,6 @@ static void cs_8409_play_real(struct hda_codec *codec)
 
 }
 
-
 static void playstop_disable_amp(struct hda_codec *codec, int amp_address)
 {
         //int retval;
@@ -727,6 +896,8 @@ static void playstop_sync_converters_off(struct hda_codec *codec)
 }
 
 
+static void playstop_disable_amp_ssm3(struct hda_codec *codec, int amp_address);
+
 static void playstop_disable_amps12(struct hda_codec *codec)
 {
         if (codec->core.subsystem_id == 0x106b3900) {
@@ -735,6 +906,8 @@ static void playstop_disable_amps12(struct hda_codec *codec)
         }
         else if (codec->core.subsystem_id == 0x106b3300) {
                 //setup_node_alpha_ssm3(codec);
+                playstop_disable_amp_ssm3(codec, 0x28);
+                playstop_disable_amp_ssm3(codec, 0x2a);
         }
         else {
                 printk("snd_hda_intel: UNKNOWN subsystem id 0x%08x",codec->core.subsystem_id);
@@ -799,6 +972,8 @@ static void playstop_disable_amps34(struct hda_codec *codec)
         }
         else if (codec->core.subsystem_id == 0x106b3300) {
                 //setup_node_alpha_ssm3(codec);
+                playstop_disable_amp_ssm3(codec, 0x2c);
+                playstop_disable_amp_ssm3(codec, 0x2e);
         }
         else {
                 printk("snd_hda_intel: UNKNOWN subsystem id 0x%08x",codec->core.subsystem_id);
