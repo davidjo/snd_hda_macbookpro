@@ -661,8 +661,9 @@ static void play_setup_amps12(struct hda_codec *codec)
         }
         else if (codec->core.subsystem_id == 0x106b3300) {
                 //setup_node_alpha_ssm3(codec);
-                play_setup_amp_ssm3(codec, 0x28, 0x48);
-                play_setup_amp_ssm3(codec, 0x2a, 0x48);
+		// use reduced volume - from 0x48 to 0x80 - same reduction as for MAXs -24dB
+                play_setup_amp_ssm3(codec, 0x28, 0x80);
+                play_setup_amp_ssm3(codec, 0x2a, 0x80);
         }
         else {
                 printk("snd_hda_intel: UNKNOWN subsystem id 0x%08x",codec->core.subsystem_id);
@@ -729,8 +730,9 @@ static void play_setup_amps34(struct hda_codec *codec)
         }
         else if (codec->core.subsystem_id == 0x106b3300) {
                 //setup_node_alpha_ssm3(codec);
-                play_setup_amp_ssm3(codec, 0x2c, 0x48);
-                play_setup_amp_ssm3(codec, 0x2e, 0x48);
+		// use reduced volume - from 0x48 to 0x80 - same reduction as for MAXs -24dB
+                play_setup_amp_ssm3(codec, 0x2c, 0x80);
+                play_setup_amp_ssm3(codec, 0x2e, 0x80);
         }
         else {
                 printk("snd_hda_intel: UNKNOWN subsystem id 0x%08x",codec->core.subsystem_id);
