@@ -30,6 +30,8 @@
 #include "hda_jack.h"
 #include "hda_generic.h"
 
+#include <linux/bitops.h>
+
 /*
  */
 
@@ -1333,13 +1335,14 @@ static int cs_8409_playback_pcm_prepare(struct hda_pcm_stream *hinfo,
         return err;
 }
 
-static void cs_8409_set_extended_codec_verb(void);
+//static void cs_8409_set_extended_codec_verb(void);
 
 static int cs_8409_init(struct hda_codec *codec)
 {
 	struct hda_pcm *info = NULL;
 	struct hda_pcm_stream *hinfo = NULL;
 	struct cs_spec *spec = NULL;
+	int pcmcnt = 0;
 
         printk("snd_hda_intel: cs_8409_init\n");
 
@@ -1364,34 +1367,63 @@ static int cs_8409_init(struct hda_codec *codec)
 	}
 	else
 		codec_dbg(codec, "playback stream NULL\n");
-	info = spec->gen.pcm_rec[0];
-	if (info != NULL)
-	{
-		hinfo = &(info->stream[SNDRV_PCM_STREAM_PLAYBACK]);
-		if (hinfo != NULL)
-			codec_dbg(codec, "playback info stream nid 0x%02x rates 0x%08x formats 0x%016llx\n",hinfo->nid,hinfo->rates,hinfo->formats);
-		else
-			codec_dbg(codec, "playback info stream NULL\n");
-	}
-	else
-		codec_dbg(codec, "playback info NULL\n");
 
-	if (info != NULL)
-	{
-		hinfo = &(info->stream[SNDRV_PCM_STREAM_PLAYBACK]);
-		if (hinfo != NULL)
-		{
-			// so now we need to force the rates and formats to the single one Apple defines ie 44.1 kHz and S24_LE
-			// probably can leave S32_LE
-			// we can still handle 2/4 channel (what about 1 channel?)
-			hinfo->rates = SNDRV_PCM_RATE_44100;
-			hinfo->formats = SNDRV_PCM_FMTBIT_S32_LE | SNDRV_PCM_FMTBIT_S24_LE;
-			codec_dbg(codec, "playback info stream forced nid 0x%02x rates 0x%08x formats 0x%016llx\n",hinfo->nid,hinfo->rates,hinfo->formats);
+	// think this is what I need to fixup
 
-			// update the playback function
-			hinfo->ops.prepare = cs_8409_playback_pcm_prepare;
+        list_for_each_entry(info, &codec->pcm_list_head, list) {
+                int stream;
 
+                codec_dbg(codec, "cs_8409_init pcm %d\n",pcmcnt);
+
+                for (stream = 0; stream < 2; stream++) {
+                        struct hda_pcm_stream *hinfo = &info->stream[stream];
+
+			codec_dbg(codec, "cs_8409_init info stream %d pointer %p\n",stream,hinfo);
+
+			if (hinfo != NULL)
+			{
+				codec_dbg(codec, "cs_8409_init info stream %d nid 0x%02x rates 0x%08x formats 0x%016llx\n",stream,hinfo->nid,hinfo->rates,hinfo->formats);
+				codec_dbg(codec, "cs_8409_init        stream substreams %d\n",hinfo->substreams);
+				codec_dbg(codec, "cs_8409_init        stream channels min %d\n",hinfo->channels_min);
+				codec_dbg(codec, "cs_8409_init        stream channels max %d\n",hinfo->channels_max);
+				codec_dbg(codec, "cs_8409_init        stream maxbps %d\n",hinfo->maxbps);
+			}
+			else
+				codec_dbg(codec, "cs_8409_init info stream %d NULL\n", stream);
 		}
+		pcmcnt++;
+	}
+
+	// update the streams specifically by nid
+	// we seem to have only 1 stream here with the nid of 0x02
+	// (I still dont really understand the linux generic coding here)
+
+        list_for_each_entry(info, &codec->pcm_list_head, list) {
+                int stream;
+
+                for (stream = 0; stream < 2; stream++) {
+                        struct hda_pcm_stream *hinfo = &info->stream[stream];
+
+			if (hinfo != NULL)
+			{
+				if (stream == SNDRV_PCM_STREAM_PLAYBACK && hinfo->nid == 0x02)
+				{
+					codec_dbg(codec, "cs_8409_init info stream %d pointer %p\n",stream,hinfo);
+					// so now we need to force the rates and formats to the single one Apple defines ie 44.1 kHz and S24_LE
+					// probably can leave S32_LE
+					// we can still handle 2/4 channel (what about 1 channel?)
+					hinfo->rates = SNDRV_PCM_RATE_44100;
+					hinfo->formats = SNDRV_PCM_FMTBIT_S32_LE | SNDRV_PCM_FMTBIT_S24_LE;
+					codec_dbg(codec, "playback info stream forced nid 0x%02x rates 0x%08x formats 0x%016llx\n",hinfo->nid,hinfo->rates,hinfo->formats);
+
+					// update the playback function
+					hinfo->ops.prepare = cs_8409_playback_pcm_prepare;
+				}
+			}
+			else
+				codec_dbg(codec, "cs_8409_init info stream %d NULL\n", stream);
+		}
+		pcmcnt++;
 	}
 
 
@@ -1409,7 +1441,7 @@ static int cs_8409_init(struct hda_codec *codec)
 	//	init_digital_coef(codec);
 	//}
 
-	cs_8409_set_extended_codec_verb();
+	//cs_8409_set_extended_codec_verb();
 
 
         printk("snd_hda_intel: end cs_8409_init\n");
@@ -1622,7 +1654,7 @@ static int patch_cs8409(struct hda_codec *codec)
        //struct hda_pcm_stream *hinfo = NULL;
 
        printk("snd_hda_intel: Patching for CS8409 explicit %d\n", explicit);
-       dev_info(hda_codec_dev(codec), "Patching for CS8409 %d\n", explicit);
+       //dev_info(hda_codec_dev(codec), "Patching for CS8409 %d\n", explicit);
 
        //dump_stack();
 
@@ -1792,7 +1824,7 @@ static int patch_cs8409(struct hda_codec *codec)
 
        getnstimeofday(&(spec->first_play_time));
 
-       //printk("snd_hda_intel: Post Patching for CS8409\n");
+       printk("snd_hda_intel: Post Patching for CS8409\n");
        //dev_info(codec->dev, "Post Patching for CS8409\n");
 
        return 0;
@@ -1857,10 +1889,10 @@ cs_8409_extended_codec_verb(struct hda_codec *codec, hda_nid_t nid,
 	return retval;
 }
 
-static void cs_8409_set_extended_codec_verb(void)
-{
-	snd_hda_set_extended_codec_verb(cs_8409_extended_codec_verb);
-}
+//static void cs_8409_set_extended_codec_verb(void)
+//{
+//	snd_hda_set_extended_codec_verb(cs_8409_extended_codec_verb);
+//}
 
 
 /*

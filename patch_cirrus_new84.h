@@ -672,12 +672,54 @@ static void cs_8409_pcm_playback_pre_prepare_hook(struct hda_pcm_stream *hinfo, 
 		printk("snd_hda_intel: command nid cs_8409_pcm_playback_pre_prepare_hook HOOK PREPARE init %d last %ld cur %ld",spec->play_init,spec->last_play_time.tv_sec,curtim.tv_sec);
 		//if (!spec->play_init) {
 		if (1) {
+			struct hda_cvt_setup *p = NULL;
 			//int power_chk = 0;
 			struct timespec curtim;
 			getnstimeofday(&curtim);
 			spec->first_play_time.tv_sec = curtim.tv_sec;
 			cs_8409_play_setup(codec);
 			printk("snd_hda_intel: command nid cs_8409_playback_pcm_hook setup play called");
+
+
+			// I dont now understand how this worked - the codes above ALWAYS reset the stream format
+			// to the OSX format
+			// and unless I force a stream update here there will be a stream format difference
+			// yet it appears it worked - even tho sometimes there was no format update after this routine
+			// now I dont know why
+
+
+			// so we need to force the stream to be re-set here
+			// problem is it appears hda_codec caches the stream format and id and only updates if changed
+			// and there doesnt seem to be a good way to force an update
+			// problem - the get_hda_cvt_setup function is local to hda_codec
+
+			// this routine doesnt seem to be nid specific - so explicitly fix the known nids here
+
+			p = get_hda_cvt_setup_8409(codec, 0x02);
+
+			printk("snd_hda_intel: command nid cs_8409_playback_pcm_hook BAD cvt pointer 0x02 %p",p);
+
+			p->stream_tag = 0;
+			p->channel_id = 0;
+			p->format_id = 0;
+
+			p = get_hda_cvt_setup_8409(codec, 0x03);
+
+			printk("snd_hda_intel: command nid cs_8409_playback_pcm_hook BAD cvt pointer 0x03 %p",p);
+
+			p->stream_tag = 0;
+			p->channel_id = 0;
+			p->format_id = 0;
+
+			p = get_hda_cvt_setup_8409(codec, 0x0a);
+
+			printk("snd_hda_intel: command nid cs_8409_playback_pcm_hook BAD cvt pointer 0x0a %p",p);
+
+			p->stream_tag = 0;
+			p->channel_id = 0;
+			p->format_id = 0;
+
+
 			spec->play_init = 1;
 			spec->playing = 0;
 		}
