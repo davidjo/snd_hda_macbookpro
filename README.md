@@ -3,18 +3,37 @@
 Last kernel tested was 4.15.0-54.
 
 This is a working sound system for linux on a Macbook Pro 14,3.
-The hardware device sound format is limited to 2/4 channel 44.1 kHz S24_LE S32_LE.
+The hardware device sound format is limited to 2/4 channel 44.1 kHz S24_LE S32_LE S24_3LE.
 Alsa handles 2 channel input by copying onto node 0x3.
-As long as use the default or plughw device volume control, other formats, frequencies work.
+As long as use the default (pulse) device volume control, other formats, frequencies work.
 
-NOTA BENE: The direct hardware device (hw:0,0) has NO volume control so will be loud!
+NOTA BENE: Both the direct hardware device (hw:0,0) and the plughw:0,0 device have NO volume control so will be loud!
+
+Now updated to allow output to headphones (not all headphones with mike implemented - testing was for
+an Apple headset with mike plus no mike headset).
+This is a 2 channel output using the 1st 2 channels of the stream if a 4 channel stream is sent.
+
+NOTE that the headphone plugin/unplug events use unsolicited responses which under linux seem to be executed concurrently
+with other commands.
+I have implemented a blocking system to ensure the response verb blocks are done serially (which seems to be how OSX does this).
+I do not know enough about the internals of the linux kernel module to know if there are better ways of doing this.
+As these verb blocks last multiseconds using simple linux kernel mutex locks (as done in other parts of the sound module
+for single commands) dont seem to be the right approach but I could be wrong.
+There are still issues with concurrency to be handled eg if you plugin and quickly start something playing - the play setup
+verbs still need to be delayed while the plugin block finishes.
+Currently I just physically wait a few seconds after eg plugging in before starting to play.
+Plugging while playing and then unplugging while playing is known to work.
+
+Input nodes (internal mike, external mike, linein) now setup as per OSX ie using OSX format.
+NOT linked to any actual input streams.
+SPDIF not implemented.
 
 Power down/sleep completely unknown and untested.
 
-The hda auto config is force updated to just deal with speaker output, all other nodes disabled.
-
 
 Macbook Pro 14,1 with SSM3515 amps is now complete but NOT tested at all.
+I think I have identified the specific differences for amp setup to 14,3 and these
+now implemented in the main boot and play code.
 
 
 Comments on what OSX seems to be doing.
@@ -38,3 +57,4 @@ Issues:
 Because the format is fixed at 44.1 kHz, 24 bit (S24_3LE) 4 channel and the format is set by undocumented vendor node
 commands its not clear if other formats can be supported in the 8409 itself.
 It appears now that Apples set up can take eg S24_LE format and S32_LE format.
+

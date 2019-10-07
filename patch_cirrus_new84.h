@@ -44,12 +44,13 @@ static unsigned int hda_sync_power_state_8409(struct hda_codec *codec,
 // hda_set_power_state sets all nodes to the required power state
 // so apparently node 0x01 does not have the power capability - but is powerable!!
 // if we wish to use this for all nodes then need to check for this
-static unsigned int hda_set_node_power_state(struct hda_codec *codec, hda_nid_t nid, unsigned int power_state)
+
+static unsigned int hda_set_node_power_state_dbg(struct hda_codec *codec, hda_nid_t nid, unsigned int power_state, bool dbgflg)
 {
         unsigned int wcaps = get_wcaps(codec, nid);
         unsigned int state = power_state;
 	//unsigned int current_state;
-	dev_info(hda_codec_dev(codec), "hda_set_node_power_state  nid 0x%02x power %d\n",nid,power_state);
+	if (dbgflg) dev_info(hda_codec_dev(codec), "hda_set_node_power_state  nid 0x%02x power %d\n",nid,power_state);
         state = snd_hda_codec_read(codec, nid, 0, AC_VERB_GET_POWER_STATE, 0);
         if (!(state & AC_PWRST_ERROR)) {
 	        if (state != power_state) {
@@ -76,9 +77,14 @@ static unsigned int hda_set_node_power_state(struct hda_codec *codec, hda_nid_t 
 	else {
 		dev_info(hda_codec_dev(codec), "hda_set_node_power_state ERROR!! 0x%04x\n",state);
 	}
-	dev_info(hda_codec_dev(codec), "hda_set_node_power_state end power %d\n",state);
+	if (dbgflg) dev_info(hda_codec_dev(codec), "hda_set_node_power_state end power %d\n",state);
 
         return state;
+}
+
+static unsigned int hda_set_node_power_state(struct hda_codec *codec, hda_nid_t nid, unsigned int power_state)
+{
+        return hda_set_node_power_state_dbg(codec, nid, power_state, 0);
 }
 
 static unsigned int hda_set_node_power_state_simple(struct hda_codec *codec, hda_nid_t nid, unsigned int power_state)
@@ -141,11 +147,12 @@ static inline void cs_8409_vendor_coef_set(struct hda_codec *codec, unsigned int
 }
 
 static inline unsigned int cs_8409_vendor_coef_set_mask(struct hda_codec *codec, unsigned int idx,
-                                      unsigned int coef, unsigned int mask)
+                                      unsigned int coef, unsigned int mask, unsigned int srcval, int srcidx)
 {
+        // for the moment hackily add srcidx argument while debugging
         struct cs_spec *spec = codec->spec;
         unsigned int retval;
-        //unsigned int mask_coef;
+        unsigned int mask_coef;
         snd_hda_codec_read(codec, spec->vendor_nid, 0,
                             AC_VERB_GET_COEF_INDEX, 0);
         snd_hda_codec_write(codec, spec->vendor_nid, 0,
@@ -154,9 +161,19 @@ static inline unsigned int cs_8409_vendor_coef_set_mask(struct hda_codec *codec,
                                   AC_VERB_GET_PROC_COEF, 0);
         snd_hda_codec_write(codec, spec->vendor_nid, 0,
                             AC_VERB_SET_COEF_INDEX, idx);
-	//mask_coef = (retval & ~mask) | coef;
+        mask_coef = (retval & ~mask) | coef;
+        if (srcval != 0)
+        {
+		if (srcidx != 0 && mask_coef != srcval)
+			printk("snd_hda_intel: cs_8409_vendor_coef_set_mask 0x%04x 0x%04x: 0x%04x (0x%04x 0x%04x 0x%04x) 0x%04x != 0x%04x %d BAD",idx,coef,mask_coef,retval,coef,mask, mask_coef, srcval, srcidx);
+	        else
+                        printk("snd_hda_intel: cs_8409_vendor_coef_set_mask 0x%04x 0x%04x: 0x%04x (0x%04x 0x%04x 0x%04x) %d",idx,coef,mask_coef,retval,coef,mask,srcidx);
+        }
+	else
+                //if (mask != 0xffff)
+                printk("snd_hda_intel: cs_8409_vendor_coef_set_mask 0x%04x 0x%04x: 0x%04x (0x%04x 0x%04x 0x%04x) %d",idx,coef,mask_coef,retval,coef,mask,srcidx);
         snd_hda_codec_write(codec, spec->vendor_nid, 0,
-                            AC_VERB_SET_PROC_COEF, coef);
+                            AC_VERB_SET_PROC_COEF, mask_coef);
         snd_hda_codec_write(codec, spec->vendor_nid, 0,
                             AC_VERB_SET_COEF_INDEX, 0);
         // appears to return 0
@@ -167,8 +184,8 @@ static inline unsigned int cs_8409_vendor_coef_set_mask(struct hda_codec *codec,
 static inline void cs_8409_vendor_enableI2Cclock(struct hda_codec *codec, unsigned int flag)
 {
 
-	unsigned int retval = 0;
-	unsigned int newval = 0;
+        unsigned int retval = 0;
+        unsigned int newval = 0;
 
 	// note that apple returns the status value with data value in returned parameter 
 	// snd_hda_codec_read just returns value - not sure what happens about errors
@@ -205,7 +222,7 @@ static unsigned int cs_8409_vendor_i2cRead(struct hda_codec *codec, unsigned int
 
         printk("snd_hda_intel: i2cRead 0x%04x 0x%04x: %d",i2c_address,i2c_reg,paged);
 
-	hda_set_node_power_state(codec, codec->core.afg, AC_PWRST_D0);
+	hda_set_node_power_state_dbg(codec, codec->core.afg, AC_PWRST_D0, 0);
 	// exit on error
 
 	snd_hda_codec_write(codec, CS8409_VENDOR_NID, 0, AC_VERB_SET_PROC_STATE, 0x00000001);
@@ -221,9 +238,9 @@ static unsigned int cs_8409_vendor_i2cRead(struct hda_codec *codec, unsigned int
 		unsigned int retval1;
 
 		cs_8409_vendor_coef_set(codec, 0x5d, i2c_reg >> 8);
-sleep1:
-		rdcnt = -8;
 
+		rdcnt = -8;
+sleep1:
 		retval1 = cs_8409_vendor_coef_get(codec, 0x5c);
 
 		if (retval1 != -1)
@@ -256,9 +273,8 @@ sleep1:
 	retval = cs_8409_vendor_coef_get(codec, 0x5c);
 	//if (retval == -1)
 
-sleep2:
 	rdcnt = -8;
-
+sleep2:
 	retval = cs_8409_vendor_coef_get(codec, 0x5c);
 	//if (retval == -1)
 
@@ -324,9 +340,8 @@ static unsigned int cs_8409_vendor_i2cWrite(struct hda_codec *codec, unsigned in
 
 		retval1 = cs_8409_vendor_coef_get(codec, 0x5c);
 
-sleep1:
 		rdcnt = -8;
-
+sleep1:
 		retval1 = cs_8409_vendor_coef_get(codec, 0x5c);
 
 		if (retval1 != -1)
@@ -359,9 +374,8 @@ sleep1:
 	retval = cs_8409_vendor_coef_get(codec, 0x5c);
 	//if (retval == -1)
 
-sleep2:
 	rdcnt = -8;
-
+sleep2:
 	retval = cs_8409_vendor_coef_get(codec, 0x5c);
 	//if (retval == -1)
 
@@ -389,6 +403,26 @@ sleep2:
 	// exit on error
 
 	return retval;
+}
+
+static unsigned int cs_8409_vendor_i2cWriteMask(struct hda_codec *codec, unsigned int i2c_address,
+                                      unsigned int i2c_reg, unsigned int i2c_mask, unsigned int i2c_data, unsigned int paged)
+{
+        // masked version to emulate AppleHDATDMDevice::maskWriteReg(unsigned short, unsigned char, unsigned char)
+
+        unsigned int retval;
+        unsigned int mask_val;
+
+        retval = cs_8409_vendor_i2cRead(codec, i2c_address, i2c_reg, paged);
+
+	mask_val = (retval & ~i2c_mask);
+	mask_val |= (i2c_data & i2c_mask);
+
+        printk("snd_hda_intel: i2cWriteMask 0x%04x 0x%04x: 0x%04x (0x%04x 0x%04x 0x%04x)  %d",i2c_address,i2c_reg,mask_val,retval,i2c_data,i2c_mask,paged);
+
+        retval = cs_8409_vendor_i2cWrite(codec, i2c_address, i2c_reg, mask_val, paged);
+
+        return retval;
 }
 
 
@@ -424,13 +458,15 @@ void snd_hda_coef_item(struct hda_codec *codec, u16 write_flag, hda_nid_t nid, u
 {
         if (write_flag == 2)
 	{
-                unsigned int retval = cs_8409_vendor_coef_set_mask(codec, idx, param, 0);
-                if (retval != retdata)
+		// NOTA BENE - just for initial debugging differentiation - pass a mask of 0xffff for total overwrite
+		// use snd_hda_coef_item_masked for actual masked setup
+                unsigned int retreadval = cs_8409_vendor_coef_set_mask(codec, idx, param, 0xffff, 0, srcidx);
+                if (retreadval != retdata)
 		{
                         if (srcidx > 0)
-                                codec_dbg(codec, "command nid BAD mask return value at %d: 0x%08x 0x%08x\n",srcidx,retval,retdata);
-                        else
-                                codec_dbg(codec, "command nid BAD mask return value: 0x%08x 0x%08x\n",retval,retdata);
+                                codec_dbg(codec, "command BAD mask return value at %d: 0x%08x 0x%08x (0x%02x, 0x%04x, 0x%04x)\n",srcidx,retreadval,retdata,nid,idx,param);
+                        //else
+                        //        codec_dbg(codec, "command BAD mask return value: 0x%08x 0x%08x (0x%02x, 0x%04x, 0x%04x)\n",retreadval,retdata,nid,idx,param);
 		}
 	}
         else if (write_flag == 1)
@@ -441,11 +477,55 @@ void snd_hda_coef_item(struct hda_codec *codec, u16 write_flag, hda_nid_t nid, u
                 if (retval != retdata)
 		{
                         if (srcidx > 0)
-                                codec_dbg(codec, "command nid BAD      return value at %d: 0x%08x 0x%08x\n",srcidx,retval,retdata);
-                        else
-                                codec_dbg(codec, "command nid BAD      return value: 0x%08x 0x%08x\n",retval,retdata);
+                                codec_dbg(codec, "command BAD      return value at %d: 0x%08x 0x%08x (0x%02x, 0x%04x, 0x%04x)\n",srcidx,retval,retdata,nid,idx,param);
+                        //else
+                        //        codec_dbg(codec, "command BAD      return value: 0x%08x 0x%08x (0x%02x, 0x%04x, 0x%04x)\n",retval,retdata,nid,idx,param);
 		}
 	}
+}
+
+// just create a special routine if we wish to return the actual value for the moment
+int snd_hda_coef_item_check(struct hda_codec *codec, u16 write_flag, hda_nid_t nid, u32 idx, u32 param, u32 retdata, int srcidx)
+{
+        int retval = 0;
+
+        if (write_flag == 2)
+                codec_dbg(codec, "command BAD usage of snd_hda_coef_item_check %d\n", write_flag);
+        else if (write_flag == 1)
+                codec_dbg(codec, "command BAD usage of snd_hda_coef_item_check %d\n", write_flag);
+        else
+        {
+                unsigned int retval1 = cs_8409_vendor_coef_get(codec, idx);
+                if (retval1 != retdata)
+		{
+                        if (srcidx > 0)
+                                codec_dbg(codec, "command BAD      return value at %d: 0x%08x 0x%08x (0x%02x, 0x%04x, 0x%04x)\n",srcidx,retval1,retdata,nid,idx,param);
+                        //else
+                        //        codec_dbg(codec, "command BAD      return value: 0x%08x 0x%08x (0x%02x, 0x%04x, 0x%04x)\n",retval1,retdata,nid,idx,param);
+		}
+                retval = retval1;
+        }
+
+        return retval;
+}
+
+void snd_hda_coef_item_masked(struct hda_codec *codec, u16 write_flag, hda_nid_t nid, u32 idx, u32 param, u32 mask, u32 retdata, u32 srcval, int srcidx)
+{
+        //int retval = 0;
+        if (write_flag != 2)
+                codec_dbg(codec, "command BAD usage of snd_hda_coef_item_masked %d\n", write_flag);
+	else
+	{
+		unsigned int retreadval = cs_8409_vendor_coef_set_mask(codec, idx, param, mask, srcval, srcidx);
+                if (retreadval != retdata)
+		{
+                        if (srcidx > 0)
+                                codec_dbg(codec, "command BAD mask return value at %d: 0x%08x 0x%08x (0x%02x, 0x%04x, 0x%04x)\n",srcidx,retreadval,retdata,nid,idx,param);
+                        //else
+                        //        codec_dbg(codec, "command BAD mask return value: 0x%08x 0x%08x (0x%02x, 0x%04x, 0x%04x)\n",retreadval,retdata,nid,idx,param);
+		}
+	}
+        //return retval;
 }
 
 void snd_hda_coef_sequence(struct hda_codec *codec, const struct hda_coef *seq, char *prtstr)
@@ -466,8 +546,9 @@ static inline unsigned int snd_hda_codec_read_check(struct hda_codec *codec, hda
 	if (retval == -1)
 		return retval;
 
-	if (retval != check_val)
-        	codec_dbg(codec, "command nid BAD read check return value at %d: 0x%08x 0x%08x\n",srcidx,retval,check_val);
+	if (srcidx > 0)
+		if (retval != check_val)
+			codec_dbg(codec, "command BAD read check return value at %d: 0x%08x 0x%08x (0x%02x, 0x%03x 0x%04x)\n",srcidx,retval,check_val,nid,verb,parm);
 
 	return retval;
 }
@@ -550,14 +631,244 @@ get_hda_cvt_setup_8409(struct hda_codec *codec, hda_nid_t nid)
         return p;
 }
 
+static void cs_8409_dump_stream_format(struct hda_codec *codec, hda_nid_t nid)
+{
+        struct hda_cvt_setup *p = NULL;
+        int i;
+
+	// use explicit search so we dont create one if doesnt exist
+
+        for (i = 0; i < codec->cvt_setups.used; i++) {
+                p = snd_array_elem(&codec->cvt_setups, i);
+                if (p->nid == nid)
+                        break;
+        }
+
+        if (p != NULL)
+                codec_dbg(codec, "cs_8409_dump_stream_format: NID=0x%x, cached values: stream=0x%x, channel=%d, format=0x%x\n", nid, p->stream_tag, p->channel_id, p->format_id);
+        else
+                codec_dbg(codec, "cs_8409_dump_stream_format: NID=0x%x, cached values: NULL\n", nid);
+}
+
+static void cs_8409_reset_stream_format(struct hda_codec *codec, hda_nid_t nid, int format, int doreset)
+{
+
+        // this resets the cached stream format so that next
+        // stream setup will actually rewrite the stream format and stream id
+        // or if doreset set it will perform the stream update now
+        // also allow for only updating the stream format and not stream id
+
+	// problem - the get_hda_cvt_setup function is local to hda_codec - so need our own copy above
+
+        struct hda_cvt_setup *p = NULL;
+        u32 stream_tag_sv;
+        int channel_id_sv;
+        int format_id_sv;
+
+        p = get_hda_cvt_setup_8409(codec, nid);
+
+        stream_tag_sv = p->stream_tag;
+        channel_id_sv = p->channel_id;
+        format_id_sv = p->format_id;
+
+	dev_info(hda_codec_dev(codec), "cs_8409_reset_stream_format RESET for nid 0x%02x: 0x%08x id 0x%08x chan 0x%08x\n", nid, format_id_sv, stream_tag_sv, channel_id_sv);
+
+        p->stream_tag = 0;
+        p->channel_id = 0;
+	if (format)
+                p->format_id = 0;
+
+        if (doreset)
+                snd_hda_codec_setup_stream(codec, nid, stream_tag_sv, channel_id_sv, format_id_sv);
+
+}
+
+        // so what do I want this to do
+        // the stream format will be stored in the hda_cvt_setup (at what stage is this valid??)
+        // - we want to remove the Apple specific stream format/channel setup
+        // and just call snd_hda_setup_stream - but we need the actual stream format for this
+        // - hopefully getting from the hda_cvt_setup struct
+
+static void cs_8409_save_and_clear_stream_format(struct hda_codec *codec, hda_nid_t nid, struct hda_cvt_setup *savep)
+{
+        struct hda_cvt_setup *p = NULL;
+        u32 stream_tag_sv;
+        int channel_id_sv;
+        int format_id_sv;
+
+        codec_dbg(codec, "cs_8409_save_and_clear_stream_format\n");
+
+        // use this to save the stream format and clear the stream id and channel
+
+        p = get_hda_cvt_setup_8409(codec, nid);
+
+        savep->stream_tag = p->stream_tag;
+        savep->channel_id = p->channel_id;
+        savep->format_id = p->format_id;
+
+        snd_hda_codec_write(codec, nid, 0, AC_VERB_SET_CHANNEL_STREAMID, 0x00000000);
+}
+
+static void cs_8409_update_from_save_stream_format(struct hda_codec *codec, hda_nid_t nid, struct hda_cvt_setup *savep, int update_stream_id, int update_format_id)
+{
+        struct hda_cvt_setup *p = NULL;
+
+        codec_dbg(codec, "cs_8409_update_from_save_stream_format\n");
+
+        // so this will ensure the format is re-updated
+
+        p = get_hda_cvt_setup_8409(codec, nid);
+
+        if (update_stream_id)
+        {
+                p->stream_tag = 0;
+                p->channel_id = 0;
+        }
+        if (update_format_id)
+                p->format_id = 0;
+
+        snd_hda_codec_setup_stream(codec, nid, savep->stream_tag, savep->channel_id, savep->format_id);
+}
+
+static void cs_8409_really_update_stream_format(struct hda_codec *codec, hda_nid_t nid, int update_format_id, int update_stream_id, unsigned int new_channel_id)
+{
+        struct hda_cvt_setup *p = NULL;
+        u32 stream_tag_sv;
+        int channel_id_sv;
+        int format_id_sv;
+
+        codec_dbg(codec, "cs_8409_really_update_stream_format\n");
+
+        cs_8409_dump_stream_format(codec, nid);
+
+        // so here we take the cached format and save locally, clear out the cached values
+        // then call snd_hda_codec_setup_stream with the cached values
+        // this will ensure we update the HDA with the stream format
+
+        p = get_hda_cvt_setup_8409(codec, nid);
+
+        stream_tag_sv = p->stream_tag;
+        channel_id_sv = p->channel_id;
+        format_id_sv = p->format_id;
+
+        if (update_stream_id)
+        {
+                p->stream_tag = 0;
+                p->channel_id = 0;
+        }
+        if (update_format_id)
+                p->format_id = 0;
+
+        if (update_stream_id == 2)
+            snd_hda_codec_setup_stream(codec, nid, stream_tag_sv, new_channel_id, format_id_sv);
+        else
+            snd_hda_codec_setup_stream(codec, nid, stream_tag_sv, channel_id_sv, format_id_sv);
+}
+
+static void cs_8409_setup_stream_format(struct hda_codec *codec, hda_nid_t nid, unsigned int stream_tag, unsigned int format)
+{
+        struct hda_cvt_setup *p = NULL;
+
+        codec_dbg(codec, "cs_8409_setup_stream_format\n");
+
+        cs_8409_dump_stream_format(codec, nid);
+
+        // this functions sets up the cached stream - get_hda_cvt_setup_8409 creates a struct if not yet defined
+        // NOTA BENE we do not do the update here - we are relying that this will be done by a call to
+        // cs_8409_really_update_stream_format now we have set the format correctly
+
+        p = get_hda_cvt_setup_8409(codec, nid);
+
+        // NOTA BENE - we do not set the channel id here - this will be done by cs_8409_really_update_stream_format
+
+        p->stream_tag = stream_tag;
+        p->channel_id = 0;
+        p->format_id = format;
+
+}
+
+static int read_gpio_status_check(struct hda_codec *codec);
+
+#ifdef USE_DATA
 
 #include "patch_cirrus_data84.h"
 
+#include "patch_cirrus_plugin.h"
+
+#include "patch_cirrus_headplay.h"
+
+#include "patch_cirrus_unplug.h"
+
+#include "patch_cirrus_plugin3.h"
+
+#include "patch_cirrus_plugin23.h"
+
 #include "patch_cirrus_mb141_data84.h"
+
+#else
+
+// error definitions
+static void cs_8409_external_device_unsolicited_response_data(struct hda_codec *codec, unsigned int res)
+{
+	dev_err(hda_codec_dev(codec), "ERROR - to use data functions need to define USE_DATA\n");
+}
+
+static void cs_8409_boot_setup_data(struct hda_codec *codec)
+{
+	dev_err(hda_codec_dev(codec), "ERROR - to use data functions need to define USE_DATA\n");
+}
+
+static void cs_8409_play_data(struct hda_codec *codec)
+{
+	dev_err(hda_codec_dev(codec), "ERROR - to use data functions need to define USE_DATA\n");
+}
+
+//static void cs_8409_play_real(struct hda_codec *codec);
+
+static void cs_8409_playstop_data(struct hda_codec *codec)
+{
+	dev_err(hda_codec_dev(codec), "ERROR - to use data functions need to define USE_DATA\n");
+}
+
+//static void cs_8409_playstop_real(struct hda_codec *codec);
+
+static void cs_8409_headplay_data(struct hda_codec *codec)
+{
+	dev_err(hda_codec_dev(codec), "ERROR - to use data functions need to define USE_DATA\n");
+}
+
+//static void cs_8409_headplay_real(struct hda_codec *codec);
+
+static void cs_8409_headplaystop_data(struct hda_codec *codec)
+{
+	dev_err(hda_codec_dev(codec), "ERROR - to use data functions need to define USE_DATA\n");
+}
+
+//static void cs_8409_headplaystop_real(struct hda_codec *codec);
+
+
+static void cs_8409_boot_setup_data_ssm3(struct hda_codec *codec)
+{
+	dev_err(hda_codec_dev(codec), "ERROR - to use data functions need to define USE_DATA\n");
+}
+
+static void cs_8409_play_data_ssm3(struct hda_codec *codec)
+{
+	dev_err(hda_codec_dev(codec), "ERROR - to use data functions need to define USE_DATA\n");
+}
+
+
+#endif
+
+#include "patch_cirrus_boot84.h"
+
+#include "patch_cirrus_real84_i2c.h"
 
 #include "patch_cirrus_real84.h"
 
-#include "patch_cirrus_mb141_real84.h"
+// only needed if wish to test the version using the mb141 logs
+// cs_8409_boot_setup_real now supposed to do both machines
+//#include "patch_cirrus_mb141_real84.h"
 
 
 // macbook pro subsystem ids
@@ -578,24 +889,27 @@ static int cs_8409_boot_setup(struct hda_codec *codec)
         // so here the codec vendor is 0x106b, the subvendor id is 0x39 and the assembly id is 0x00
         if (codec->core.subsystem_id == 0x106b3900) {
                 if (spec->use_data) {
-                        printk("snd_hda_intel: pre cs_8409_data_config\n");
+                        printk("snd_hda_intel: cs_8409_boot_setup pre cs_8409_data_config\n");
 
                         err = cs_8409_data_config(codec);
 
-                        printk("snd_hda_intel: cs_8409_init post cs_8409_data_config\n");
+                        printk("snd_hda_intel: cs_8409_boot_setup post cs_8409_data_config\n");
                 } else {
-                        printk("snd_hda_intel: pre cs_8409_real_config\n");
+                        printk("snd_hda_intel: cs_8409_boot_setup pre cs_8409_real_config\n");
 
                         err = cs_8409_real_config(codec);
 
-                        printk("snd_hda_intel: cs_8409_init post cs_8409_real_config\n");
+                        printk("snd_hda_intel: cs_8409_boot_setup post cs_8409_real_config\n");
                 }
 	}
         else if (codec->core.subsystem_id == 0x106b3300) {
-                if (spec->use_data)
+                if (spec->use_data) {
                         cs_8409_boot_setup_data_ssm3(codec);
-                else
-                        cs_8409_boot_setup_real_ssm3(codec);
+		} else {
+                        printk("snd_hda_intel: cs_8409_boot_setup pre cs_8409_real_config\n");
+                        //cs_8409_boot_setup_real_ssm3(codec);
+                        err = cs_8409_real_config(codec);
+                }
         }
         else {
                 printk("snd_hda_intel: UNKNOWN subsystem id 0x%08x",codec->core.subsystem_id);
@@ -604,9 +918,6 @@ static int cs_8409_boot_setup(struct hda_codec *codec)
 
 	return err;
 }
-
-static void cs_8409_play_data(struct hda_codec *codec);
-static void cs_8409_play_real(struct hda_codec *codec);
 
 void cs_8409_play_setup(struct hda_codec *codec)
 {
@@ -622,9 +933,10 @@ void cs_8409_play_setup(struct hda_codec *codec)
 	}
 	else if (codec->core.subsystem_id == 0x106b3300) {
 		if (spec->use_data) {
-                       cs_8409_play_data_ssm3(codec);
+                        cs_8409_play_data_ssm3(codec);
 		} else {
-                       cs_8409_play_real_ssm3(codec);
+                        //cs_8409_play_real_ssm3(codec);
+		        cs_8409_play_real(codec);
 		}
 	}
 	else {
@@ -632,11 +944,8 @@ void cs_8409_play_setup(struct hda_codec *codec)
 	}
 }
 
-static void cs_8409_playstop_data(struct hda_codec *codec);
-static void cs_8409_playstop_real(struct hda_codec *codec);
-
 //static void cs_8409_playstop_data_ssm3(struct hda_codec *codec);
-static void cs_8409_playstop_real_ssm3(struct hda_codec *codec);
+//static void cs_8409_playstop_real_ssm3(struct hda_codec *codec);
 
 void cs_8409_play_cleanup(struct hda_codec *codec)
 {
@@ -652,7 +961,8 @@ void cs_8409_play_cleanup(struct hda_codec *codec)
 		if (spec->use_data) {
                        //cs_8409_playstop_data_ssm3(codec);
 		} else {
-                       cs_8409_playstop_real_ssm3(codec);
+                       //cs_8409_playstop_real_ssm3(codec);
+                       cs_8409_playstop_real(codec);
                 }
 	}
 	else {
@@ -661,7 +971,182 @@ void cs_8409_play_cleanup(struct hda_codec *codec)
 
 }
 
-static void cs_8409_pcm_playback_pre_prepare_hook(struct hda_pcm_stream *hinfo, struct hda_codec *codec, struct snd_pcm_substream *substream,
+static void cs_8409_cs42l83_unsolicited_response_finalize(struct hda_codec *codec, unsigned int res);
+
+static void cs_8409_perform_external_device_unsolicited_responses(struct hda_codec *codec)
+{
+	struct cs_spec *spec = codec->spec;
+	struct unsol_item *unsol_entry = NULL;
+	struct unsol_item *unsol_temp = NULL;
+	dev_info(hda_codec_dev(codec), "cs_8409_perform_external_device_unsolicited_responses UNSOL start\n");
+	list_for_each_entry_safe(unsol_entry, unsol_temp, &spec->unsol_list, list)
+	{
+		list_del_init(&unsol_entry->list);
+		// pigs this gets complicated - these might issue other unsol responses
+		cs_8409_cs42l83_unsolicited_response_finalize(codec, unsol_entry->res);
+		spec->unsol_items_prealloc_used[unsol_entry->idx] = 0;
+		memset(unsol_entry, 0, sizeof(struct unsol_item));
+	}
+	dev_info(hda_codec_dev(codec), "cs_8409_perform_external_device_unsolicited_responses UNSOL end\n");
+}
+
+static void cs_8409_cs42l83_unsolicited_response(struct hda_codec *codec, unsigned int res)
+{
+	struct cs_spec *spec = codec->spec;
+
+	// not clear if want to use the GPIO pins apparently passed in res to determine
+	// if want to do interrupt checking here and if no interrupts then to do
+	// some other unsolicited response function (not seen any such unsolicited responses yet)
+	// without checking the unsolicited block status
+
+	// now think dont need a list - we can only have 1 outstanding unsolicted interrupt request
+	// we may get multiple unsolicited interrupt requests - but they all will have same GPIO status (0x26)
+	// and we determine the exact interrupt by reading the cs42l83 registers - which we are trying to avoid
+	// clashing with other verbs
+	// it may be that we get multiple interrupt flags to handle when we do read - not seen so far
+
+	if (spec->block_unsol)
+	{
+		int itm;
+		int new_itm = -1;
+		dev_info(hda_codec_dev(codec), "cs_8409_cs42l83_unsolicited_response -     UNSOL BLOCKED\n");
+		for (itm=0; itm<10; itm++)
+			if (spec->unsol_items_prealloc_used[itm] == 0) { new_itm = itm; break; }
+		if (new_itm < 0)
+		{
+			dev_info(hda_codec_dev(codec), "cs_8409_cs42l83_unsolicited_response - IGNORING UNSOL RESPONSE!!\n");
+			return;
+		}
+		spec->unsol_items_prealloc_used[new_itm] = 1;
+		memset(&(spec->unsol_items_prealloc[new_itm]), 0, sizeof(struct unsol_item));
+                spec->unsol_items_prealloc[new_itm].res = res;
+                spec->unsol_items_prealloc[new_itm].idx = new_itm;
+		list_add_tail(&(spec->unsol_items_prealloc[new_itm].list), &spec->unsol_list);
+		dev_info(hda_codec_dev(codec), "cs_8409_cs42l83_unsolicited_response - UNSOL response stored\n");
+		return;
+        }
+        else
+		dev_info(hda_codec_dev(codec), "cs_8409_cs42l83_unsolicited_response - NOT UNSOL BLOCKED\n");
+
+        // so it appears we need to block unsol responses while doing unsol responses
+	// this is probably not the way to do this but still havent figured out how to use locking properly
+	// as this needs to be interruptible because some of these functions take a long time
+	// I think if we get here we cannot have been blocked so list maybe always empty
+	// whats not clear is if list_for_each_entry_safe is safe for addition also
+	spec->block_unsol = 1;
+
+	cs_8409_cs42l83_unsolicited_response_finalize(codec, res);
+
+	if (!list_empty(&spec->unsol_list))
+	{
+		dev_info(hda_codec_dev(codec), "cs_8409_cs42l83_unsolicited_response - performing blocked responses start\n");
+		cs_8409_perform_external_device_unsolicited_responses(codec);
+		dev_info(hda_codec_dev(codec), "cs_8409_cs42l83_unsolicited_response - performing blocked responses end\n");
+	}
+
+	spec->block_unsol = 0;
+}
+
+static void cs_8409_cs42l83_unsolicited_response_finalize(struct hda_codec *codec, unsigned int res)
+{
+	struct cs_spec *spec = codec->spec;
+
+	if (spec->use_data)
+		cs_8409_external_device_unsolicited_response_data(codec, res);
+	else
+	{
+		if (spec->headset_phase == 0)
+		{
+			dev_info(hda_codec_dev(codec), "cs_8409_external_device_unsolicited_response_finalize - phase is 0 - skipping\n");
+			return;
+		}
+
+
+		// note the data version will only play thro the headphones for a single time
+		//cs_8409_external_device_unsolicited_response_data(codec, res);
+		cs_8409_external_device_unsolicited_response(codec);
+	}
+}
+
+
+static void cs_8409_headset_mike_setup(struct hda_codec *codec)
+{
+        struct cs_spec *spec = codec->spec;
+
+        cs_8409_intmike_linein_disable(codec);
+
+        cs_8409_headset_mike_enable(codec);
+}
+
+
+void cs_8409_headplay_setup(struct hda_codec *codec)
+{
+        struct cs_spec *spec = codec->spec;
+        if (codec->core.subsystem_id == 0x106b3900) {
+		if (spec->use_data) {
+                        cs_8409_headplay_data(codec);
+		} else {
+		        cs_8409_headplay_real(codec);
+                }
+	}
+	else if (codec->core.subsystem_id == 0x106b3300) {
+		if (spec->use_data) {
+                        //cs_8409_play_data_ssm3(codec);
+		} else {
+                        //cs_8409_play_real_ssm3(codec);
+		        cs_8409_headplay_real(codec);
+		}
+	}
+	else {
+                printk("snd_hda_intel: UNKNOWN subsystem id 0x%08x",codec->core.subsystem_id);
+	}
+
+        // decided this needs moving till all stream setup verbs done
+        //spec->block_unsol = 0;
+
+        //if (!list_empty(&spec->unsol_list))
+        //{
+        //        dev_info(hda_codec_dev(codec), "cs_8409_headplay_setup - performing UNSOL responses\n");
+        //        cs_8409_perform_external_device_unsolicited_responses(codec);
+        //}
+}
+
+
+void cs_8409_headplay_cleanup(struct hda_codec *codec)
+{
+        struct cs_spec *spec = codec->spec;
+        if (codec->core.subsystem_id == 0x106b3900) {
+		if (spec->use_data) {
+                        cs_8409_headplaystop_data(codec);
+		} else {
+                        //cs_8409_headplaystop_data(codec);
+		        cs_8409_headplaystop_real(codec);
+                }
+	}
+	else if (codec->core.subsystem_id == 0x106b3300) {
+		if (spec->use_data) {
+                        //cs_8409_play_data_ssm3(codec);
+		} else {
+                        //cs_8409_play_real_ssm3(codec);
+		        cs_8409_headplaystop_real(codec);
+		}
+	}
+	else {
+                printk("snd_hda_intel: UNKNOWN subsystem id 0x%08x",codec->core.subsystem_id);
+	}
+
+        // decided this needs moving till all stream cleanup verbs done
+        //spec->block_unsol = 0;
+
+        //if (!list_empty(&spec->unsol_list))
+        //{
+        //        dev_info(hda_codec_dev(codec), "cs_8409_headplay_cleanup - performing UNSOL responses\n");
+        //        cs_8409_perform_external_device_unsolicited_responses(codec);
+        //}
+}
+
+static void cs_8409_pcm_playback_pre_prepare_hook(struct hda_pcm_stream *hinfo, struct hda_codec *codec,
+                               unsigned int stream_tag, unsigned int format, struct snd_pcm_substream *substream,
                                int action)
 {
 	struct cs_spec *spec = codec->spec;
@@ -669,16 +1154,39 @@ static void cs_8409_pcm_playback_pre_prepare_hook(struct hda_pcm_stream *hinfo, 
 	if (action == HDA_GEN_PCM_ACT_PREPARE) {
 		struct timespec curtim;
 		getnstimeofday(&curtim);
-		printk("snd_hda_intel: command nid cs_8409_pcm_playback_pre_prepare_hook HOOK PREPARE init %d last %ld cur %ld",spec->play_init,spec->last_play_time.tv_sec,curtim.tv_sec);
-		//if (!spec->play_init) {
+		printk("snd_hda_intel: command cs_8409_pcm_playback_pre_prepare_hook HOOK PREPARE init %d last %ld cur %ld",spec->play_init,spec->last_play_time.tv_sec,curtim.tv_sec);
 		if (1) {
 			struct hda_cvt_setup *p = NULL;
 			//int power_chk = 0;
-			struct timespec curtim;
-			getnstimeofday(&curtim);
-			spec->first_play_time.tv_sec = curtim.tv_sec;
-			cs_8409_play_setup(codec);
-			printk("snd_hda_intel: command nid cs_8409_playback_pcm_hook setup play called");
+
+			// in the new way we set the stream up here using the passed data
+			// - this does not actually update the stream format here but sets the cached parameters
+			// so the cs_8409_really_update_stream_format will cause the updates to occur
+                        // note we explicitly set the channel id - dont see another way yet
+
+                        cs_8409_setup_stream_format(codec, 0x02, stream_tag, format);
+
+                        cs_8409_setup_stream_format(codec, 0x03, stream_tag, format);
+
+                        cs_8409_setup_stream_format(codec, 0x0a, stream_tag, format);
+
+			// for the moment have junky test here
+			if (spec->jack_present)
+			{
+				// for the moment I think this works for both MB 14,1 and 14,3 - same hda and headphone chip
+				// note that so far only the headphone chip seems to generate unsol responses usually
+				spec->block_unsol = 1;
+				if (spec->format_setup_needed)
+				{
+					cs_8409_headplay_setup(codec);
+					if (spec->have_mike)
+						cs_8409_headset_mike_setup(codec);
+					spec->format_setup_needed = 0;
+				}
+			}
+                        else
+			        cs_8409_play_setup(codec);
+			printk("snd_hda_intel: command cs_8409_playback_pcm_hook setup play called");
 
 
 			// I dont now understand how this worked - the codes above ALWAYS reset the stream format
@@ -691,37 +1199,23 @@ static void cs_8409_pcm_playback_pre_prepare_hook(struct hda_pcm_stream *hinfo, 
 			// so we need to force the stream to be re-set here
 			// problem is it appears hda_codec caches the stream format and id and only updates if changed
 			// and there doesnt seem to be a good way to force an update
-			// problem - the get_hda_cvt_setup function is local to hda_codec
 
 			// this routine doesnt seem to be nid specific - so explicitly fix the known nids here
+			// no longer needed now we set the stream format correctly above
+			// so when snd_hda_multi_out_analog_prepare is called after this routine it should do nothing
+			// as we will have cached and set the right format now
 
-			p = get_hda_cvt_setup_8409(codec, 0x02);
+                        //cs_8409_reset_stream_format(codec, 0x02, 1, 0);
 
-			printk("snd_hda_intel: command nid cs_8409_playback_pcm_hook BAD cvt pointer 0x02 %p",p);
+                        //cs_8409_reset_stream_format(codec, 0x03, 1, 0);
 
-			p->stream_tag = 0;
-			p->channel_id = 0;
-			p->format_id = 0;
+                        //cs_8409_reset_stream_format(codec, 0x0a, 1, 0);
 
-			p = get_hda_cvt_setup_8409(codec, 0x03);
 
-			printk("snd_hda_intel: command nid cs_8409_playback_pcm_hook BAD cvt pointer 0x03 %p",p);
-
-			p->stream_tag = 0;
-			p->channel_id = 0;
-			p->format_id = 0;
-
-			p = get_hda_cvt_setup_8409(codec, 0x0a);
-
-			printk("snd_hda_intel: command nid cs_8409_playback_pcm_hook BAD cvt pointer 0x0a %p",p);
-
-			p->stream_tag = 0;
-			p->channel_id = 0;
-			p->format_id = 0;
+			spec->playing = 0;
 
 
 			spec->play_init = 1;
-			spec->playing = 0;
 		}
 	}
 }
@@ -741,46 +1235,66 @@ static void cs_8409_playback_pcm_hook(struct hda_pcm_stream *hinfo, struct hda_c
 	// (because the generic setup was done before the OSX setup and the actual streamed format is slightly different)
 	// (the hda documentation says these really need to match)
 	// It appears the 8409 setup can handle at least some differences in the stream format
-	// certainly seems to handle S24_LE or S32_LE differences
+	// as long as we set the nid to format the kernel is sending
+	// certainly seems to handle S24_LE or S32_LE differences (OSX format is always S24_3LE)
 
 
 	if (action == HDA_GEN_PCM_ACT_OPEN) {
 		//struct hda_cvt_setup *p = NULL;
-		printk("snd_hda_intel: command nid cs_8409_playback_pcm_hook open");
+		printk("snd_hda_intel: command cs_8409_playback_pcm_hook open");
 
-		printk("snd_hda_intel: command nid cs_8409_playback_pcm_hook open end");
+		printk("snd_hda_intel: command cs_8409_playback_pcm_hook open end");
 	} else if (action == HDA_GEN_PCM_ACT_PREPARE) {
+		// so this comes AFTER the stream format, frequency setup verbs are sent for the pcm stream
 		struct timespec curtim;
 		getnstimeofday(&curtim);
-		printk("snd_hda_intel: command nid cs_8409_playback_pcm_hook HOOK PREPARE init %d last %ld cur %ld",spec->play_init,spec->last_play_time.tv_sec,curtim.tv_sec);
-		//if (spec->play_init && curtim.tv_sec > (spec->first_play_time.tv_sec + 0))
-		//if (spec->play_init) {
-		if (1) {
-			int power_chk = 0;
-        		power_chk = snd_hda_codec_read(codec, codec->core.afg, 0, AC_VERB_GET_POWER_STATE, 0);
-			printk("snd_hda_intel: command nid cs_8409_playback_pcm_hook power check 0x01 2 %d", power_chk);
-			spec->last_play_time.tv_sec = curtim.tv_sec;
-			spec->playing = 1;
+		printk("snd_hda_intel: command cs_8409_playback_pcm_hook HOOK PREPARE init %d last %ld cur %ld",spec->play_init,spec->last_play_time.tv_sec,curtim.tv_sec);
+		//int power_chk = 0;
+		//power_chk = snd_hda_codec_read(codec, codec->core.afg, 0, AC_VERB_GET_POWER_STATE, 0);
+		//printk("snd_hda_intel: command cs_8409_playback_pcm_hook power check 0x01 2 %d", power_chk);
+		// this is where we need to finally unset the block_unsol
+		// - which also means this is where we should check for unsolicited responses
+		spec->block_unsol = 0;
+		if (!list_empty(&spec->unsol_list))
+		{
+			dev_info(hda_codec_dev(codec), "cs_8409_playback_pcm_hook - performing UNSOL responses\n");
+			cs_8409_perform_external_device_unsolicited_responses(codec);
 		}
-
-		printk("snd_hda_intel: command nid cs_8409_playback_pcm_hook HOOK PREPARE end");
+		spec->playing = 1;
+		printk("snd_hda_intel: command cs_8409_playback_pcm_hook HOOK PREPARE end");
 	} else if (action == HDA_GEN_PCM_ACT_CLEANUP) {
+		// so this also comes AFTER the stream format, frequency cleanup verbs are sent for the pcm stream
 		int power_chk = 0;
-		printk("snd_hda_intel: command nid cs_8409_playback_pcm_hook HOOK CLEANUP");
+		printk("snd_hda_intel: command cs_8409_playback_pcm_hook HOOK CLEANUP");
         	power_chk = snd_hda_codec_read(codec, codec->core.afg, 0, AC_VERB_GET_POWER_STATE, 0);
-		printk("snd_hda_intel: command nid cs_8409_playback_pcm_hook power check 0x01 3 %d", power_chk);
-		//if (spec->playing) {
-			cs_8409_play_cleanup(codec);
-			printk("snd_hda_intel: command nid cs_8409_playback_pcm_hook done play down");
-			spec->playing = 0;
-		//}
-		//cs_8409_play_cleanup(codec);
+		printk("snd_hda_intel: command cs_8409_playback_pcm_hook power check 0x01 3 %d", power_chk);
+		printk("snd_hda_intel: command cs_8409_playback_pcm_hook jack_present %d\n",spec->jack_present);
+		// for the moment have junky test here
+		if (spec->jack_present)
+		{
+			// for the moment I think this works for both MB 14,1 and 14,3 - same hda and headphone chip
+			// note that so far only the headphone chip seems to generate unsol responses usually
+			spec->block_unsol = 1;
+		        cs_8409_headplay_cleanup(codec);
+			spec->format_setup_needed = 1;
+		}
+                else
+		        cs_8409_play_cleanup(codec);
+		printk("snd_hda_intel: command cs_8409_playback_pcm_hook done play down");
+		spec->block_unsol = 0;
+		if (!list_empty(&spec->unsol_list))
+		{
+			dev_info(hda_codec_dev(codec), "cs_8409_playback_pcm_hook - performing UNSOL responses\n");
+			cs_8409_perform_external_device_unsolicited_responses(codec);
+		}
+		// not sure of this position yet
+		spec->playing = 0;
         	power_chk = snd_hda_codec_read(codec, codec->core.afg, 0, AC_VERB_GET_POWER_STATE, 0);
-		printk("snd_hda_intel: command nid cs_8409_playback_pcm_hook power check 0x01 4 %d", power_chk);
-		printk("snd_hda_intel: command nid cs_8409_playback_pcm_hook HOOK CLEANUP end");
+		printk("snd_hda_intel: command cs_8409_playback_pcm_hook power check 0x01 4 %d", power_chk);
+		printk("snd_hda_intel: command cs_8409_playback_pcm_hook HOOK CLEANUP end");
 	} else if (action == HDA_GEN_PCM_ACT_CLOSE) {
-		printk("snd_hda_intel: command nid cs_8409_playback_pcm_hook close");
-		printk("snd_hda_intel: command nid cs_8409_playback_pcm_hook close end");
+		printk("snd_hda_intel: command cs_8409_playback_pcm_hook close");
+		printk("snd_hda_intel: command cs_8409_playback_pcm_hook close end");
 	}
 
 }

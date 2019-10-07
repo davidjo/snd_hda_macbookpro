@@ -24,6 +24,7 @@
 #include <sound/core.h>
 #include <sound/tlv.h>
 #include <linux/ctype.h>
+#include <linux/timer.h>
 #include "hda_codec.h"
 #include "hda_local.h"
 #include "hda_auto_parser.h"
@@ -34,6 +35,12 @@
 
 /*
  */
+
+struct unsol_item {
+        struct list_head list;
+        unsigned int idx;
+        unsigned int res;
+};
 
 struct cs_spec {
 	struct hda_gen_spec gen;
@@ -57,8 +64,57 @@ struct cs_spec {
 	int (*spdif_sw_put)(struct snd_kcontrol *kcontrol,
 			    struct snd_ctl_elem_value *ucontrol);
 
+        // so it appears we have "concurrency" in the linux HDA code
+        // in that if unsolicited responses occur which perform extensive verbs
+        // the hda verbs are intermixed with eg extensive start playback verbs
+        // on OSX we appear to have blocks of verbs during which unsolicited responses
+        // are logged but the unsolicited verbs occur after the verb block
+        // this flag is used to flag such verb blocks and the list will store the
+        // responses
+        // we use a pre-allocated list - if we have more than 10 outstanding unsols
+        // we will drop
+        // not clear if mutexes would be the way to go
+        int block_unsol;
+        struct list_head unsol_list;
+        struct unsol_item unsol_items_prealloc[10];
+        int unsol_items_prealloc_used[10];
+
+        // new item to deal with jack presence as Apple seems to have barfed
+        // the HDA spec by using a separate headphone chip
+	int jack_present;
+
+	// save the type of headphone connected
+	int headset_type;
+
+	// if headphone has mike or not
+	int have_mike;
+
+	// if headphone has buttons or not
+	int have_buttons;
+
+	// set when playing for plug/unplug events while playing
+	int playing;
+
+	// changing coding - OSX sets up the format on plugin
+	// then does some minimal setup when start play
+	// initial coding delayed any format setup till actually play
+	// this works for no mike but not for mike - we need to initialize
+	// the mike on plugin
+	// this flag will be set when we have done the format setup
+	// so know if need to do it on play or not
+	int format_setup_needed;
+
 
 	int use_data;
+
+
+	// this is new item for dealing with headset plugins
+	// so can distinguish which phase we are in if have multiple interrupts
+	// not really used now have analyzed interrupts properly
+	int headset_phase;
+
+	// another dirty hack item to manage the different headset enable codes
+	int headset_enable;
 
 	// new item to limit times we redo unmute/play
 	struct timespec last_play_time;
@@ -67,7 +123,6 @@ struct cs_spec {
 	// some initial plays that I dont understand - so skip any setup
 	// till sometime after the first play
 	struct timespec first_play_time;
-	int playing;
 
 };
 
@@ -1286,18 +1341,20 @@ enum {
 };
 
 
-static void cs_8409_pcm_playback_pre_prepare_hook(struct hda_pcm_stream *hinfo, struct hda_codec *codec, struct snd_pcm_substream *substream,
+static void cs_8409_pcm_playback_pre_prepare_hook(struct hda_pcm_stream *hinfo, struct hda_codec *codec, 
+                               unsigned int stream_tag, unsigned int format, struct snd_pcm_substream *substream,
                                int action);
 
 // this is a copy from playback_pcm_prepare in hda_generic.c
-// we need to do the Apple setup BEFORE the snd_hda_multi_out_analog_prepare
+// initially I needed to do the Apple setup BEFORE the snd_hda_multi_out_analog_prepare
+// in order to overwrite the Apple setup with the actual format/stream id
 // NOTA BENE - if playback_pcm_prepare is changed in hda_generic.c then
 // those changes must be re-implemented here
 // we need this order because snd_hda_multi_out_analog_prepare writes the
 // the format and stream id's to the audio nodes
-// so far we have left the Apple setup of the nodes format and stream id's
-// in
-// now Apples is very specifically S24_3LE (24 bit), 4 channel, 44.1 kHz
+//// so far we have left the Apple setup of the nodes format and stream id's in
+// now updated to set the actual format where Apple does the format/stream id setup
+// Apples format is very specifically S24_3LE (24 bit), 4 channel, 44.1 kHz
 // S24_3LE seems to be very difficult to create so best Ive done is
 // S24_LE (24 in 32 bits) or S32_LE
 // it seems the digital setup is able to handle this with the Apple TDM
@@ -1306,6 +1363,14 @@ static void cs_8409_pcm_playback_pre_prepare_hook(struct hda_pcm_stream *hinfo, 
 // (the HDA specs say the node format setup must match the data)
 // if we do the Apple setup and then the snd_hda_multi_out_analog_prepare
 // the nodes will have the slightly different but working format
+// with proper update of stream format at same point as in Apple log we need to pass
+// the actual playback format as passed to this routine to our new "hook"
+// cs_8409_pcm_playback_pre_prepare_hook
+// to define the cached format correctly in that routine
+// so far my analysis is that hinfo stores the stream format in the kernel format style
+// but what is passed to cs_8409_playback_pcm_prepare is the format in HDA style
+// not yet figured how to convert from kernel format style to HDA style
+
 static int cs_8409_playback_pcm_prepare(struct hda_pcm_stream *hinfo,
                                 struct hda_codec *codec,
                                 unsigned int stream_tag,
@@ -1316,7 +1381,10 @@ static int cs_8409_playback_pcm_prepare(struct hda_pcm_stream *hinfo,
         int err;
         codec_dbg(codec, "cs_8409_playback_pcm_prepare\n");
 
-        cs_8409_pcm_playback_pre_prepare_hook(hinfo, codec, substream,
+        codec_dbg(codec, "cs_8409_playback_pcm_prepare: NID=0x%x, stream=0x%x, format=0x%x\n",
+                  hinfo->nid, stream_tag, format);
+
+        cs_8409_pcm_playback_pre_prepare_hook(hinfo, codec, stream_tag, format, substream,
                                HDA_GEN_PCM_ACT_PREPARE);
 
         err = snd_hda_multi_out_analog_prepare(codec, &spec->multiout,
@@ -1335,7 +1403,70 @@ static int cs_8409_playback_pcm_prepare(struct hda_pcm_stream *hinfo,
         return err;
 }
 
-//static void cs_8409_set_extended_codec_verb(void);
+// another copied routine as this is local to hda_jack.c
+static struct hda_jack_tbl *
+cs_8409_hda_jack_tbl_new(struct hda_codec *codec, hda_nid_t nid)
+{
+        struct hda_jack_tbl *jack = snd_hda_jack_tbl_get(codec, nid);
+        if (jack)
+                return jack;
+        jack = snd_array_new(&codec->jacktbl);
+        if (!jack)
+                return NULL;
+        jack->nid = nid;
+        jack->jack_dirty = 1;
+        jack->tag = codec->jacktbl.used;
+	// use this to prevent f09 verbs being sent - not seen in OSX logs
+        jack->phantom_jack = 1;
+        return jack;
+}
+
+// copy of snd_hda_jack_detect_enable_callback code
+// there is no AC_VERB_SET_UNSOLICITED_ENABLE for 8409
+// it appears unsolicited response is pre-enabled
+// but we need to fix this to setup the callback on such responses
+struct hda_jack_callback *
+cs_8409_hda_jack_detect_enable_callback(struct hda_codec *codec, hda_nid_t nid, int tag,
+				    hda_jack_callback_fn func)
+{
+	struct hda_jack_tbl *jack;
+	struct hda_jack_callback *callback = NULL;
+	int err;
+
+	jack = cs_8409_hda_jack_tbl_new(codec, nid);
+	if (!jack)
+		return ERR_PTR(-ENOMEM);
+	if (func) {
+		callback = kzalloc(sizeof(*callback), GFP_KERNEL);
+		if (!callback)
+			return ERR_PTR(-ENOMEM);
+		callback->func = func;
+		callback->nid = jack->nid;
+		callback->next = jack->callback;
+		jack->callback = callback;
+	}
+
+	if (jack->jack_detect)
+		return callback; /* already registered */
+	jack->jack_detect = 1;
+	// update the tag - linux code just counted the number of jacks set up
+	// for a tag
+	// jack->tag = codec->jacktbl.used;
+	jack->tag = tag;
+	if (codec->jackpoll_interval > 0)
+		return callback; /* No unsol if we're polling instead */
+	// apparently we dont need to send this
+	//err = snd_hda_codec_write_cache(codec, nid, 0,
+	//				 AC_VERB_SET_UNSOLICITED_ENABLE,
+	//				 AC_USRSP_EN | jack->tag);
+	//if (err < 0)
+	//	return ERR_PTR(err);
+	return callback;
+}
+
+#ifdef ADD_EXTENDED_VERB
+static void cs_8409_set_extended_codec_verb(void);
+#endif
 
 static int cs_8409_init(struct hda_codec *codec)
 {
@@ -1343,6 +1474,7 @@ static int cs_8409_init(struct hda_codec *codec)
 	struct hda_pcm_stream *hinfo = NULL;
 	struct cs_spec *spec = NULL;
 	int pcmcnt = 0;
+	int ret_unsol_enable = 0;
 
         printk("snd_hda_intel: cs_8409_init\n");
 
@@ -1427,6 +1559,13 @@ static int cs_8409_init(struct hda_codec *codec)
 	}
 
 
+	// read UNSOL enable data to see what initial setup is
+        //ret_unsol_enable = snd_hda_codec_read(codec, codec->core.afg, 0, AC_VERB_GET_UNSOLICITED_RESPONSE, 0);
+	//codec_dbg(codec,"UNSOL event 0x01 boot setup is 0x%08x\n",ret_unsol_enable);
+        //ret_unsol_enable = snd_hda_codec_read(codec, 0x47, 0, AC_VERB_GET_UNSOLICITED_RESPONSE, 0);
+	//codec_dbg(codec,"UNSOL event 0x47 boot setup is 0x%08x\n",ret_unsol_enable);
+
+
 	//if (spec->gpio_mask) {
 	//	snd_hda_codec_write(codec, 0x01, 0, AC_VERB_SET_GPIO_MASK,
 	//			    spec->gpio_mask);
@@ -1441,7 +1580,9 @@ static int cs_8409_init(struct hda_codec *codec)
 	//	init_digital_coef(codec);
 	//}
 
-	//cs_8409_set_extended_codec_verb();
+#ifdef ADD_EXTENDED_VERB
+	cs_8409_set_extended_codec_verb();
+#endif
 
 
         printk("snd_hda_intel: end cs_8409_init\n");
@@ -1480,25 +1621,87 @@ int cs_8409_build_pcms(struct hda_codec *codec)
 	return retval;
 }
 
+
+static void cs_8409_call_jack_callback(struct hda_codec *codec,
+                               struct hda_jack_tbl *jack)
+{
+        struct hda_jack_callback *cb;
+
+        for (cb = jack->callback; cb; cb = cb->next)
+                cb->func(codec, cb);
+        if (jack->gated_jack) {
+                struct hda_jack_tbl *gated =
+                        snd_hda_jack_tbl_get(codec, jack->gated_jack);
+                if (gated) {
+                        for (cb = gated->callback; cb; cb = cb->next)
+                                cb->func(codec, cb);
+                }
+        }
+}
+
+// so I think this is what gets called for any unsolicited event - including jack plug events
+// so anything we do to switch amp/headphone should be done from here
+
 void cs_8409_jack_unsol_event(struct hda_codec *codec, unsigned int res)
 {
         struct hda_jack_tbl *event;
+        //int ret_unsol_enable = 0;
         int tag = (res >> AC_UNSOL_RES_TAG_SHIFT) & 0x7f;
 
-        dev_info(hda_codec_dev(codec), "cs_8409_jack_unsol_event 0x%08x tag 0x%02x\n",res,tag);
+	//// read UNSOL enable data to see what current setup is
+        //ret_unsol_enable = snd_hda_codec_read(codec, codec->core.afg, 0, AC_VERB_GET_UNSOLICITED_RESPONSE, 0);
+	//codec_dbg(codec,"UNSOL event 0x01 at unsol is 0x%08x\n",ret_unsol_enable);
+        //ret_unsol_enable = snd_hda_codec_read(codec, 0x47, 0, AC_VERB_GET_UNSOLICITED_RESPONSE, 0);
+	//codec_dbg(codec,"UNSOL event 0x47 at unsol is 0x%08x\n",ret_unsol_enable);
+
+	// so it seems the low order byte of the res for the 8409 is a copy of the GPIO register state
+	// - except that we dont seem to pass this to the callback functions!!
+
+        dev_info(hda_codec_dev(codec), "cs_8409_jack_unsol_event UNSOL 0x%08x tag 0x%02x\n",res,tag);
 
         event = snd_hda_jack_tbl_get_from_tag(codec, tag);
         if (!event)
                 return;
         event->jack_dirty = 1;
 
-        //call_jack_callback(codec, event);
+	// its the callback struct thats passed as an argument to the callback function
+	// so stuff the res data in the private_data member which seems to be used for such a purpose
+        event->callback->private_data = res;
+
+        // leave this as is even tho so far have only 1 tag so not really needed
+        // so could just call the callback routine directly here
+        cs_8409_call_jack_callback(codec, event);
+
+	// this is the code that generates the 0xf09 verb
+	// however if we define the jack as a phantom_jack we do not send the 0xf09 verb
+	// we need to call this even tho we only have 1 jack to reset jack_dirty
         snd_hda_jack_report_sync(codec);
 }
 
+// Im pretty convinced that Apple uses a timed event from the plugin event
+// before performing further setup
+// not clear how to set this up in linux
+// timer might be way to go but there are some limitations on the timer function
+// which is not clear is going to work here
+// now think just using msleeps is the way to go - this is similar to code in patch_realtek.c
+// for dealing with similar issues
+//static struct timer_list cs_8409_hp_timer;
+
+//static void cs_8409_hp_timer_callback(struct timer_list *tlist)
+//{
+//        printk("snd_hda_intel: cs_8409_hp_timer_callback\n");
+//}
+
 // have an explict one for 8409
 // cs_free is just a definition
-#define cs_8409_free		snd_hda_gen_free
+//#define cs_8409_free		snd_hda_gen_free
+
+void cs_8409_free(struct hda_codec *codec)
+{
+	//del_timer(&cs_8409_hp_timer);
+
+	snd_hda_gen_free(codec);
+}
 
 
 // note this must come after any function definitions used
@@ -1634,6 +1837,55 @@ static const struct hda_fixup cs8409_fixups[] = {
 };
 
 
+static void cs_8409_cs42l83_unsolicited_response(struct hda_codec *codec, unsigned int res);
+
+static void cs_8409_cs42l83_callback(struct hda_codec *codec, struct hda_jack_callback *event)
+{
+	struct cs_spec *spec = codec->spec;
+
+        dev_info(hda_codec_dev(codec), "cs_8409_cs42l83_callback\n");
+
+	// so we have confirmed that these unsol responses are not in linux kernel interrupt state
+	//if (in_interrupt())
+	//	dev_info(hda_codec_dev(codec), "cs_8409_cs42l83_callback - INTERRUPT\n");
+	//else
+	//	dev_info(hda_codec_dev(codec), "cs_8409_cs42l83_callback - not interrupt\n");
+
+	// print the stored unsol res which seems to be the GPIO pins state
+	dev_info(hda_codec_dev(codec), "cs_8409_cs42l83_callback - event private data 0x%08x\n",event->private_data);
+
+
+	cs_8409_cs42l83_unsolicited_response(codec, event->private_data);
+
+
+	// now think timers not the way to go
+	// patch_realtek.c has to deal with similar issues of plugin, headset detection
+	// and just uses msleep calls
+	//mod_timer(&cs_8409_hp_timer, jiffies + msecs_to_jiffies(250));
+
+        // the delayed_work feature might be a way to go tho
+
+        dev_info(hda_codec_dev(codec), "cs_8409_cs42l83_callback end\n");
+}
+
+
+// dont know how to handle the headphone plug in/out yet
+// unfortunately Im guessing these are based on the HDA spec pin event operation
+// and not sure how to trigger the pin events from the logged OSX code of plug in/out events
+// ah - the HDA spec says a jack plug event triggers an unsolicted response
+// plus sets presence detect bits read by command 0xf09
+// we have 4 automute hooks
+// void (*automute_hook)(struct hda_codec *codec);
+// void (*hp_automute_hook)(struct hda_codec *codec, struct hda_jack_callback *cb);
+// void (*line_automute_hook)(struct hda_codec *codec, struct hda_jack_callback *cb);
+// void (*mic_autoswitch_hook)(struct hda_codec *codec, struct hda_jack_callback *cb);
+
+static void cs_8409_automute(struct hda_codec *codec)
+{
+	struct cs_spec *spec = codec->spec;
+	dev_info(hda_codec_dev(codec), "cs_8409_automute called\n");
+}
+
 static int cs_8409_boot_setup(struct hda_codec *codec);
 
 static void cs_8409_playback_pcm_hook(struct hda_pcm_stream *hinfo,
@@ -1646,6 +1898,7 @@ static int patch_cs8409(struct hda_codec *codec)
 {
        struct cs_spec *spec;
        int err;
+       int itm;
        //hda_nid_t *dac_nids_ptr = NULL;
 
        int explicit = 0;
@@ -1675,7 +1928,7 @@ static int patch_cs8409(struct hda_codec *codec)
 
        spec->gen.pcm_playback_hook = cs_8409_playback_pcm_hook;
 
-       //      spec->gen.automute_hook = cs_automute;
+       spec->gen.automute_hook = cs_8409_automute;
 
        // so it appears we need to explicitly apply pre probe fixups here
        // note that if the pinconfigs lists are empty the pin config fixup
@@ -1686,6 +1939,56 @@ static int patch_cs8409(struct hda_codec *codec)
        //                   cs8409_fixups);
        //printk("cs8409 - 2\n");
        //snd_hda_apply_fixup(codec, HDA_FIXUP_ACT_PRE_PROBE);
+
+
+       //timer_setup(&cs_8409_hp_timer, cs_8409_hp_timer_callback, 0);
+
+       printk("snd_hda_intel: cs 8409 jack used %d\n",codec->jacktbl.used);
+
+       // use this to cause unsolicited responses to be stored
+       // but not run
+       spec->block_unsol = 0;
+
+       INIT_LIST_HEAD(&spec->unsol_list);
+
+       for (itm=0; itm<10; itm++)
+               { spec->unsol_items_prealloc_used[itm] = 0; }
+
+
+       // for the moment set initial jack status to not present
+       // we will detect if have jack plugged in on boot later
+       spec->jack_present = 0;
+
+
+       spec->headset_type = 0;
+
+       spec->have_mike = 0;
+
+       spec->have_buttons = 0;
+
+       spec->playing = 0;
+
+       spec->format_setup_needed = 1;
+
+
+       // use this to distinguish which unsolicited phase we are in
+       // for the moment - we only seem to get a tag of 0x37 and dont see any
+       // different tags being setup in OSX logs
+       spec->headset_phase = 0;
+
+       spec->headset_enable = 0;
+
+
+       // so it appears we dont get interrupts in the auto config stage
+
+       // we need to figure out how to setup the jack detect callback
+       // not clear what nid should be used - 0x01 or 0x47
+       // added a tag argument because we seem to get a tag
+       // so far the tag seems to be 0x37
+       cs_8409_hda_jack_detect_enable_callback(codec, 0x01, 0x37, cs_8409_cs42l83_callback);
+
+       printk("snd_hda_intel: cs 8409 jack used callback %d\n",codec->jacktbl.used);
+
 
        //      cs8409_pinmux_init(codec);
 
@@ -1787,11 +2090,11 @@ static int patch_cs8409(struct hda_codec *codec)
 
        // try removing the unused nodes
        spec->gen.autocfg.line_outs = 0;
-       spec->gen.autocfg.hp_outs = 0;
+       //spec->gen.autocfg.hp_outs = 0;
        spec->gen.autocfg.num_inputs = 0;
        spec->gen.num_adc_nids = 0;
        // to clobber the headphone output we would need to clear the hp_out_nid array
-       spec->gen.multiout.hp_out_nid[0] = 0x00;
+       //spec->gen.multiout.hp_out_nid[0] = 0x00;
        // do this to prevent copying to other streams
        // well this clobbers output!!
        //spec->gen.multiout.no_share_stream = 1;
@@ -1813,9 +2116,16 @@ static int patch_cs8409(struct hda_codec *codec)
        //spec->gen.multiout.dac_nids[0] = 0x03;
        //spec->gen.multiout.dac_nids[1] = 0x00;
 
+
+       printk("snd_hda_intel: cs 8409 jack used post %d\n",codec->jacktbl.used);
+
+
        err = cs_8409_boot_setup(codec);
        if (err < 0)
 	       goto error;
+
+       // update the headset phase
+       spec->headset_phase = 1;
 
        spec->play_init = 0;
 
@@ -1833,6 +2143,7 @@ static int patch_cs8409(struct hda_codec *codec)
        cs_free(codec);
        return err;
 }
+
 
 // for the moment split the new code into an include file
 
@@ -1889,10 +2200,12 @@ cs_8409_extended_codec_verb(struct hda_codec *codec, hda_nid_t nid,
 	return retval;
 }
 
-//static void cs_8409_set_extended_codec_verb(void)
-//{
-//	snd_hda_set_extended_codec_verb(cs_8409_extended_codec_verb);
-//}
+#ifdef ADD_EXTENDED_VERB
+static void cs_8409_set_extended_codec_verb(void)
+{
+	snd_hda_set_extended_codec_verb(cs_8409_extended_codec_verb);
+}
+#endif
 
 
 /*

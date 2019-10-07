@@ -1809,29 +1809,39 @@ static void enable_GPIforUR_ssm3(struct hda_codec *codec)
 
 }
 
-static void external_control_GPIO_clear_2_ssm3(struct hda_codec *codec);
-static void external_control_GPIO_set_2_ssm3(struct hda_codec *codec);
+static void cs42l83_external_control_GPIO_clear_2_ssm3(struct hda_codec *codec);
+static void cs42l83_external_control_GPIO_set_2_ssm3(struct hda_codec *codec);
 
-static void external_control_GPIO_ssm3(struct hda_codec *codec)
+static void cs42l83_external_control_GPIO_ssm3(struct hda_codec *codec)
 {
-        // very unsure about this but this could be setting up the GPIO for the headphone jack
+
+        snd_hda_codec_write(codec, CS8409_VENDOR_NID, 0, AC_VERB_SET_PROC_STATE, 0x00000001); // 0x04770301
+        snd_hda_codec_write(codec, CS8409_VENDOR_NID, 0, AC_VERB_SET_PROC_STATE, 0x00000001); // 0x04770301
+
+        // from AppleHDATDM_Codec::resetDevice
+
+        // this could be setting up the GPIO for the headphone jack
         // based on proximity to headphone/mic setup
 
-
-        snd_hda_codec_write(codec, CS8409_VENDOR_NID, 0, AC_VERB_SET_PROC_STATE, 0x00000001); // 0x04770301
-        snd_hda_codec_write(codec, CS8409_VENDOR_NID, 0, AC_VERB_SET_PROC_STATE, 0x00000001); // 0x04770301
+        // note that AppleHDAFunctionGroupExternalControl::setExternalControlState
+        // has an IOSleep() as the first call depending on a value - if non-zero time to sleep
+        // if 0 IOSleep() call ignored
 
         // this clearing then setting gpio bit 2
         // note the gpio mask value here is 0xf cf. the MAX system 0x7
 
-        external_control_GPIO_clear_2_ssm3(codec);
+        //usleep_range(2000,4000);
 
-        external_control_GPIO_set_2_ssm3(codec);
+        cs42l83_external_control_GPIO_clear_2_ssm3(codec);
+
+        //usleep_range(2000,4000);
+
+        cs42l83_external_control_GPIO_set_2_ssm3(codec);
 
 }
 
 
-static void external_control_GPIO_clear_2_ssm3(struct hda_codec *codec)
+static void cs42l83_external_control_GPIO_clear_2_ssm3(struct hda_codec *codec)
 {
 
         //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_POWER_STATE, 0x00000000); // 0x00170500
@@ -1853,7 +1863,7 @@ static void external_control_GPIO_clear_2_ssm3(struct hda_codec *codec)
 
 }
 
-static void external_control_GPIO_set_2_ssm3(struct hda_codec *codec)
+static void cs42l83_external_control_GPIO_set_2_ssm3(struct hda_codec *codec)
 {
 
         //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_POWER_STATE, 0x00000000); // 0x00170500
@@ -1875,10 +1885,9 @@ static void external_control_GPIO_set_2_ssm3(struct hda_codec *codec)
 
 }
 
-static void putative_setup_mic_ssm3(struct hda_codec *codec)
+static void cs42l83_reset_ssm3(struct hda_codec *codec)
 {
-
-
+        //      AppleHDATDM_CS42L83::resetDevice()
 
         // these are i2c calls
         // so it seems Apple is using SET_COEF_INDEX, SET_PROC_COEF to write to the local i2c bus
@@ -2124,7 +2133,7 @@ static void putative_setup_mic_ssm3(struct hda_codec *codec)
 
 }
 
-static void external_control_GPIO2_clear_2_ssm3(struct hda_codec *codec)
+static void cs42l83_external_control_GPIO2_clear_2_ssm3(struct hda_codec *codec)
 {
 
         // plausibly AppleHDAFunctionGroupExternalControl_GPIO::publicSetExternalControlState(bool)
@@ -2146,7 +2155,7 @@ static void external_control_GPIO2_clear_2_ssm3(struct hda_codec *codec)
 
 }
 
-static void external_control_GPIO2_set_2_ssm3(struct hda_codec *codec)
+static void cs42l83_external_control_GPIO2_set_2_ssm3(struct hda_codec *codec)
 {
 
         // plausibly AppleHDAFunctionGroupExternalControl_GPIO::publicSetExternalControlState(bool)
@@ -2168,7 +2177,7 @@ static void external_control_GPIO2_set_2_ssm3(struct hda_codec *codec)
 
 }
 
-static void putative_setup_mic2_ssm3(struct hda_codec *codec)
+static void cs42l83_init_ssm3(struct hda_codec *codec)
 {
 
         //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_POWER_STATE, 0x00000000); // 0x00170500
@@ -2216,6 +2225,12 @@ static void putative_setup_mic2_ssm3(struct hda_codec *codec)
 
         //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_POWER_STATE, 0x00000003); // 0x00170503
         //hda_set_node_power_state(codec, codec->core.afg, AC_PWRST_D3);
+
+}
+
+
+static void cs42l83_inithw_ssm3(struct hda_codec *codec)
+{
 
         //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_POWER_STATE, 0x00000000); // 0x00170500
         //hda_set_node_power_state(codec, codec->core.afg, AC_PWRST_D0);
@@ -3053,8 +3068,11 @@ static void putative_gpio_ssm3(struct hda_codec *codec)
 }
 
 
-static void putative_setup_mic3_ssm3(struct hda_codec *codec)
+static void cs42l83_mic_detect_ssm3(struct hda_codec *codec)
 {
+
+        // enterStandby is only function that issues 0x75 but it doesnt look right
+        // mic detect is register name
 
         snd_hda_codec_write(codec, CS8409_VENDOR_NID, 0, AC_VERB_SET_PROC_STATE, 0x00000001); // 0x04770301
 
@@ -3095,6 +3113,12 @@ static void putative_setup_mic3_ssm3(struct hda_codec *codec)
         snd_hda_coef_item(codec, 1, CS8409_VENDOR_NID, 0x0000, 0x9000, 0x00000000, 4277 ); // i2cPagedWrite  coef write 4277
 //      snd_hda i2cPagedWrite end
 
+}
+
+static void cs42l83_tip_sense_ssm3(struct hda_codec *codec)
+{
+        //int retval;
+
 //      snd_hda: # i2cPagedRead: 
 //      snd_hda i2cPagedRead  i2c address 0x90 i2c reg hi 0x1b lo 0x7300 i2c data 0x7302
         //cs_8409_vendor_i2cRead(codec, 0x90, 0x1b73, 1); // snd_hda
@@ -3128,6 +3152,13 @@ static void putative_setup_mic3_ssm3(struct hda_codec *codec)
         snd_hda_coef_item(codec, 0, CS8409_VENDOR_NID, 0x0000, 0x0000, 0x00009008, 4367 ); // i2cPagedWrite  coef read 4367
         snd_hda_coef_item(codec, 1, CS8409_VENDOR_NID, 0x0000, 0x9000, 0x00000000, 4371 ); // i2cPagedWrite  coef write 4371
 //      snd_hda i2cPagedWrite end
+
+}
+
+static void cs42l83_interrupt_setup_ssm3(struct hda_codec *codec)
+{
+
+        // this enables the headphone sense interrupt
 
 //      snd_hda: # i2cPagedRead: 
 //      snd_hda i2cPagedRead  i2c address 0x90 i2c reg hi 0x1b lo 0x7b00 i2c data 0x7b60
@@ -3180,6 +3211,7 @@ static void putative_setup_mic3_ssm3(struct hda_codec *codec)
         snd_hda_coef_item(codec, 1, CS8409_VENDOR_NID, 0x0000, 0x9000, 0x00000000, 4512 ); // i2cPagedWrite  coef write 4512
 //      snd_hda i2cPagedWrite end
 
+}
 
         // I now think the OSX logs may not be exactly ordered - so this may be a bunch from the above calls
         //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_POWER_STATE, 0x00000003); // 0x00170503
@@ -3194,6 +3226,11 @@ static void putative_setup_mic3_ssm3(struct hda_codec *codec)
         //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_POWER_STATE, 0x00000000); // 0x00170500
         //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_POWER_STATE, 0x00000003); // 0x00170503
         //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_POWER_STATE, 0x00000000); // 0x00170500
+
+static void cs42l83_headphone_sense_ssm3(struct hda_codec *codec)
+{
+
+        // AppleHDATDM_Codec::getHeadphonePinSense(bool*, unsigned int*)
 
 //      snd_hda: # i2cPagedRead: 
 //      snd_hda i2cPagedRead  i2c address 0x90 i2c reg hi 0x1b lo 0x7700 i2c data 0x7716
@@ -5393,7 +5430,7 @@ static void read_gpio_status3_ssm3(struct hda_codec *codec)
         //hda_set_node_power_state(codec, codec->core.afg, AC_PWRST_D3);
 
 
-static void setup_mic3_ssm3(struct hda_codec *codec)
+static void cs42l83_headphone_sense1_ssm3(struct hda_codec *codec)
 {
 
         //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_POWER_STATE, 0x00000000); // 0x00170500
@@ -5483,7 +5520,7 @@ static void setup_mic_vol5_ssm3(struct hda_codec *codec)
         //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_POWER_STATE, 0x00000003); // 0x00170503
 
 
-static void setup_mic4_ssm3(struct hda_codec *codec)
+static void cs42l83_headphone_sense2_ssm3(struct hda_codec *codec)
 {
 
         //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_POWER_STATE, 0x00000000); // 0x00170500
@@ -5512,7 +5549,7 @@ static void setup_mic4_ssm3(struct hda_codec *codec)
 }
 
 
-static void setup_mic5_ssm3(struct hda_codec *codec)
+static void cs42l83_headphone_sense3_ssm3(struct hda_codec *codec)
 {
 
         //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_POWER_STATE, 0x00000000); // 0x00170500
@@ -5607,15 +5644,18 @@ static void cs_8409_boot_setup_data_ssm3(struct hda_codec *codec)
 
         enable_GPIforUR_ssm3(codec);
 
-        external_control_GPIO_ssm3(codec);
 
-        putative_setup_mic_ssm3(codec);
+        cs42l83_external_control_GPIO_ssm3(codec);
 
-        external_control_GPIO2_clear_2_ssm3(codec);
+        cs42l83_reset_ssm3(codec);
 
-        external_control_GPIO2_set_2_ssm3(codec);
+        cs42l83_external_control_GPIO2_clear_2_ssm3(codec);
 
-        putative_setup_mic2_ssm3(codec);
+        cs42l83_external_control_GPIO2_set_2_ssm3(codec);
+
+        cs42l83_init_ssm3(codec);
+
+        cs42l83_inithw_ssm3(codec);
 
 
         setup_amps_reset_ssm3(codec);
@@ -5623,7 +5663,13 @@ static void cs_8409_boot_setup_data_ssm3(struct hda_codec *codec)
         putative_gpio_ssm3(codec);
 
 
-        putative_setup_mic3_ssm3(codec);
+        cs42l83_mic_detect_ssm3(codec);
+
+        cs42l83_tip_sense_ssm3(codec);
+
+        cs42l83_interrupt_setup_ssm3(codec);
+
+        cs42l83_headphone_sense_ssm3(codec);
 
         setup_jack_nids_ssm3(codec);
 
@@ -5701,15 +5747,15 @@ static void cs_8409_boot_setup_data_ssm3(struct hda_codec *codec)
         read_gpio_status3_ssm3(codec);
 
 
-        setup_mic3_ssm3(codec);
+        cs42l83_headphone_sense1_ssm3(codec);
 
         setup_mic_vol4_ssm3(codec);
 
         setup_mic_vol5_ssm3(codec);
 
-        setup_mic4_ssm3(codec);
+        cs42l83_headphone_sense2_ssm3(codec);
 
-        setup_mic5_ssm3(codec);
+        cs42l83_headphone_sense3_ssm3(codec);
 
         setup_mic_vol6_ssm3(codec);
 

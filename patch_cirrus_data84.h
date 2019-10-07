@@ -163,7 +163,7 @@ static void gpio_set4(struct hda_codec *codec)
 	dev_info(hda_codec_dev(codec), "end   gpio_set4\n");
 }
 
-static void setup_reset_and_clear(struct hda_codec *codec)
+static void setup_reset_and_clear_data(struct hda_codec *codec)
 {
 
         // so now really dont know why I skipped all this - maybe because they
@@ -234,7 +234,7 @@ static void setup_reset_and_clear(struct hda_codec *codec)
 
 }
 
-static void init_read_all_nodes(struct hda_codec *codec)
+static void init_read_all_nodes_data(struct hda_codec *codec)
 {
         int retval;
 
@@ -1527,7 +1527,7 @@ static void init_read_all_nodes(struct hda_codec *codec)
 
 }
 
-static void read_vendor_node(struct hda_codec *codec)
+static void read_vendor_node_data(struct hda_codec *codec)
 {
         int retval;
 
@@ -1552,9 +1552,9 @@ static void read_vendor_node(struct hda_codec *codec)
 
 }
 
-static void read_coefs_all(struct hda_codec *codec);
+static void read_coefs_all_data(struct hda_codec *codec);
 
-static void init_read_coefs(struct hda_codec *codec)
+static void init_read_coefs_data(struct hda_codec *codec)
 {
 
         int retval;
@@ -1568,14 +1568,14 @@ static void init_read_coefs(struct hda_codec *codec)
 
         // this is after the read_all_nodes loop
 
-        read_coefs_all(codec);
+        read_coefs_all_data(codec);
 
         //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_POWER_STATE, 0x00000003);
         //hda_set_node_power_state(codec, codec->core.afg, AC_PWRST_D3);
 
 }
 
-static void read_coefs_all(struct hda_codec *codec)
+static void read_coefs_all_data(struct hda_codec *codec)
 {
 
         // leave these in as check of state
@@ -1717,13 +1717,13 @@ static void read_coefs_all(struct hda_codec *codec)
 
 }
 
-static void read_virtual_widgets(struct hda_codec *codec)
+static void read_virtual_widgets_data(struct hda_codec *codec)
 {
        // setup the virtual widgets
 
         unsigned int retval;
 
-        dev_info(hda_codec_dev(codec), "command nid start read_virtual_widgets\n");
+        dev_info(hda_codec_dev(codec), "command nid start read_virtual_widgets_data\n");
 
         // copied to outer routine
         //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_POWER_STATE, 0x00000000); // 0x00170500
@@ -1790,11 +1790,11 @@ static void read_virtual_widgets(struct hda_codec *codec)
 //      snd_hda:     75 AC_WID_AUD_OUT ['AC_WCAP_CHAN_CNT_EXT', 'AC_WCAP_DELAY', 'AC_WCAP_TYPE'] 0 0 0
 
 
-        dev_info(hda_codec_dev(codec), "command nid end   read_virtual_widgets\n");
+        dev_info(hda_codec_dev(codec), "command nid end   read_virtual_widgets_data\n");
 
 }
 
-static void init_for_node_id(struct hda_codec *codec)
+static void init_for_node_id_data(struct hda_codec *codec)
 {
 
         int retval;
@@ -1909,7 +1909,7 @@ static void init_for_node_id(struct hda_codec *codec)
 
 }
 
-static void setup_jack_pin_config(struct hda_codec *codec)
+static void setup_jack_pin_config_data(struct hda_codec *codec)
 {
 
         //int retval;
@@ -1932,7 +1932,7 @@ static void setup_jack_pin_config(struct hda_codec *codec)
 
 }
 
-static void enable_i2c(struct hda_codec *codec)
+static void enable_i2c_data(struct hda_codec *codec)
 {
         //int retval;
 
@@ -1973,6 +1973,11 @@ static void enable_GPIforUR_max(struct hda_codec *codec)
 
         // AppleHDAFunctionGroupCS8409::enableGPIforUR
 
+        // finally understood this function GPIO 1 is programmed as an input
+        // and state changes lead to an Unsolicited Response - hence enableGPIforUR
+        // this is used to handle jack plugin/plugout events
+        // (possibly among other things)
+
         //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_POWER_STATE, 0x00000000); // 0x00170500
         //hda_set_node_power_state(codec, codec->core.afg, AC_PWRST_D0);
 
@@ -2003,52 +2008,90 @@ static void enable_GPIforUR_max(struct hda_codec *codec)
 
 }
 
+        // this may be more likely
+        // only issue is that AppleHDATDM_Codec::resetDevice seems to have other functions that seem likely to send i2c data
+        // note the setExternalControlForDefaultDeviceTypeAndTag function sends the GPIO updates as noted above
+        // but AppleHDATDM_CS42L83::resetDevice contains the 0x1301 to 0x130f sequence
+        // AppleHDATDM_CS42L83::init
+        //         AppleHDATDM_CS42L83::resetDevice
+        //                 AppleHDATDM_Codec::resetDevice
+        //                        AppleHDAFunctionGroup::externalControlExistsForDefaultDeviceTypeAndTag(0xf(%rsi), 0x35(%rdx))
+        //                        AppleHDAFunctionGroup::setExternalControlForDefaultDeviceTypeAndTag(1(%rsi), 0xf(%rdx), 0x35(%rcx))
+        //                                AppleHDAFunctionGroupExternalControl::setExternalControlState(unk(%rsi), unk(%rdx))
+        //                        AppleHDAFunctionGroup::setExternalControlForDefaultDeviceTypeAndTag(0(%rsi), 0xf(%rdx), 0x35(%rcx))
+        //                                AppleHDAFunctionGroupExternalControl::setExternalControlState(unk(%rsi), unk(%rdx))
 
-static void external_control_GPIO_clear_2_max(struct hda_codec *codec);
-static void external_control_GPIO_set_2_max(struct hda_codec *codec);
+        //                                AppleHDAFunctionGroupExternalControl::setExternalControlState
+        //                                calls AppleHDAFunctionGroupExternalControl::publicSetExternalControlState
+        //                                this appears to be virtual - the definition just asserts
+        //                                good candidate is AppleHDAFunctionGroupExternalControl_GPIO::publicSetExternalControlState
+        //                                AppleHDAFunctionGroupExternalControl_GPIO::publicSetExternalControlState
+        //                                is the function which does the external_control_GPIO_clear0 or external_control_GPIO_set1
+        //                                functions below
 
-static void external_control_GPIO_max(struct hda_codec *codec)
+        //         followed by i2c calls for 0x1301 to 0x130f
+        // we have a 2nd set of GPIO clear/set calls which cant figure out where they get called
+        // followed by i2c calls 0x1001
+        // followed by i2c calls 0x1005
+        // followed by AppleHDATDM_CS42L83::_initHW()
+
+
+        // functions with 0x1301 calls
+        //      AppleHDATDM_CS42L83::_initHW
+        //      AppleHDATDM_CS42L83::resetDevice()
+        //      AppleHDATDM_CS42L83::readStatusAndClearInterrupt(unsigned int)
+
+        // only reasonable one for bare 0x1301 calls is AppleHDATDM_CS42L83::resetDevice()
+        // if the AppleHDATDM_Codec::resetDevice() ignores the AppleHDAFunctionGroup::setExternalControlForDefaultDeviceTypeAndTag
+        // ah yes - if AppleHDAFunctionGroup::externalControlExistsForDefaultDeviceTypeAndTag returns 0 (false)
+        // no set calls are done
+
+
+static void cs42l83_external_control_GPIO_clear_2_max(struct hda_codec *codec);
+static void cs42l83_external_control_GPIO_set_2_max(struct hda_codec *codec);
+
+static void cs42l83_external_control_GPIO_max(struct hda_codec *codec)
 {
 
-        // possibly AppleHDAPathSet::initPathSetFromXML
-        // or AppleHDAPathSet::enable and AppleHDAPathSet::disable
+        snd_hda_codec_write(codec, CS8409_VENDOR_NID, 0, AC_VERB_SET_PROC_STATE, 0x00000001); // 0x04770301
+        snd_hda_codec_write(codec, CS8409_VENDOR_NID, 0, AC_VERB_SET_PROC_STATE, 0x00000001); // 0x04770301
 
-        // forward call trace
-        // AppleHDAPathSet::initPathSetFromXML
-        // calls AppleHDAFunctionGroup::setExternalControlForDefaultDeviceTypeAndTag
-        // AppleHDAFunctionGroup::setExternalControlForDefaultDeviceTypeAndTag
-        // calls AppleHDAFunctionGroupExternalControl::setExternalControlState
-        // AppleHDAFunctionGroupExternalControl::setExternalControlState
-        // calls AppleHDAFunctionGroupExternalControl::publicSetExternalControlState
-        // this appears to be virtual - the definition just asserts
-        // good candidate is AppleHDAFunctionGroupExternalControl_GPIO::publicSetExternalControlState
-        // AppleHDAFunctionGroupExternalControl_GPIO::publicSetExternalControlState
-        // is the function which does the external_control_GPIO_clear0 or external_control_GPIO_set1
-        // functions below
+        // from AppleHDATDM_Codec::resetDevice
+
+        // this could be setting up the GPIO for the headphone jack
+        // based on proximity to headphone/mic setup
 
         // note that AppleHDAFunctionGroupExternalControl::setExternalControlState
-        // has an IOSleep() as the first call depending on a flag 
+        // has an IOSleep() as the first call depending on a value - if non-zero time to sleep
+        // if 0 IOSleep() call ignored
 
-        snd_hda_codec_write(codec, CS8409_VENDOR_NID, 0, AC_VERB_SET_PROC_STATE, 0x00000001); // 0x04770301
-        snd_hda_codec_write(codec, CS8409_VENDOR_NID, 0, AC_VERB_SET_PROC_STATE, 0x00000001); // 0x04770301
-
+        dev_info(hda_codec_dev(codec), "command cs42l83_external_control_GPIO start\n");
 
         // this clearing then setting gpio bit 2
 
-        external_control_GPIO_clear_2_max(codec);
+        //usleep_range(2000,4000);
 
-        external_control_GPIO_set_2_max(codec);
+        cs42l83_external_control_GPIO_clear_2_max(codec);
+
+        //usleep_range(2000,4000);
+
+        cs42l83_external_control_GPIO_set_2_max(codec);
+
+
+        dev_info(hda_codec_dev(codec), "command cs42l83_external_control_GPIO end\n");
 
 }
 
 
-static void external_control_GPIO_clear_2_max(struct hda_codec *codec)
+static void cs42l83_external_control_GPIO_clear_2_max(struct hda_codec *codec)
 {
+
+        // from AppleHDATDM_Codec::resetDevice
+
+        // plausibly AppleHDAFunctionGroupExternalControl_GPIO::publicSetExternalControlState(bool)
 
         //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_POWER_STATE, 0x00000000); // 0x00170500
         //hda_set_node_power_state(codec, codec->core.afg, AC_PWRST_D0);
-
-        // plausibly AppleHDAFunctionGroupExternalControl_GPIO::publicSetExternalControlState(bool)
 
         // AppleHDAFunctionGroup::setGPIODirection
         snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_GPIO_DIRECTION, 0x00000002); // 0x00171702
@@ -2065,11 +2108,13 @@ static void external_control_GPIO_clear_2_max(struct hda_codec *codec)
 
 }
 
-static void external_control_GPIO_set_2_max(struct hda_codec *codec)
+static void cs42l83_external_control_GPIO_set_2_max(struct hda_codec *codec)
 {
 
         //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_POWER_STATE, 0x00000000); // 0x00170500
         //hda_set_node_power_state(codec, codec->core.afg, AC_PWRST_D0);
+
+        // from AppleHDATDM_Codec::resetDevice
 
         // plausibly AppleHDAFunctionGroupExternalControl_GPIO::publicSetExternalControlState(bool)
 
@@ -2088,10 +2133,9 @@ static void external_control_GPIO_set_2_max(struct hda_codec *codec)
 
 }
 
-static void putative_setup_mic(struct hda_codec *codec)
+static void cs42l83_reset_data(struct hda_codec *codec)
 {
-
-
+        //      AppleHDATDM_CS42L83::resetDevice()
 
         // these are i2c calls
         // so it seems Apple is using SET_COEF_INDEX, SET_PROC_COEF to write to the local i2c bus
@@ -2335,9 +2379,13 @@ static void putative_setup_mic(struct hda_codec *codec)
         //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_POWER_STATE, 0x00000003); // 0x00170503
         //hda_set_node_power_state(codec, codec->core.afg, AC_PWRST_D3);
 
+        dev_info(hda_codec_dev(codec), "command cs42l83_reset_data end\n");
 }
 
-static void external_control_GPIO2_clear_2_max(struct hda_codec *codec)
+        // this is likely a repeat of cs42l83_external_control_GPIO_max
+        // from AppleHDATDM_Codec::resetDevice
+
+static void cs42l83_external_control_GPIO2_clear_2_max(struct hda_codec *codec)
 {
 
 
@@ -2361,7 +2409,7 @@ static void external_control_GPIO2_clear_2_max(struct hda_codec *codec)
 
 }
 
-static void external_control_GPIO2_set_2_max(struct hda_codec *codec)
+static void cs42l83_external_control_GPIO2_set_2_max(struct hda_codec *codec)
 {
 
         // plausibly AppleHDAFunctionGroupExternalControl_GPIO::publicSetExternalControlState(bool)
@@ -2379,13 +2427,21 @@ static void external_control_GPIO2_set_2_max(struct hda_codec *codec)
         //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_POWER_STATE, 0x00000003); // 0x00170503
         //hda_set_node_power_state(codec, codec->core.afg, AC_PWRST_D3);
 
+        dev_info(hda_codec_dev(codec), "command cs42l83_external_control_GPIO2_set_2_max end\n");
 }
 
-static void putative_setup_mic2(struct hda_codec *codec)
+static void cs42l83_device_id_data(struct hda_codec *codec)
 {
+
+        // in AppleHDATDM_CS42L83::init
 
         //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_POWER_STATE, 0x00000000); // 0x00170500
         //hda_set_node_power_state(codec, codec->core.afg, AC_PWRST_D0);
+
+        // register 0x1001 - Device ID A and B
+        //                 - value 0x42 (0x4 device id A, 0x2 device id B)
+        // register 0x1005 - Revision ID
+        //                 - value 0xb0 (0xb Alpha revision, 0x0 Metal revision)
 
 //      snd_hda: # i2cPagedRead: 
 //      snd_hda i2cPagedRead  i2c address 0x90 i2c reg hi 0x10 lo 0x0100 i2c data 0x0142
@@ -2429,6 +2485,20 @@ static void putative_setup_mic2(struct hda_codec *codec)
 
         //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_POWER_STATE, 0x00000003); // 0x00170503
         //hda_set_node_power_state(codec, codec->core.afg, AC_PWRST_D3);
+
+        dev_info(hda_codec_dev(codec), "command cs42l83_device_id_data end\n");
+}
+
+
+static void cs42l83_inithw_data(struct hda_codec *codec)
+{
+
+        // AppleHDATDM_CS42L83::_initHW() called from AppleHDATDM_CS42L83::init
+
+        // this triggers the 1st UNSOL response
+
+        dev_info(hda_codec_dev(codec), "command cs42l83_inithw_data start\n");
+
 
         //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_POWER_STATE, 0x00000000); // 0x00170500
         //hda_set_node_power_state(codec, codec->core.afg, AC_PWRST_D0);
@@ -2521,11 +2591,6 @@ static void putative_setup_mic2(struct hda_codec *codec)
 
         //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_POWER_STATE, 0x00000003); // 0x00170503
         //hda_set_node_power_state(codec, codec->core.afg, AC_PWRST_D3);
-
-}
-
-static void putative_setup_mic3(struct hda_codec *codec)
-{
 
         //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_POWER_STATE, 0x00000000); // 0x00170500
         //hda_set_node_power_state(codec, codec->core.afg, AC_PWRST_D0);
@@ -2691,6 +2756,10 @@ static void putative_setup_mic3(struct hda_codec *codec)
         //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_POWER_STATE, 0x00000000); // 0x00170500
         //hda_set_node_power_state(codec, codec->core.afg, AC_PWRST_D0);
 
+
+        // this triggers an UNSOL response with interrupt cleared state
+        // this writes to SRC Interrupt Mask unmasking all interrupts
+
 //      snd_hda: # i2cPagedWrite: 
 //      snd_hda i2cPagedWrite i2c address 0x90 i2c reg hi 0x13 lo 0x1800 i2c data 0x0000
         //cs_8409_vendor_i2cWrite(codec, 0x90, 0x1318, 0x0000, 1); // snd_hda
@@ -2852,6 +2921,7 @@ static void putative_setup_mic3(struct hda_codec *codec)
         //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_POWER_STATE, 0x00000000); // 0x00170500
         //hda_set_node_power_state(codec, codec->core.afg, AC_PWRST_D0);
 
+
 //      snd_hda: # i2cPagedRead: 
 //      snd_hda i2cPagedRead  i2c address 0x90 i2c reg hi 0x13 lo 0x0100 i2c data 0x0100
         //cs_8409_vendor_i2cRead(codec, 0x90, 0x1301, 1); // snd_hda
@@ -2940,11 +3010,6 @@ static void putative_setup_mic3(struct hda_codec *codec)
 
         //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_POWER_STATE, 0x00000003); // 0x00170503
         //hda_set_node_power_state(codec, codec->core.afg, AC_PWRST_D3);
-
-}
-
-static void putative_setup_mic4(struct hda_codec *codec)
-{
 
         //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_POWER_STATE, 0x00000000); // 0x00170500
         //hda_set_node_power_state(codec, codec->core.afg, AC_PWRST_D0);
@@ -3176,6 +3241,7 @@ static void putative_setup_mic4(struct hda_codec *codec)
         //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_POWER_STATE, 0x00000003); // 0x00170503
         //hda_set_node_power_state(codec, codec->core.afg, AC_PWRST_D3);
 
+        dev_info(hda_codec_dev(codec), "command cs42l83_inithw_data end\n");
 }
 
 
@@ -3367,15 +3433,22 @@ static void read_gpio_status(struct hda_codec *codec)
 
 }
 
-static void putative_setup_mic5(struct hda_codec *codec)
+static void cs42l83_mic_detect_data(struct hda_codec *codec)
 {
         //int retval;
 
+        // enterStandby is only function that issues 0x75 but it doesnt look right
+        // mic detect is register name
+
+        // AppleHDATDM_CS42L83::enterStandby
+
+        // so this appears to change 0x1b75 from 0x9f to 0x9f
+
+        // register 0x1b75 - Mic Detect Control 1
+        //                   changed from 0x9f ((0x80 LATCH_TO_VP set, HS_DETECT_LEVEL 1f) to 0x9f ((0x80 LATCH_TO_VP set, HS_DETECT_LEVEL 1f)
+
 
         snd_hda_codec_write(codec, CS8409_VENDOR_NID, 0, AC_VERB_SET_PROC_STATE, 0x00000001); // 0x04770301
-
-        // curious - these functions not separated by power down/ups
-        // ah - the log may not be ordered - they are output as a bunch at the end!!
 
         //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_POWER_STATE, 0x00000000); // 0x00170500
         //hda_set_node_power_state(codec, codec->core.afg, AC_PWRST_D0);
@@ -3414,6 +3487,16 @@ static void putative_setup_mic5(struct hda_codec *codec)
         snd_hda_coef_item(codec, 1, CS8409_VENDOR_NID, 0x0000, 0x9000, 0x00000000, 4319 ); // i2cPagedWrite  coef write 4319
 //      snd_hda i2cPagedWrite end
 
+        dev_info(hda_codec_dev(codec), "command cs42l83_mic_detect end\n");
+}
+
+static void cs42l83_tip_sense_data(struct hda_codec *codec)
+{
+        //int retval;
+
+        // register 0x1b73 - Tip Sense Control 2
+        //                   changed from 0x02 (default) to 0xc0 (short detect)
+
 //      snd_hda: # i2cPagedRead: 
 //      snd_hda i2cPagedRead  i2c address 0x90 i2c reg hi 0x1b lo 0x7300 i2c data 0x7302
         //cs_8409_vendor_i2cRead(codec, 0x90, 0x1b73, 1); // snd_hda
@@ -3447,6 +3530,27 @@ static void putative_setup_mic5(struct hda_codec *codec)
         snd_hda_coef_item(codec, 0, CS8409_VENDOR_NID, 0x0000, 0x0000, 0x00009008, 4409 ); // i2cPagedWrite  coef read 4409
         snd_hda_coef_item(codec, 1, CS8409_VENDOR_NID, 0x0000, 0x9000, 0x00000000, 4413 ); // i2cPagedWrite  coef write 4413
 //      snd_hda i2cPagedWrite end
+
+        dev_info(hda_codec_dev(codec), "command cs42l83_tip_sense end\n");
+}
+
+
+static void cs42l83_plug_interrupt_setup_data(struct hda_codec *codec)
+{
+
+        // this enables the headphone sense interrupt
+
+        // register 0x1b7b - this is undocumented for 42l42 but labelled in fig 4-45 as Interrupt
+        //                   now think this shows which interrupt of 0x1b79 was triggered
+        //                   reading this clears any interrupt which will send a UR
+        //                   value 0x00 
+        // register 0x1b79 - Detect Interrupt Mask 1
+        //                   changed from 0xe0 (default) to 0xa0 - unmasks TIP_SENSE_PLUG
+
+        // so reading 0x1b7b seems to lead to 2 UNSOL events
+        // one with interrupt set followed by one with interrupt cleared
+
+        dev_info(hda_codec_dev(codec), "command cs42l83_plug_interrupt_setup start\n");
 
 //      snd_hda: # i2cPagedRead: 
 //      snd_hda i2cPagedRead  i2c address 0x90 i2c reg hi 0x1b lo 0x7b00 i2c data 0x7b00
@@ -3499,23 +3603,34 @@ static void putative_setup_mic5(struct hda_codec *codec)
         snd_hda_coef_item(codec, 1, CS8409_VENDOR_NID, 0x0000, 0x9000, 0x00000000, 4554 ); // i2cPagedWrite  coef write 4554
 //      snd_hda i2cPagedWrite end
 
-        // weird - multiple power down/ups
-        // oh pigs - I bet these are delayed from the above calls - log output may not be ordered!!
-        // highly likely - there is same number of these as i2c calls above
         //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_POWER_STATE, 0x00000003); // 0x00170503
-        //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_POWER_STATE, 0x00000000); // 0x00170500
-        //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_POWER_STATE, 0x00000003); // 0x00170503
-        //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_POWER_STATE, 0x00000000); // 0x00170500
-        //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_POWER_STATE, 0x00000003); // 0x00170503
-        //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_POWER_STATE, 0x00000000); // 0x00170500
-        //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_POWER_STATE, 0x00000003); // 0x00170503
-        //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_POWER_STATE, 0x00000000); // 0x00170500
-        //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_POWER_STATE, 0x00000003); // 0x00170503
-        //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_POWER_STATE, 0x00000000); // 0x00170500
-        //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_POWER_STATE, 0x00000003); // 0x00170503
-        //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_POWER_STATE, 0x00000000); // 0x00170500
         //hda_set_node_power_state(codec, codec->core.afg, AC_PWRST_D3);
-        //hda_set_node_power_state(codec, codec->core.afg, AC_PWRST_D0);
+
+        dev_info(hda_codec_dev(codec), "command cs42l83_plug_interrupt_setup end\n");
+}
+
+        // weird - multiple power down/ups
+        //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_POWER_STATE, 0x00000000); // 0x00170500
+        //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_POWER_STATE, 0x00000003); // 0x00170503
+        //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_POWER_STATE, 0x00000000); // 0x00170500
+        //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_POWER_STATE, 0x00000003); // 0x00170503
+        //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_POWER_STATE, 0x00000000); // 0x00170500
+        //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_POWER_STATE, 0x00000003); // 0x00170503
+        //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_POWER_STATE, 0x00000000); // 0x00170500
+        //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_POWER_STATE, 0x00000003); // 0x00170503
+        //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_POWER_STATE, 0x00000000); // 0x00170500
+        //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_POWER_STATE, 0x00000003); // 0x00170503
+
+static void cs42l83_headphone_sense_data(struct hda_codec *codec)
+{
+
+        // AppleHDATDM_Codec::getHeadphonePinSense(bool*, unsigned int*)
+
+        // register 0x1b77 - Detect Status 1
+        //                   value 0x16 HP unplugged, bias 0x16
+
+        //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_POWER_STATE, 0x00000000); // 0x00170500
+        hda_set_node_power_state(codec, codec->core.afg, AC_PWRST_D0);
 
 //      snd_hda: # i2cPagedRead: 
 //      snd_hda i2cPagedRead  i2c address 0x90 i2c reg hi 0x1b lo 0x7700 i2c data 0x7716
@@ -3535,24 +3650,29 @@ static void putative_setup_mic5(struct hda_codec *codec)
 //      snd_hda i2cPagedRead end
 
         //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_POWER_STATE, 0x00000003); // 0x00170503
-        //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_POWER_STATE, 0x00000000); // 0x00170500
-        //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_POWER_STATE, 0x00000003); // 0x00170503
-        //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_POWER_STATE, 0x00000000); // 0x00170500
-        //hda_set_node_power_state(codec, codec->core.afg, AC_PWRST_D3);
-        //hda_set_node_power_state(codec, codec->core.afg, AC_PWRST_D0);
+        hda_set_node_power_state(codec, codec->core.afg, AC_PWRST_D3);
 
+        dev_info(hda_codec_dev(codec), "command cs42l83_headphone_sense_data end\n");
 }
 
-static void setup_jack_nids(struct hda_codec *codec)
+        //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_POWER_STATE, 0x00000000); // 0x00170500
+        //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_POWER_STATE, 0x00000003); // 0x00170503
+
+static void setup_intmike_nid(struct hda_codec *codec)
 {
         int retval;
 
         //int retgain1;
         //int retgain2;
 
-        // this works on nids 0x22, 0x23, and 0x44, 0x45
 
-        // these I think are the line in/headphone socket nids
+        // this works on nids 0x22 and 0x44 - I think this is the internal mike
+
+        // this is the internal mike nid path 0x44 -> 0x22
+
+
+        //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_POWER_STATE, 0x00000000); // 0x00170500
+        hda_set_node_power_state(codec, codec->core.afg, AC_PWRST_D0);
 
 
         snd_hda_codec_write(codec, 0x22, 0, AC_VERB_SET_STREAM_FORMAT, 0x00004031); // 0x02224031
@@ -3614,8 +3734,6 @@ static void setup_jack_nids(struct hda_codec *codec)
 //      snd_hda:     amp gain/mute 68 0x5000 mute 0 gain 0x0 0 index 0x00 left 0 right 1 output 0 input 1  right  input
 
 
-        // I think this is for node 0x44
-
         snd_hda_coef_item(codec, 0, CS8409_VENDOR_NID, 0x0082, 0x0000, 0x00000000, 4692 ); //   coef read 4692
         snd_hda_coef_item(codec, 1, CS8409_VENDOR_NID, 0x0082, 0x0001, 0x00000000, 4696 ); //   coef write 4696
 
@@ -3623,16 +3741,37 @@ static void setup_jack_nids(struct hda_codec *codec)
         snd_hda_codec_write(codec, 0x44, 0, AC_VERB_SET_PIN_WIDGET_CONTROL, 0x00000020); // 0x04470720
 //      snd_hda:     68 ['AC_PINCTL_IN_EN']
 
+
         //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_POWER_STATE, 0x00000003); // 0x00170503
-        //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_POWER_STATE, 0x00000000); // 0x00170500
-        //hda_set_node_power_state(codec, codec->core.afg, AC_PWRST_D0);
         //hda_set_node_power_state(codec, codec->core.afg, AC_PWRST_D3);
 
-        // and redo the stream format???
+}
+
+static void setup_intmike_format_resetup(struct hda_codec *codec)
+{
+        //int retval;
+
+        //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_POWER_STATE, 0x00000000); // 0x00170500
+        //hda_set_node_power_state(codec, codec->core.afg, AC_PWRST_D0);
+
+
+        // and redo the stream format for the int mike???
         snd_hda_codec_write(codec, 0x22, 0, AC_VERB_SET_STREAM_FORMAT, 0x00004031); // 0x02224031
 //      snd_hda:     stream format 34 [('CHAN', 2), ('RATE', 44100), ('BITS', 24), ('RATE_MUL', 1), ('RATE_DIV', 1)]
 
-        // followed by channels for node 0x23 and 0x45
+}
+
+static void setup_linein_nid(struct hda_codec *codec)
+{
+        int retval;
+
+        //int retgain1;
+        //int retgain2;
+
+        // this works on nids 0x23, and 0x45 - I think this is line in
+
+        // this is the line in nid path 0x45 -> 0x23
+
 
         retval = snd_hda_codec_read_check(codec, 0x23, 0, AC_VERB_GET_AMP_GAIN_MUTE, 0x00002000, 0x000000b3, 4710); // 0x023b2000
 //      snd_hda:     amp gain/mute 35 0x2000 index 0x00 left/right 1 left output/input 0 input
@@ -3685,25 +3824,19 @@ static void setup_jack_nids(struct hda_codec *codec)
         snd_hda_coef_item(codec, 0, CS8409_VENDOR_NID, 0x0082, 0x0000, 0x00000001, 4731 ); //   coef read 4731
         snd_hda_coef_item(codec, 1, CS8409_VENDOR_NID, 0x0082, 0x0001, 0x00000000, 4735 ); //   coef write 4735
 
-        // and a sneaky node 0x45 here
-
         retval = snd_hda_codec_read_check(codec, 0x45, 0, AC_VERB_GET_PIN_WIDGET_CONTROL, 0x00000000, 0x00000000, 4739); // 0x045f0700
         snd_hda_codec_write(codec, 0x45, 0, AC_VERB_SET_PIN_WIDGET_CONTROL, 0x00000000); // 0x04570700
 //      snd_hda:     69 []
 
 }
 
-static void setup_jack_nids2(struct hda_codec *codec)
+static void setup_intmike_stream_conn_off_nid(struct hda_codec *codec)
 {
         int retval;
 
         //int retgain1;
         //int retgain2;
 
-
-        // more node 0x22, 0x23 setups
-        // this does seem to repeat the above
-        // except the gain is slightly different
 
         snd_hda_codec_write(codec, CS8409_VENDOR_NID, 0, AC_VERB_SET_PROC_STATE, 0x00000001); // 0x04770301
 
@@ -3715,6 +3848,7 @@ static void setup_jack_nids2(struct hda_codec *codec)
         //snd_hda_codec_write(codec, 0x22, 0, AC_VERB_SET_POWER_STATE, 0x00000000); // 0x02270500
         //retval = snd_hda_codec_read_check(codec, 0x22, 0, AC_VERB_GET_POWER_STATE, 0x00000000, 0x00000030, 4746); // 0x022f0500
         hda_set_node_power_state(codec, 0x22, AC_PWRST_D0);
+
 
         snd_hda_codec_write(codec, 0x22, 0, AC_VERB_SET_CHANNEL_STREAMID, 0x00000000); // 0x02270600
 //      snd_hda:     conv stream channel map 34 [('CHAN', 0), ('STREAMID', 0)]
@@ -3729,6 +3863,11 @@ static void setup_jack_nids2(struct hda_codec *codec)
         snd_hda_coef_item(codec, 2, CS8409_VENDOR_NID, 0x0009, 0x0033, 0x00000033, 4751 ); // coef write mask 4751
 //      snd_hda_coef_item_masked(codec, 2, CS8409_VENDOR_NID, 0x0009, 0x0033, 0xundef, 0x00000033, 4751 ); // coef write mask 4751
 
+}
+
+static void setup_linein_stream_conn_off_nid(struct hda_codec *codec)
+{
+        int retval;
 
         retval = snd_hda_codec_read_check(codec, 0x23, 0, AC_VERB_GET_CONV, 0x00000000, 0x00000000, 4757); // 0x023f0600
 //      snd_hda:     conv stream channel map 35 [('CHAN', 0), ('STREAMID', 0)]
@@ -3751,6 +3890,11 @@ static void setup_jack_nids2(struct hda_codec *codec)
         snd_hda_coef_item(codec, 2, CS8409_VENDOR_NID, 0x0009, 0x0033, 0x00000033, 4766 ); // coef write mask 4766
 //      snd_hda_coef_item_masked(codec, 2, CS8409_VENDOR_NID, 0x0009, 0x0033, 0xundef, 0x00000033, 4766 ); // coef write mask 4766
 
+}
+
+static void setup_intmike_stream_off_nid(struct hda_codec *codec)
+{
+        //int retval;
 
         //retval = snd_hda_codec_read_check(codec, 0x22, 0, AC_VERB_GET_POWER_STATE, 0x00000000, 0x00000033, 4772); // 0x022f0500
         //snd_hda_codec_write(codec, 0x22, 0, AC_VERB_SET_POWER_STATE, 0x00000000); // 0x02270500
@@ -3763,6 +3907,12 @@ static void setup_jack_nids2(struct hda_codec *codec)
         //snd_hda_codec_write(codec, 0x22, 0, AC_VERB_SET_POWER_STATE, 0x00000003); // 0x02270503
         //retval = snd_hda_codec_read_check(codec, 0x22, 0, AC_VERB_GET_POWER_STATE, 0x00000000, 0x00000033, 4778); // 0x022f0500
         hda_set_node_power_state(codec, 0x22, AC_PWRST_D3);
+
+}
+
+static void setup_linein_stream_off_nid(struct hda_codec *codec)
+{
+        //int retval;
 
         //retval = snd_hda_codec_read_check(codec, 0x23, 0, AC_VERB_GET_POWER_STATE, 0x00000000, 0x00000033, 4780); // 0x023f0500
         //snd_hda_codec_write(codec, 0x23, 0, AC_VERB_SET_POWER_STATE, 0x00000000); // 0x02370500
@@ -3781,7 +3931,7 @@ static void setup_jack_nids2(struct hda_codec *codec)
 
 }
 
-static void setup_jack_vol1(struct hda_codec *codec)
+static void setup_intmike_vol1(struct hda_codec *codec)
 {
         int retval;
 
@@ -3802,6 +3952,12 @@ static void setup_jack_vol1(struct hda_codec *codec)
         snd_hda_codec_write(codec, 0x22, 0, AC_VERB_SET_AMP_GAIN_MUTE, 0x000050b3); // 0x022350b3
 //      snd_hda:     amp gain/mute 34 0x50b3 mute 1 gain 0x33 51 index 0x00 left 0 right 1 output 0 input 1  right  input
 
+}
+
+static void setup_linein_vol1(struct hda_codec *codec)
+{
+        int retval;
+
         retval = snd_hda_codec_read_check(codec, 0x23, 0, AC_VERB_GET_AMP_GAIN_MUTE, 0x00002000, 0x000000a7, 4800); // 0x023b2000
 //      snd_hda:     amp gain/mute 35 0x2000 index 0x00 left/right 1 left output/input 0 input
 //      snd_hda:     amp gain/mute 35 0x00a7 mute 1 gain 0x27 39
@@ -3812,9 +3968,10 @@ static void setup_jack_vol1(struct hda_codec *codec)
 //      snd_hda:     amp gain/mute 35 0x00a7 mute 1 gain 0x27 39
         snd_hda_codec_write(codec, 0x23, 0, AC_VERB_SET_AMP_GAIN_MUTE, 0x000050b3); // 0x023350b3
 //      snd_hda:     amp gain/mute 35 0x50b3 mute 1 gain 0x33 51 index 0x00 left 0 right 1 output 0 input 1  right  input
+
 }
 
-static void setup_jack_vol2(struct hda_codec *codec)
+static void setup_intmike_vol2(struct hda_codec *codec)
 {
         int retval;
 
@@ -3833,6 +3990,12 @@ static void setup_jack_vol2(struct hda_codec *codec)
 //      snd_hda:     amp gain/mute 34 0x00b3 mute 1 gain 0x33 51
         snd_hda_codec_write(codec, 0x22, 0, AC_VERB_SET_AMP_GAIN_MUTE, 0x00005033); // 0x02235033
 //      snd_hda:     amp gain/mute 34 0x5033 mute 0 gain 0x33 51 index 0x00 left 0 right 1 output 0 input 1  right  input
+
+}
+
+static void setup_linein_vol2(struct hda_codec *codec)
+{
+        int retval;
 
         retval = snd_hda_codec_read_check(codec, 0x23, 0, AC_VERB_GET_AMP_GAIN_MUTE, 0x00002000, 0x000000b3, 4809); // 0x023b2000
 //      snd_hda:     amp gain/mute 35 0x2000 index 0x00 left/right 1 left output/input 0 input
@@ -7003,11 +7166,11 @@ static void putative_disable3_TDM_7472(struct hda_codec *codec)
 }
 
 
-static void setup_mic_vol2(struct hda_codec *codec)
+static void setup_intmike_vol3(struct hda_codec *codec)
 {
         int retval;
 
-        // nodes 0x44, 0x45 which are connected to 0x22, 0x23 are labelled as mic inputs
+        // nodes 0x44 is connected to 0x22 which is labelled mic input
 
         //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_POWER_STATE, 0x00000000); // 0x00170500
         hda_set_node_power_state(codec, codec->core.afg, AC_PWRST_D0);
@@ -7022,6 +7185,14 @@ static void setup_mic_vol2(struct hda_codec *codec)
 //      snd_hda:     amp gain/mute 34 0x0033 mute 0 gain 0x33 51
         snd_hda_codec_write(codec, 0x22, 0, AC_VERB_SET_AMP_GAIN_MUTE, 0x00005033); // 0x02235033
 //      snd_hda:     amp gain/mute 34 0x5033 mute 0 gain 0x33 51 index 0x00 left 0 right 1 output 0 input 1  right  input
+
+}
+
+static void setup_linein_vol3(struct hda_codec *codec)
+{
+        int retval;
+
+        // nodes 0x45 which are connected to 0x23 is labelled as line input
 
         retval = snd_hda_codec_read_check(codec, 0x23, 0, AC_VERB_GET_AMP_GAIN_MUTE, 0x00002000, 0x00000033, 11855); // 0x023b2000
 //      snd_hda:     amp gain/mute 35 0x2000 index 0x00 left/right 1 left output/input 0 input
@@ -7040,11 +7211,11 @@ static void setup_mic_vol2(struct hda_codec *codec)
 }
 
 
-static void setup_mic_vol3(struct hda_codec *codec)
+static void setup_intmike_vol4(struct hda_codec *codec)
 {
         int retval;
 
-        // nodes 0x44, 0x45 which are connected to 0x22, 0x23 are labelled as mic inputs
+        // nodes 0x44 is connected to 0x22 which is labelled mic input
 
         //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_POWER_STATE, 0x00000000); // 0x00170500
         hda_set_node_power_state(codec, codec->core.afg, AC_PWRST_D0);
@@ -7059,6 +7230,14 @@ static void setup_mic_vol3(struct hda_codec *codec)
 //      snd_hda:     amp gain/mute 34 0x0033 mute 0 gain 0x33 51
         snd_hda_codec_write(codec, 0x22, 0, AC_VERB_SET_AMP_GAIN_MUTE, 0x00005033); // 0x02235033
 //      snd_hda:     amp gain/mute 34 0x5033 mute 0 gain 0x33 51 index 0x00 left 0 right 1 output 0 input 1  right  input
+
+}
+
+static void setup_linein_vol4(struct hda_codec *codec)
+{
+        int retval;
+
+        // nodes 0x45 which are connected to 0x23 is labelled as line input
 
         retval = snd_hda_codec_read_check(codec, 0x23, 0, AC_VERB_GET_AMP_GAIN_MUTE, 0x00002000, 0x00000033, 11870); // 0x023b2000
 //      snd_hda:     amp gain/mute 35 0x2000 index 0x00 left/right 1 left output/input 0 input
@@ -7077,7 +7256,6 @@ static void setup_mic_vol3(struct hda_codec *codec)
 }
 
         // whats with these multiple power ups/down
-        // it appears OSXs logs are not guaranteed to be ordered - so these are delayed from some above calls
         //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_POWER_STATE, 0x00000000); // 0x00170500
         //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_POWER_STATE, 0x00000003); // 0x00170503
         //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_POWER_STATE, 0x00000000); // 0x00170500
@@ -7089,9 +7267,16 @@ static void setup_mic_vol3(struct hda_codec *codec)
         //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_POWER_STATE, 0x00000000); // 0x00170500
         //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_POWER_STATE, 0x00000003); // 0x00170503
 
-        // so these may also be delayed outputs - which explains their weird positioning
+static void setup_input_power_nids_off(struct hda_codec *codec)
+{
+        //int retval;
+
         //retval = snd_hda_codec_read_check(codec, 0x22, 0, AC_VERB_GET_POWER_STATE, 0x00000000, 0x00000033, 11911); // 0x022f0500
         //retval = snd_hda_codec_read_check(codec, 0x23, 0, AC_VERB_GET_POWER_STATE, 0x00000000, 0x00000033, 11912); // 0x023f0500
+        hda_set_node_power_state(codec, 0x22, AC_PWRST_D3);
+        hda_set_node_power_state(codec, 0x23, AC_PWRST_D3);
+
+}
 
 
 static void read_gpio_status1(struct hda_codec *codec)
@@ -7130,8 +7315,12 @@ static void read_gpio_status3(struct hda_codec *codec)
         //hda_set_node_power_state(codec, codec->core.afg, AC_PWRST_D3);
 
 
-static void setup_mic3(struct hda_codec *codec)
+static void cs42l83_headphone_sense1(struct hda_codec *codec)
 {
+        // AppleHDATDM_Codec::getHeadphonePinSense(bool*, unsigned int*)
+
+        // register 0x1b77 - Detect Status 1
+        //                   value 0x16 HP unplugged, bias 0x16
 
         //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_POWER_STATE, 0x00000000); // 0x00170500
         hda_set_node_power_state(codec, codec->core.afg, AC_PWRST_D0);
@@ -7156,14 +7345,17 @@ static void setup_mic3(struct hda_codec *codec)
         //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_POWER_STATE, 0x00000003); // 0x00170503
         hda_set_node_power_state(codec, codec->core.afg, AC_PWRST_D3);
 
+        dev_info(hda_codec_dev(codec), "command cs42l83_headphone_sense1 end\n");
 }
 
-static void setup_mic_vol4(struct hda_codec *codec)
+static void setup_intmike_vol5(struct hda_codec *codec)
 {
         int retval;
 
         //int retgain1;
         //int retgain2;
+
+        // nodes 0x44 is connected to 0x22 which is labelled mic input
 
         //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_POWER_STATE, 0x00000000); // 0x00170500
         hda_set_node_power_state(codec, codec->core.afg, AC_PWRST_D0);
@@ -7178,6 +7370,14 @@ static void setup_mic_vol4(struct hda_codec *codec)
 //      snd_hda:     amp gain/mute 34 0x0033 mute 0 gain 0x33 51
         snd_hda_codec_write(codec, 0x22, 0, AC_VERB_SET_AMP_GAIN_MUTE, 0x00005033); // 0x02235033
 //      snd_hda:     amp gain/mute 34 0x5033 mute 0 gain 0x33 51 index 0x00 left 0 right 1 output 0 input 1  right  input
+
+}
+
+static void setup_linein_vol5(struct hda_codec *codec)
+{
+        int retval;
+
+        // nodes 0x45 is connected to 0x23 which is labelled line input
 
         retval = snd_hda_codec_read_check(codec, 0x23, 0, AC_VERB_GET_AMP_GAIN_MUTE, 0x00002000, 0x00000033, 11988); // 0x023b2000
 //      snd_hda:     amp gain/mute 35 0x2000 index 0x00 left/right 1 left output/input 0 input
@@ -7195,9 +7395,14 @@ static void setup_mic_vol4(struct hda_codec *codec)
 
 }
 
-static void setup_mic_vol5(struct hda_codec *codec)
+static void setup_intmike_vol6(struct hda_codec *codec)
 {
         int retval;
+
+        //int retgain1;
+        //int retgain2;
+
+        // nodes 0x44 is connected to 0x22 which is labelled mic input
 
 
         //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_POWER_STATE, 0x00000000); // 0x00170500
@@ -7214,6 +7419,14 @@ static void setup_mic_vol5(struct hda_codec *codec)
         snd_hda_codec_write(codec, 0x22, 0, AC_VERB_SET_AMP_GAIN_MUTE, 0x00005033); // 0x02235033
 //      snd_hda:     amp gain/mute 34 0x5033 mute 0 gain 0x33 51 index 0x00 left 0 right 1 output 0 input 1  right  input
 
+}
+
+static void setup_linein_vol6(struct hda_codec *codec)
+{
+        int retval;
+
+        // nodes 0x45 is connected to 0x23 which is labelled line input
+
         retval = snd_hda_codec_read_check(codec, 0x23, 0, AC_VERB_GET_AMP_GAIN_MUTE, 0x00002000, 0x00000033, 12003); // 0x023b2000
 //      snd_hda:     amp gain/mute 35 0x2000 index 0x00 left/right 1 left output/input 0 input
 //      snd_hda:     amp gain/mute 35 0x0033 mute 0 gain 0x33 51
@@ -7229,7 +7442,6 @@ static void setup_mic_vol5(struct hda_codec *codec)
         hda_set_node_power_state(codec, codec->core.afg, AC_PWRST_D3);
 }
 
-        // more likely delayed log prints
         //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_POWER_STATE, 0x00000000); // 0x00170500
         //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_POWER_STATE, 0x00000003); // 0x00170503
         //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_POWER_STATE, 0x00000000); // 0x00170500
@@ -7242,8 +7454,12 @@ static void setup_mic_vol5(struct hda_codec *codec)
         //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_POWER_STATE, 0x00000003); // 0x00170503
 
 
-static void setup_mic4(struct hda_codec *codec)
+static void cs42l83_headphone_sense2(struct hda_codec *codec)
 {
+        // AppleHDATDM_Codec::getHeadphonePinSense(bool*, unsigned int*)
+
+        // register 0x1b77 - Detect Status 1
+        //                   value 0x16 HP unplugged, bias 0x16
 
         //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_POWER_STATE, 0x00000000); // 0x00170500
         hda_set_node_power_state(codec, codec->core.afg, AC_PWRST_D0);
@@ -7268,11 +7484,18 @@ static void setup_mic4(struct hda_codec *codec)
         //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_POWER_STATE, 0x00000003); // 0x00170503
         hda_set_node_power_state(codec, codec->core.afg, AC_PWRST_D3);
 
+        dev_info(hda_codec_dev(codec), "command cs42l83_headphone_sense2 end\n");
 }
 
 
-static void setup_mic5(struct hda_codec *codec)
+static void cs42l83_headphone_sense3(struct hda_codec *codec)
 {
+
+        // AppleHDATDM_Codec::getHeadphonePinSense(bool*, unsigned int*)
+
+        // register 0x1b77 - Detect Status 1
+        //                   value 0x16 HP unplugged, bias 0x16
+
 
         //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_POWER_STATE, 0x00000000); // 0x00170500
         hda_set_node_power_state(codec, codec->core.afg, AC_PWRST_D0);
@@ -7300,7 +7523,6 @@ static void setup_mic5(struct hda_codec *codec)
 }
 
 
-        // likely delayed outputs
         //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_POWER_STATE, 0x00000000); // 0x00170500
         //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_POWER_STATE, 0x00000003); // 0x00170503
         //hda_set_node_power_state(codec, codec->core.afg, AC_PWRST_D3);
@@ -7309,20 +7531,29 @@ static void setup_mic5(struct hda_codec *codec)
         //retval = snd_hda_codec_read_check(codec, 0x23, 0, AC_VERB_GET_POWER_STATE, 0x00000000, 0x00000033, 12154); // 0x023f0500
 
 
-static void setup_mic_vol6(struct hda_codec *codec)
+static void setup_intmike_nid1(struct hda_codec *codec)
 {
-
         int retval;
 
         //int retgain1;
         //int retgain2;
 
+        // nodes 0x44 is connected to 0x22 which is labelled mic input
+
 
         //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_POWER_STATE, 0x00000000); // 0x00170500
         hda_set_node_power_state(codec, codec->core.afg, AC_PWRST_D0);
 
+        // again - reset of format for node 0x22????
+
         snd_hda_codec_write(codec, 0x22, 0, AC_VERB_SET_STREAM_FORMAT, 0x00004031); // 0x02224031
 //      snd_hda:     stream format 34 [('CHAN', 2), ('RATE', 44100), ('BITS', 24), ('RATE_MUL', 1), ('RATE_DIV', 1)]
+
+}
+
+static void setup_linein_vol7(struct hda_codec *codec)
+{
+        int retval;
 
         // why the double setup of 0x23 here??
 
@@ -7359,6 +7590,11 @@ static void setup_mic_vol6(struct hda_codec *codec)
         snd_hda_codec_write(codec, 0x45, 0, AC_VERB_SET_AMP_GAIN_MUTE, 0x00005000); // 0x04535000
 //      snd_hda:     amp gain/mute 69 0x5000 mute 0 gain 0x0 0 index 0x00 left 0 right 1 output 0 input 1  right  input
 
+}
+
+static void setup_linein_nid1(struct hda_codec *codec)
+{
+        int retval;
 
         //retval = snd_hda_codec_read_check(codec, 0x23, 0, AC_VERB_GET_POWER_STATE, 0x00000000, 0x00000033, 12175); // 0x023f0500
         //snd_hda_codec_write(codec, 0x23, 0, AC_VERB_SET_POWER_STATE, 0x00000000); // 0x02370500
@@ -7382,12 +7618,10 @@ static void setup_mic_vol6(struct hda_codec *codec)
         snd_hda_codec_write(codec, 0x45, 0, AC_VERB_SET_PIN_WIDGET_CONTROL, 0x00000000); // 0x04570700
 //      snd_hda:     69 []
 
-
 }
 
-static void setup_mic7(struct hda_codec *codec)
+static void setup_intmike_stream_conn_off_nid1(struct hda_codec *codec)
 {
-
         int retval;
 
         snd_hda_codec_write(codec, CS8409_VENDOR_NID, 0, AC_VERB_SET_PROC_STATE, 0x00000001); // 0x04770301
@@ -7410,6 +7644,11 @@ static void setup_mic7(struct hda_codec *codec)
         snd_hda_coef_item(codec, 2, CS8409_VENDOR_NID, 0x0009, 0x0033, 0x00000033, 12204 ); // coef write mask 12204
 //      snd_hda_coef_item_masked(codec, 2, CS8409_VENDOR_NID, 0x0009, 0x0033, 0xundef, 0x00000033, 12204 ); // coef write mask 12204
 
+}
+
+static void setup_linein_stream_conn_off_nid1(struct hda_codec *codec)
+{
+        int retval;
 
         retval = snd_hda_codec_read_check(codec, 0x23, 0, AC_VERB_GET_CONV, 0x00000000, 0x00000000, 12210); // 0x023f0600
 //      snd_hda:     conv stream channel map 35 [('CHAN', 0), ('STREAMID', 0)]
@@ -7429,6 +7668,12 @@ static void setup_mic7(struct hda_codec *codec)
         snd_hda_coef_item(codec, 2, CS8409_VENDOR_NID, 0x0009, 0x0033, 0x00000033, 12219 ); // coef write mask 12219
 //      snd_hda_coef_item_masked(codec, 2, CS8409_VENDOR_NID, 0x0009, 0x0033, 0xundef, 0x00000033, 12219 ); // coef write mask 12219
 
+}
+
+static void setup_intmike_stream_off_nid1(struct hda_codec *codec)
+{
+        //int retval;
+
         //retval = snd_hda_codec_read_check(codec, 0x22, 0, AC_VERB_GET_POWER_STATE, 0x00000000, 0x00000033, 12225); // 0x022f0500
         //snd_hda_codec_write(codec, 0x22, 0, AC_VERB_SET_POWER_STATE, 0x00000000); // 0x02270500
         //retval = snd_hda_codec_read_check(codec, 0x22, 0, AC_VERB_GET_POWER_STATE, 0x00000000, 0x00000030, 12228); // 0x022f0500
@@ -7441,11 +7686,16 @@ static void setup_mic7(struct hda_codec *codec)
         //retval = snd_hda_codec_read_check(codec, 0x22, 0, AC_VERB_GET_POWER_STATE, 0x00000000, 0x00000033, 12231); // 0x022f0500
         hda_set_node_power_state(codec, 0x22, AC_PWRST_D3);
 
+}
+
+static void setup_linein_stream_off_nid1(struct hda_codec *codec)
+{
+        //int retval;
 
         //retval = snd_hda_codec_read_check(codec, 0x23, 0, AC_VERB_GET_POWER_STATE, 0x00000000, 0x00000033, 12233); // 0x023f0500
         //snd_hda_codec_write(codec, 0x23, 0, AC_VERB_SET_POWER_STATE, 0x00000000); // 0x02370500
         //retval = snd_hda_codec_read_check(codec, 0x23, 0, AC_VERB_GET_POWER_STATE, 0x00000000, 0x00000030, 12236); // 0x023f0500
-        hda_set_node_power_state(codec, 0x22, AC_PWRST_D0);
+        hda_set_node_power_state(codec, 0x23, AC_PWRST_D0);
 
         snd_hda_codec_write(codec, 0x23, 0, AC_VERB_SET_CHANNEL_STREAMID, 0x00000000); // 0x02370600
 //      snd_hda:     conv stream channel map 35 [('CHAN', 0), ('STREAMID', 0)]
@@ -7459,9 +7709,8 @@ static void setup_mic7(struct hda_codec *codec)
 
 }
 
-static void setup_mic_vol7(struct hda_codec *codec)
+static void setup_intmike_vol10(struct hda_codec *codec)
 {
-
         int retval;
 
 
@@ -7478,6 +7727,12 @@ static void setup_mic_vol7(struct hda_codec *codec)
 //      snd_hda:     amp gain/mute 34 0x0033 mute 0 gain 0x33 51
         snd_hda_codec_write(codec, 0x22, 0, AC_VERB_SET_AMP_GAIN_MUTE, 0x00005033); // 0x02235033
 //      snd_hda:     amp gain/mute 34 0x5033 mute 0 gain 0x33 51 index 0x00 left 0 right 1 output 0 input 1  right  input
+
+}
+
+static void setup_linein_vol10(struct hda_codec *codec)
+{
+        int retval;
 
         retval = snd_hda_codec_read_check(codec, 0x23, 0, AC_VERB_GET_AMP_GAIN_MUTE, 0x00002000, 0x000000a7, 12252); // 0x023b2000
 //      snd_hda:     amp gain/mute 35 0x2000 index 0x00 left/right 1 left output/input 0 input
@@ -7554,13 +7809,13 @@ static void setup_node_alpha_reset_and_clear(struct hda_codec *codec)
 
         // read parameters from all nodes - excluding VirtualWidgets
 
-        init_read_all_nodes(codec);
+        init_read_all_nodes_data(codec);
 
         //setup_beep(codec);
 
-        read_vendor_node(codec);
+        read_vendor_node_data(codec);
 
-        // now moved to separate function read_virtual_widgets
+        // now moved to separate function read_virtual_widgets_data
 
         dev_info(hda_codec_dev(codec), "command nid end setup_node_alpha_reset_and_clear\n");
 
@@ -7580,7 +7835,7 @@ static void cs_8409_boot_setup_data(struct hda_codec *codec)
         //int retval;
 
 
-        setup_reset_and_clear(codec);
+        setup_reset_and_clear_data(codec);
 
 
         // read parameters from all nodes - excluding VirtualWidgets
@@ -7588,42 +7843,41 @@ static void cs_8409_boot_setup_data(struct hda_codec *codec)
         // the loop over node counts calls AppleHDAWidgetFactory::createAppleHDAWidget(DevIdStruct*)
         // which Im assuming calls the initForNodeID functions
 
-        init_read_all_nodes(codec);
+        init_read_all_nodes_data(codec);
 
         //setup_beep(codec);
 
-        read_vendor_node(codec);
+        read_vendor_node_data(codec);
 
-        init_read_coefs(codec);
+        init_read_coefs_data(codec);
 
         //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_POWER_STATE, 0x00000000);
         hda_set_node_power_state(codec, codec->core.afg, AC_PWRST_D0);
 
         snd_hda_codec_write(codec, CS8409_VENDOR_NID, 0, AC_VERB_SET_PROC_STATE, 0x00000001); // 0x04770301
 
-        read_virtual_widgets(codec);
+        read_virtual_widgets_data(codec);
 
-        init_for_node_id(codec);
+        init_for_node_id_data(codec);
 
-        setup_jack_pin_config(codec);
+        setup_jack_pin_config_data(codec);
 
-        enable_i2c(codec);
+        enable_i2c_data(codec);
 
         enable_GPIforUR_max(codec);
 
-        external_control_GPIO_max(codec);
 
-        putative_setup_mic(codec);
+        cs42l83_external_control_GPIO_max(codec);
 
-        external_control_GPIO2_clear_2_max(codec);
+        cs42l83_reset_data(codec);
 
-        external_control_GPIO2_set_2_max(codec);
+        cs42l83_external_control_GPIO2_clear_2_max(codec);
 
-        putative_setup_mic2(codec);
+        cs42l83_external_control_GPIO2_set_2_max(codec);
 
-        putative_setup_mic3(codec);
+        cs42l83_device_id_data(codec);
 
-        putative_setup_mic4(codec);
+        cs42l83_inithw_data(codec);
 
 
         setup_amps_reset(codec);
@@ -7631,15 +7885,36 @@ static void cs_8409_boot_setup_data(struct hda_codec *codec)
         read_gpio_status(codec);
 
 
-        putative_setup_mic5(codec);
+        cs42l83_mic_detect_data(codec);
 
-        setup_jack_nids(codec);
+        cs42l83_tip_sense_data(codec);
 
-        setup_jack_nids2(codec);
+        cs42l83_plug_interrupt_setup_data(codec);
 
-        setup_jack_vol1(codec);
+        cs42l83_headphone_sense_data(codec);
 
-        setup_jack_vol2(codec);
+
+        setup_intmike_nid(codec);
+
+        setup_intmike_format_resetup(codec);
+
+        setup_linein_nid(codec);
+
+        setup_intmike_stream_conn_off_nid(codec);
+
+        setup_linein_stream_conn_off_nid(codec);
+
+        setup_intmike_stream_off_nid(codec);
+
+        setup_linein_stream_off_nid(codec);
+
+        setup_intmike_vol1(codec);
+
+        setup_linein_vol1(codec);
+
+        setup_intmike_vol2(codec);
+
+        setup_linein_vol2(codec);
 
 
         setup_TDM_6462(codec);
@@ -7697,9 +7972,17 @@ static void cs_8409_boot_setup_data(struct hda_codec *codec)
         putative_disable3_TDM_7472(codec);
 
 
-        setup_mic_vol2(codec);
+        setup_intmike_vol3(codec);
 
-        setup_mic_vol3(codec);
+        setup_linein_vol3(codec);
+
+
+        setup_intmike_vol4(codec);
+
+        setup_linein_vol4(codec);
+
+
+        setup_input_power_nids_off(codec);
 
 
         read_gpio_status1(codec);
@@ -7709,21 +7992,44 @@ static void cs_8409_boot_setup_data(struct hda_codec *codec)
         read_gpio_status3(codec);
 
 
-        setup_mic3(codec);
+        cs42l83_headphone_sense1(codec);
 
-        setup_mic_vol4(codec);
 
-        setup_mic_vol5(codec);
+        setup_intmike_vol5(codec);
 
-        setup_mic4(codec);
+        setup_linein_vol5(codec);
 
-        setup_mic5(codec);
+        setup_intmike_vol6(codec);
 
-        setup_mic_vol6(codec);
+        setup_linein_vol6(codec);
 
-        setup_mic7(codec);
 
-        setup_mic_vol7(codec);
+        cs42l83_headphone_sense2(codec);
+
+
+        cs42l83_headphone_sense3(codec);
+
+
+        setup_intmike_nid1(codec);
+
+        setup_linein_vol7(codec);
+
+        setup_linein_nid1(codec);
+
+        setup_intmike_stream_conn_off_nid1(codec);
+
+        setup_linein_stream_conn_off_nid1(codec);
+
+        setup_intmike_stream_off_nid1(codec);
+
+        setup_linein_stream_off_nid1(codec);
+
+
+        setup_intmike_vol10(codec);
+
+        setup_linein_vol10(codec);
+
+        setup_node_alpha_reset_and_clear(codec);
 
 
         dev_info(hda_codec_dev(codec), "command cs_8409_boot_setup_data end\n");
