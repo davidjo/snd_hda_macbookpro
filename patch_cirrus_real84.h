@@ -767,7 +767,7 @@ static void cs_8409_setup_amps12(struct hda_codec *codec)
                 cs_8409_setup_amp_max(codec, 0x64, 0x30);
                 cs_8409_setup_amp_max(codec, 0x62, 0x30);
         }
-        else if (codec->core.subsystem_id == 0x106b3300) {
+        else if (codec->core.subsystem_id == 0x106b3300 || codec->core.subsystem_id == 0x106b3600) {
                 //setup_node_alpha_ssm3(codec);
                 // use reduced volume - from 0x48 to 0x80 - same reduction as for MAXs -24dB
                 cs_8409_setup_amp_ssm3(codec, 0x28, 0x80);
@@ -873,7 +873,7 @@ static void cs_8409_setup_amps34(struct hda_codec *codec)
                 cs_8409_setup_amp_max(codec, 0x74, 0x30);
                 cs_8409_setup_amp_max(codec, 0x72, 0x30);
         }
-        else if (codec->core.subsystem_id == 0x106b3300) {
+        else if (codec->core.subsystem_id == 0x106b3300 || codec->core.subsystem_id == 0x106b3600) {
                 //setup_node_alpha_ssm3(codec);
                 // use reduced volume - from 0x48 to 0x80 - same reduction as for MAXs -24dB
                 cs_8409_setup_amp_ssm3(codec, 0x2c, 0x80);
@@ -1127,7 +1127,7 @@ static void cs_8409_disable_amps12(struct hda_codec *codec)
                 cs_8409_disable_amp_max(codec, 0x64);
                 cs_8409_disable_amp_max(codec, 0x62);
         }
-        else if (codec->core.subsystem_id == 0x106b3300) {
+        else if (codec->core.subsystem_id == 0x106b3300 || codec->core.subsystem_id == 0x106b3600) {
                 //setup_node_alpha_ssm3(codec);
                 cs_8409_disable_amp_ssm3(codec, 0x28);
                 cs_8409_disable_amp_ssm3(codec, 0x2a);
@@ -1216,7 +1216,7 @@ static void cs_8409_disable_amps34(struct hda_codec *codec)
                 cs_8409_disable_amp_max(codec, 0x74);
                 cs_8409_disable_amp_max(codec, 0x72);
         }
-        else if (codec->core.subsystem_id == 0x106b3300) {
+        else if (codec->core.subsystem_id == 0x106b3300 || codec->core.subsystem_id == 0x106b3600) {
                 //setup_node_alpha_ssm3(codec);
                 cs_8409_disable_amp_ssm3(codec, 0x2c);
                 cs_8409_disable_amp_ssm3(codec, 0x2e);
@@ -1414,7 +1414,7 @@ static int cs_8409_boot_setup_real(struct hda_codec *codec)
         if (codec->core.subsystem_id == 0x106b3900) {
                 enable_GPIforUR(codec, 0x5);
         }
-        else if (codec->core.subsystem_id == 0x106b3300) {
+        else if (codec->core.subsystem_id == 0x106b3300 || codec->core.subsystem_id == 0x106b3600) {
                 enable_GPIforUR(codec, 0xd);
         }
         else {
@@ -1429,7 +1429,7 @@ static int cs_8409_boot_setup_real(struct hda_codec *codec)
         if (codec->core.subsystem_id == 0x106b3900) {
                 cs42l83_external_control_GPIO(codec, 0x7);
         }
-        else if (codec->core.subsystem_id == 0x106b3300) {
+        else if (codec->core.subsystem_id == 0x106b3300 || codec->core.subsystem_id == 0x106b3600) {
                 cs42l83_external_control_GPIO(codec, 0xf);
         }
         else {
@@ -1446,7 +1446,7 @@ static int cs_8409_boot_setup_real(struct hda_codec *codec)
         if (codec->core.subsystem_id == 0x106b3900) {
                 cs42l83_external_control_GPIO(codec, 0x7);
         }
-        else if (codec->core.subsystem_id == 0x106b3300) {
+        else if (codec->core.subsystem_id == 0x106b3300 || codec->core.subsystem_id == 0x106b3600) {
                 cs42l83_external_control_GPIO(codec, 0xf);
         }
         else {
@@ -1462,7 +1462,7 @@ static int cs_8409_boot_setup_real(struct hda_codec *codec)
                 //setup_amps_reset(codec);
                 setup_amps_reset_i2c_max(codec);
         }
-        else if (codec->core.subsystem_id == 0x106b3300) {
+        else if (codec->core.subsystem_id == 0x106b3300 || codec->core.subsystem_id == 0x106b3600) {
                 //setup_amps_reset_i2c_ssm3
                 setup_amps_reset_i2c_ssm3(codec);
         }

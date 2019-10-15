@@ -873,6 +873,7 @@ static void cs_8409_play_data_ssm3(struct hda_codec *codec)
 
 // macbook pro subsystem ids
 // 14,1 0x106b3300
+// 14,2 0x106b3600
 // 14,3 0x106b3900
 
 static int cs_8409_data_config(struct hda_codec *codec);
@@ -902,7 +903,7 @@ static int cs_8409_boot_setup(struct hda_codec *codec)
                         printk("snd_hda_intel: cs_8409_boot_setup post cs_8409_real_config\n");
                 }
 	}
-        else if (codec->core.subsystem_id == 0x106b3300) {
+        else if (codec->core.subsystem_id == 0x106b3300 || codec->core.subsystem_id == 0x106b3600) {
                 if (spec->use_data) {
                         cs_8409_boot_setup_data_ssm3(codec);
 		} else {
@@ -931,7 +932,7 @@ void cs_8409_play_setup(struct hda_codec *codec)
 		        cs_8409_play_real(codec);
                 }
 	}
-	else if (codec->core.subsystem_id == 0x106b3300) {
+        else if (codec->core.subsystem_id == 0x106b3300 || codec->core.subsystem_id == 0x106b3600) {
 		if (spec->use_data) {
                         cs_8409_play_data_ssm3(codec);
 		} else {
@@ -957,7 +958,7 @@ void cs_8409_play_cleanup(struct hda_codec *codec)
                        cs_8409_playstop_real(codec);
                 }
 	}
-	else if (codec->core.subsystem_id == 0x106b3300) {
+        else if (codec->core.subsystem_id == 0x106b3300 || codec->core.subsystem_id == 0x106b3600) {
 		if (spec->use_data) {
                        //cs_8409_playstop_data_ssm3(codec);
 		} else {
@@ -1089,7 +1090,7 @@ void cs_8409_headplay_setup(struct hda_codec *codec)
 		        cs_8409_headplay_real(codec);
                 }
 	}
-	else if (codec->core.subsystem_id == 0x106b3300) {
+        else if (codec->core.subsystem_id == 0x106b3300 || codec->core.subsystem_id == 0x106b3600) {
 		if (spec->use_data) {
                         //cs_8409_play_data_ssm3(codec);
 		} else {
@@ -1123,7 +1124,7 @@ void cs_8409_headplay_cleanup(struct hda_codec *codec)
 		        cs_8409_headplaystop_real(codec);
                 }
 	}
-	else if (codec->core.subsystem_id == 0x106b3300) {
+        else if (codec->core.subsystem_id == 0x106b3300 || codec->core.subsystem_id == 0x106b3600) {
 		if (spec->use_data) {
                         //cs_8409_play_data_ssm3(codec);
 		} else {
