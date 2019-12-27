@@ -1,7 +1,6 @@
 #!/bin/bash
 
 kernel_version=$(uname -r | cut -d '-' -f1)  #ie 5.2.7
-kernel_version='4.19.91'
 major_version=$(echo $kernel_version | cut -d '.' -f1)
 minor_version=$(echo $kernel_version | cut -d '.' -f2)
 
