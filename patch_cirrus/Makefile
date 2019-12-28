@@ -7,5 +7,5 @@ clean:
 	make -C /lib/modules/$(shell uname -r)/build M=$(shell pwd) clean
 
 install:
-	cp snd-hda-codec-cirrus.ko /lib/modules/$(shell uname -r)/updates/snd-hda-codec-cirrus.ko
+	cp snd-hda-codec-cirrus.ko /lib/modules/$(shell uname -r)/updates
 	depmod -a
