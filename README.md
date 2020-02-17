@@ -11,6 +11,11 @@ dnf install wget make gcc kernel-devel
 ```
 apt install wget make gcc linux-headers-generic
 ```
+**arch package install**
+```
+pacman -S wget make gcc linux-headers
+```
+
 **build driver**  
 ```
 git clone https://github.com/leifliddy/snd_hda_macbookpro.git  
