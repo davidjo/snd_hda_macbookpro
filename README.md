@@ -17,8 +17,9 @@ pacman -S wget make gcc linux-headers
 ```
 
 **build driver**  
+run the following commands as ```root``` or with ```sudo```
 ```
-git clone https://github.com/leifliddy/snd_hda_macbookpro.git  
+git clone https://github.com/leifliddy/snd_hda_macbookpro.git
 cd snd_hda_macbookpro/
 ./install.cirrus.driver.sh
 reboot
