@@ -30,6 +30,13 @@ mv $hda_dir/Makefile $hda_dir/Makefile.orig
 mv $hda_dir/patch_cirrus.c $hda_dir/patch_cirrus.c.orig
 cp $patch_dir/Makefile $patch_dir/patch_cirrus* $hda_dir/
 [[ $major_version == '4' ]] && sed -i 's/^#include <sound\/hda_codec.h>$/#include "hda_codec.h"/' $hda_dir/patch_cirrus.c
+
+# if kernel version is >= 5.5 then change
+# event = snd_hda_jack_tbl_get_from_tag(codec, tag);
+# to
+# event = snd_hda_jack_tbl_get_from_tag(codec, tag, 0);
+[[ $minor_version -ge '5' ]] && sed -i 's/event = snd_hda_jack_tbl_get_from_tag(codec, tag);/event = snd_hda_jack_tbl_get_from_tag(codec, tag, 0);/' $hda_dir/patch_cirrus.c
+
 cd $hda_dir
 
 make
