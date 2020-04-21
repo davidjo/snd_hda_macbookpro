@@ -3,6 +3,7 @@
 kernel_version=$(uname -r | cut -d '-' -f1)  #ie 5.2.7
 major_version=$(echo $kernel_version | cut -d '.' -f1)
 minor_version=$(echo $kernel_version | cut -d '.' -f2)
+major_minor=${major_version}${minor_version}
 
 build_dir='build'
 update_dir="/lib/modules/$(uname -r)/updates"
@@ -35,7 +36,17 @@ cp $patch_dir/Makefile $patch_dir/patch_cirrus* $hda_dir/
 # event = snd_hda_jack_tbl_get_from_tag(codec, tag);
 # to
 # event = snd_hda_jack_tbl_get_from_tag(codec, tag, 0);
-[[ $minor_version -ge '5' ]] && sed -i 's/event = snd_hda_jack_tbl_get_from_tag(codec, tag);/event = snd_hda_jack_tbl_get_from_tag(codec, tag, 0);/' $hda_dir/patch_cirrus.c
+[[ $major_minor -ge '55' ]] && sed -i 's/event = snd_hda_jack_tbl_get_from_tag(codec, tag);/event = snd_hda_jack_tbl_get_from_tag(codec, tag, 0);/' $hda_dir/patch_cirrus.c
+
+# if kernel version >= 5.6 then
+# change timespec to timespec64
+# change getnstimeofday to ktime_get_real_ts64
+if [ $major_minor -ge 56 ]; then
+   sed -i 's/timespec/timespec64/' $hda_dir/patch_cirrus.c
+   sed -i 's/timespec/timespec64/' $hda_dir/patch_cirrus_new84.h
+   sed -i 's/getnstimeofday/ktime_get_real_ts64/' $hda_dir/patch_cirrus.c
+   sed -i 's/getnstimeofday/ktime_get_real_ts64/' $hda_dir/patch_cirrus_new84.h
+fi
 
 cd $hda_dir
 
