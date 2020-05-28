@@ -1,10 +1,14 @@
 
 // this contains functions converted to use proper i2c calls
 
+// re-define this here so can turn this off for this file specifically
+#define mycodec_i2c_local_info mycodec_i2c_info
 
 static void cs42l83_headset_button_detect_interrupts_off(struct hda_codec *codec)
 {
         //int retval;
+
+	mycodec_i2c_local_info(codec, "cs42l83_headset_button_detect_interrupts_off\n");
 
         // this could be AppleHDAMikeyInternalCS8409::disableButtonDetection
         // - this calls 0x1b7c and 0x1b7a
@@ -36,6 +40,8 @@ static void cs42l83_headset_set_hpout_clamp_disable(struct hda_codec *codec)
 {
         //int retval;
 
+	mycodec_i2c_local_info(codec, "cs42l83_headset_set_hpout_clamp_disable\n");
+
         // AppleHDATDM_CS42L83::setHPOutClamp
 
         // register 0x1f06 - DAC Control 2
@@ -51,6 +57,8 @@ static void cs42l83_headset_set_hpout_clamp_disable(struct hda_codec *codec)
 
 static void cs42l83_complete_jack_detect(struct hda_codec *codec)
 {
+
+	mycodec_i2c_local_info(codec, "cs42l83_complete_jack_detect\n");
 
         // in AppleHDAMikeyInternalCS8409::completeJackDetectUR
 
@@ -83,6 +91,8 @@ static void cs42l83_complete_jack_detect(struct hda_codec *codec)
 
 static void cs42l83_power_hs_bias_on(struct hda_codec *codec)
 {
+
+	mycodec_i2c_local_info(codec, "cs42l83_power_hs_bias_on\n");
 
         // AppleHDAMikeyInternalCS8409::powerHSBIAS
 
@@ -139,6 +149,8 @@ static void cs42l83_power_hs_bias_on(struct hda_codec *codec)
 static void cs42l83_enable_hs_auto_int_on(struct hda_codec *codec)
 {
 
+	mycodec_i2c_local_info(codec, "cs42l83_enable_hs_auto_int_on\n");
+
         // AppleHDATDM_CS42L83::enableHSDetAutoInt(bool)
         // this involves a read then write
 
@@ -158,6 +170,8 @@ static void cs42l83_unplug_interrupt_setup(struct hda_codec *codec)
 {
         int retval;
         int newval;
+
+	mycodec_i2c_local_info(codec, "cs42l83_unplug_interrupt_setup\n");
 
         // in AppleHDAMikeyInternalCS8409::completeJackDetectUR
 
@@ -189,6 +203,8 @@ static void cs42l83_set_hpout_pulldown_off(struct hda_codec *codec)
 {
         //int retval;
 
+	mycodec_i2c_local_info(codec, "cs42l83_set_hpout_pulldown_off\n");
+
         // AppleHDATDM_CS42L83::setHPOutPulldown
 
         // register 0x1f06 - DAC Control 2
@@ -206,6 +222,9 @@ static void cs42l83_set_hpout_pulldown_off(struct hda_codec *codec)
 
 static void cs42l83_headset_detect_on(struct hda_codec *codec)
 {
+
+	mycodec_i2c_local_info(codec, "cs42l83_headset_detect_on\n");
+
         // this is AppleHDAMikeyInternalCS8409::enableHSDetection
         // this calls readMikey/writeMikey with either 0x8 arg or 0x9 arg
         // I think 0x8 arg is one used in the log
@@ -253,6 +272,8 @@ static void cs42l83_headset_detect_off(struct hda_codec *codec)
         int retval;
         int newval;
 
+	mycodec_i2c_local_info(codec, "cs42l83_headset_detect_off\n");
+
         // AppleHDAMikeyInternalCS8409::enableHSDetection
 
         // register 0x111f - Headset Detect Control 1
@@ -278,6 +299,8 @@ static void cs42l83_headset_detect_onoff(struct hda_codec *codec, int onstate)
 {
         int retval;
         int newval;
+
+	mycodec_i2c_local_info(codec, "cs42l83_headset_detect_onoff\n");
 
         // AppleHDAMikeyInternalCS8409::enableHSDetection
 
@@ -321,6 +344,8 @@ static void cs42l83_enable_hs_auto_int_off(struct hda_codec *codec)
         int retval;
         int newval;
 
+	mycodec_i2c_local_info(codec, "cs42l83_enable_hs_auto_int_off\n");
+
         // from AppleHDAMikeyInternalCS8409::handleJackDisconnectUR
 
         // AppleHDATDM_CS42L83::enableHSDetAutoInt
@@ -344,6 +369,8 @@ static int cs42l83_headset_type(struct hda_codec *codec)
 {
         int retval_type;
 
+	mycodec_i2c_local_info(codec, "cs42l83_headset_type\n");
+
         // this is readMikey function 0xb
   
         // register 0x1124 - Headset Detect Status
@@ -366,6 +393,8 @@ static void cs42l83_set_hpout_pulldown_on(struct hda_codec *codec)
 {
         //int retval;
 
+	mycodec_i2c_local_info(codec, "cs42l83_set_hpout_pulldown_on\n");
+
         // AppleHDATDM_CS42L83::setHPOutPulldown(bool)
 
         // register 0x1f06 - DAC Control 2
@@ -383,6 +412,8 @@ static void cs42l83_set_hpout_pulldown_on(struct hda_codec *codec)
 static void cs42l83_set_hpout_pulldown_onoff(struct hda_codec *codec, int onstate)
 {
         //int retval;
+
+	mycodec_i2c_local_info(codec, "cs42l83_set_hpout_pulldown_onoff\n");
 
         // AppleHDATDM_CS42L83::setHPOutPulldown(bool)
 
@@ -421,6 +452,8 @@ static void cs42l83_set_hpout_clamp_enable(struct hda_codec *codec)
 {
         //int retval;
 
+	mycodec_i2c_local_info(codec, "cs42l83_set_hpout_clamp_enable\n");
+
         // AppleHDATDM_CS42L83::setHPOutClamp
 
         // register 0x1f06 - DAC Control 2
@@ -439,6 +472,8 @@ static void cs42l83_headset_mike_detect_off(struct hda_codec *codec)
 {
         int retval;
         int newval;
+
+	mycodec_i2c_local_info(codec, "cs42l83_headset_mike_detect_off\n");
 
         // in AppleHDAMikeyInternalCS8409::handleTypeDetectUR
 
@@ -459,6 +494,9 @@ static void cs42l83_headset_mike_detect_off(struct hda_codec *codec)
 
 static void cs42l83_power_hs_bias_off(struct hda_codec *codec)
 {
+
+	mycodec_i2c_local_info(codec, "cs42l83_power_hs_bias_off\n");
+
         // multiple calls to this
         // AppleHDAMikeyInternalCS8409::handleTypeDetectUR
         // AppleHDAMikeyInternalCS8409::completeJackDetectUR
@@ -510,6 +548,8 @@ static void cs42l83_enable_hsbias_auto_clamp_on(struct hda_codec *codec)
 
         //int retval;
 
+	mycodec_i2c_local_info(codec, "cs42l83_enable_hsbias_auto_clamp_on\n");
+
 	// in AppleHDAMikeyInternalCS4208::handleTypeDetectUR
 
         //  AppleHDAMikeyInternalCS8409::enableHSBIASautoclamp
@@ -529,6 +569,8 @@ static void cs42l83_enable_hsbias_auto_clamp_off(struct hda_codec *codec)
 {
 
         //int retval;
+
+	mycodec_i2c_local_info(codec, "cs42l83_enable_hsbias_auto_clamp_off\n");
 
 	// in AppleHDAMikeyInternalCS4208::handleTypeDetectUR
 
@@ -553,6 +595,8 @@ static void cs42l83_enable_hsbias_auto_clamp_off(struct hda_codec *codec)
 
 static void cs42l83_setup_button_detect(struct hda_codec *codec)
 {
+
+	mycodec_i2c_local_info(codec, "cs42l83_setup_button_detect\n");
 
         // AppleHDAMikeyInternalCS8409::setupButtonDetection
 
@@ -610,6 +654,8 @@ static void cs42l83_setup_button_detect(struct hda_codec *codec)
 static void cs42l83_power_hs_bias_button_on(struct hda_codec *codec)
 {
 
+	mycodec_i2c_local_info(codec, "cs42l83_power_hs_bias_button_on\n");
+
         // in AppleHDAMikeyInternalCS8409::setupButtonDetection
 
         // AppleHDAMikeyInternalCS8409::powerHSBIAS
@@ -648,6 +694,8 @@ static void cs42l83_enable_hsbias_auto_clamp_off1(struct hda_codec *codec)
 
         //int retval;
 
+	mycodec_i2c_local_info(codec, "cs42l83_enable_hsbias_auto_clamp_off1\n");
+
         // in AppleHDAMikeyInternalCS8409::setupButtonDetection
 
         //  AppleHDAMikeyInternalCS8409::enableHSBIASautoclamp
@@ -661,8 +709,8 @@ static void cs42l83_enable_hsbias_auto_clamp_off1(struct hda_codec *codec)
 //      snd_hda i2cPagedWrite i2c address 0x90 i2c reg hi 0x1b lo 0x7046 i2c data 0x0046
 
         cs_8409_vendor_i2cRead(codec, 0x90, 0x1b70, 1); // snd_hda
-
         cs_8409_vendor_i2cWrite(codec, 0x90, 0x1b70, 0x0006, 1); // snd_hda
+
         cs_8409_vendor_i2cWrite(codec, 0x90, 0x1b70, 0x0046, 1); // snd_hda
 
 }
@@ -676,6 +724,8 @@ static int cs42l83_handle_button_detect(struct hda_codec *codec)
         int ret_state2 = 0;
         int ret_detect1 = 0;
         int ret_detect2 = 0;
+
+	mycodec_i2c_local_info(codec, "cs42l83_handle_button_detect\n");
 
         // AppleHDAMikeyInternalCS8409::handleButtonDetectUR
 
@@ -745,6 +795,8 @@ static int cs42l83_mike_connected(struct hda_codec *codec)
 	int ret_connect = 0;
 	int retval = 0;
 
+	mycodec_i2c_local_info(codec, "cs42l83_mike_connected\n");
+
         // from AppleHDAMikeyInternalCS8409::handleButtonDetectUR
 
         // from AppleHDAMikeyInternal::configureHeadset(unsigned char, unsigned char, unsigned char)
@@ -789,6 +841,9 @@ static int cs42l83_mike_connected(struct hda_codec *codec)
 
 static void cs42l83_configure_int_mclk(struct hda_codec *codec)
 {
+
+	mycodec_i2c_local_info(codec, "cs42l83_configure_int_mclk\n");
+
         // in AppleHDATDM_CS42L83::enable
 
         // AppleHDATDM_CS42L83::_configureIntMClk
@@ -850,6 +905,8 @@ static void cs42l83_configure_int_mclk(struct hda_codec *codec)
 static void cs42l83_headset_power_on_on_nouse(struct hda_codec *codec)
 {
 
+	mycodec_i2c_local_info(codec, "cs42l83_headset_power_on_on_nouse\n");
+
         // AppleHDATDM_CS42L83::powerOn
 
 
@@ -868,11 +925,14 @@ static void cs42l83_headset_power_on_on_nouse(struct hda_codec *codec)
 
 static void cs42l83_power_onoff(struct hda_codec *codec, bool onflag)
 {
+
+	mycodec_i2c_local_info(codec, "cs42l83_power_onoff\n");
+
         // in AppleHDATDM_CS42L83::enable
 
         // AppleHDATDM_CS42L83::powerOn
 
-        // bool arg switches order of 0x1107/0x1501 - on (0x2a10) 0x1501/0x1107 - off 0x1107/0x1501
+        // bool arg switches order of 0x1107/0x1501 - on (0x1207) 0x1501/0x1107 - off 0x1107/0x1501
 
         if (onflag)
         {
@@ -911,6 +971,9 @@ static void cs42l83_power_onoff(struct hda_codec *codec, bool onflag)
 
 static void cs42l83_configure_serial_port(struct hda_codec *codec)
 {
+
+	mycodec_i2c_local_info(codec, "cs42l83_configure_serial_port\n");
+
         // in AppleHDATDM_CS42L83::enable
 
         // AppleHDATDM_CS42L83::_configureSerialPort
@@ -954,8 +1017,16 @@ static void cs42l83_configure_serial_port(struct hda_codec *codec)
 
 }
 
-static void cs42l83_set_sample_rate(struct hda_codec *codec)
+static void cs42l83_output_set_input_sample_rate(struct hda_codec *codec)
 {
+	// changed name from cs42l83_set_sample_rate
+	// NOTA BENE - it says output sample rate because its the sample rate for digital data
+	//             coming into the cs42l83 and being converted to analog output
+	//             - so the register is labelled the Input sample rate!!
+        int ret_fs_rate;
+
+	mycodec_i2c_local_info(codec, "cs42l83_output_set_input_sample_rate\n");
+
         // in AppleHDATDM_CS42L83::enable
 
         // AppleHDATDM_CS42L83::_setSampleRate
@@ -987,13 +1058,20 @@ static void cs42l83_set_sample_rate(struct hda_codec *codec)
         cs_8409_vendor_i2cRead(codec, 0x90, 0x120a, 1); // snd_hda
         cs_8409_vendor_i2cWrite(codec, 0x90, 0x120a, 0x0000, 1); // snd_hda
 
-        cs_8409_vendor_i2cRead(codec, 0x90, 0x1209, 1); // snd_hda
-        cs_8409_vendor_i2cWrite(codec, 0x90, 0x1209, 0x0001, 1); // snd_hda
+	// correctly implement this to mask in the right bit as per docs
+        //cs_8409_vendor_i2cRead(codec, 0x90, 0x1209, 1); // snd_hda
+        //cs_8409_vendor_i2cWrite(codec, 0x90, 0x1209, 0x0001, 1); // snd_hda
+        ret_fs_rate = cs_8409_vendor_i2cRead(codec, 0x90, 0x1209, 1); // snd_hda
+        ret_fs_rate |= 0x1;
+        cs_8409_vendor_i2cWrite(codec, 0x90, 0x1209, ret_fs_rate, 1); // snd_hda
 
 }
 
 static void cs42l83_setup_audio_output(struct hda_codec *codec)
 {
+
+	mycodec_i2c_local_info(codec, "cs42l83_setup_audio_output\n");
+
         // in AppleHDATDM_CS42L83::enable
 
         // AppleHDATDM_CS42L83::_setupAudioOutput
@@ -1053,6 +1131,8 @@ static void cs42l83_headset_rcv_enable_on(struct hda_codec *codec)
 {
         int retval;
 
+	mycodec_i2c_local_info(codec, "cs42l83_headset_rcv_enable_on\n");
+
         // AppleHDATDM_CS42L83::enable
 
 //      snd_hda i2cPagedWrite i2c address 0x90 i2c reg hi 0x2a lo 0x010c i2c data 0x000c
@@ -1063,6 +1143,8 @@ static void cs42l83_headset_rcv_enable_on(struct hda_codec *codec)
 
 static void cs42l83_buffers_onoff(struct hda_codec *codec, bool onflag)
 {
+
+	mycodec_i2c_local_info(codec, "cs42l83_buffers_onoff\n");
 
         // in AppleHDATDM_CS42L83::enable
 
@@ -1091,6 +1173,8 @@ static void cs42l83_buffers_onoff(struct hda_codec *codec, bool onflag)
 static void cs42l83_set_power_state_on_nouse(struct hda_codec *codec, int dummy)
 {
 
+	mycodec_i2c_local_info(codec, "cs42l83_set_power_state_on_nouse\n");
+
         // AppleHDATDM_CS42L83::setPowerState
 
 //      snd_hda i2cPagedRead  i2c address 0x90 i2c reg hi 0x11 lo 0x0100 i2c data 0x01fe
@@ -1116,6 +1200,13 @@ static void cs42l83_set_power_state_on_nouse(struct hda_codec *codec, int dummy)
 
 static void cs42l83_headset_enable_on(struct hda_codec *codec)
 {
+
+	mycodec_i2c_local_info(codec, "cs42l83_headset_enable_on\n");
+
+	// looks as tho this is only enabling the headphone component
+	// - doesnt seem to be needed for the headset mike to work
+	// (unless it just happens the headphone component is always enabled so
+	//  dont see it for the headset mike)
 
         // AppleHDATDM_CS42L83::setPowerState
         // AppleHDATDM_CS42L83::enableHeadphones
@@ -1145,6 +1236,8 @@ static void cs42l83_plugin_interrupt_setup(struct hda_codec *codec)
         int retval;
         int newval;
 
+	mycodec_i2c_local_info(codec, "cs42l83_plugin_interrupt_setup\n");
+
         // in AppleHDAMikeyInternalCS8409::handleJackDisconnectUR
 
         // this enables the headphone plugin sense interrupt
@@ -1160,7 +1253,7 @@ static void cs42l83_plugin_interrupt_setup(struct hda_codec *codec)
         // so reading 0x1b7b seems to lead to 2 UNSOL events
         // one with interrupt set followed by one with interrupt cleared
 
-        dev_info(hda_codec_dev(codec), "command cs42l83_plugin_interrupt_setup start\n");
+        mycodec_info(codec, "command cs42l83_plugin_interrupt_setup start\n");
  
 //      snd_hda i2cPagedRead  i2c address 0x90 i2c reg hi 0x1b lo 0x7b00 i2c data 0x7b00
 //      snd_hda i2cPagedRead  i2c address 0x90 i2c reg hi 0x1b lo 0x7900 i2c data 0x79c0
@@ -1172,17 +1265,19 @@ static void cs42l83_plugin_interrupt_setup(struct hda_codec *codec)
 
         newval = (retval & 0x9f) | 0x20;
 
-        printk("snd_hda_intel: cs42l83_plugin_interrupt_setup 0x%04x 0x%04x: 0x%04x (0x%04x 0x%04x 0x%04x)",0x90,0x1b79,newval,0x00a0,retval,0x00c0);
+        myprintk_dbg("snd_hda_intel: cs42l83_plugin_interrupt_setup 0x%04x 0x%04x: 0x%04x (0x%04x 0x%04x 0x%04x)",0x90,0x1b79,newval,0x00a0,retval,0x00c0);
 
         cs_8409_vendor_i2cWrite(codec, 0x90, 0x1b79, 0x00a0, 1); // snd_hda
 
-        dev_info(hda_codec_dev(codec), "command cs42l83_plugin_interrupt_setup end\n");
+        mycodec_info(codec, "command cs42l83_plugin_interrupt_setup end\n");
 }
 
 static void cs42l83_headset_detect2_off(struct hda_codec *codec)
 {
         int retval;
         int newval;
+
+	mycodec_i2c_local_info(codec, "cs42l83_headset_detect2_off\n");
 
         // in AppleHDAMikeyInternalCS8409::handleJackDisconnectUR
 
@@ -1205,7 +1300,7 @@ static void cs42l83_headset_detect2_off(struct hda_codec *codec)
 
         newval = (retval | 0x38);
 
-        printk("snd_hda_intel: cs42l83_headset_detect2_off 0x%04x 0x%04x: 0x%04x (0x%04x 0x%04x 0x%04x)",0x90,0x1b7a,newval,0x00ff,retval,0x00ff);
+        myprintk_dbg("snd_hda_intel: cs42l83_headset_detect2_off 0x%04x 0x%04x: 0x%04x (0x%04x 0x%04x 0x%04x)",0x90,0x1b7a,newval,0x00ff,retval,0x00ff);
 
         cs_8409_vendor_i2cWrite(codec, 0x90, 0x1b7a, 0x00ff, 1); // snd_hda
 
@@ -1214,7 +1309,7 @@ static void cs42l83_headset_detect2_off(struct hda_codec *codec)
 
         newval = (retval & 0xe7);
 
-        printk("snd_hda_intel: cs42l83_headset_detect2_off 0x%04x 0x%04x: 0x%04x (0x%04x 0x%04x 0x%04x)",0x90,0x1b7c,newval,0x00a0,retval,0x00c0);
+        myprintk_dbg("snd_hda_intel: cs42l83_headset_detect2_off 0x%04x 0x%04x: 0x%04x (0x%04x 0x%04x 0x%04x)",0x90,0x1b7c,newval,0x00a0,retval,0x00c0);
 
         cs_8409_vendor_i2cWrite(codec, 0x90, 0x1b74, 0x0003, 1); // snd_hda
 
@@ -1224,6 +1319,8 @@ static void cs42l83_enable_hsbias_auto_clamp_off3(struct hda_codec *codec)
 {
 
         //int retval;
+
+	mycodec_i2c_local_info(codec, "cs42l83_enable_hsbias_auto_clamp_off3\n");
 
         // in AppleHDAMikeyInternalCS8409::handleJackDisconnectUR
 
@@ -1238,14 +1335,16 @@ static void cs42l83_enable_hsbias_auto_clamp_off3(struct hda_codec *codec)
 //      snd_hda i2cPagedWrite i2c address 0x90 i2c reg hi 0x1b lo 0x7046 i2c data 0x0046
 
         cs_8409_vendor_i2cRead(codec, 0x90, 0x1b70, 1); // snd_hda
-
         cs_8409_vendor_i2cWrite(codec, 0x90, 0x1b70, 0x0006, 1); // snd_hda
+
         cs_8409_vendor_i2cWrite(codec, 0x90, 0x1b70, 0x0046, 1); // snd_hda
 
 }
 
 static void cs42l83_disable_button_interrupts(struct hda_codec *codec)
 {
+
+	mycodec_i2c_local_info(codec, "cs42l83_disable_button_interrupts\n");
 
         // AppleHDAMikeyInternalCS8409::setupButtonDetection
 
@@ -1272,6 +1371,9 @@ static void cs42l83_disable_button_interrupts(struct hda_codec *codec)
 
 static void cs42l83_unplug_headset_detect_off(struct hda_codec *codec)
 {
+
+	mycodec_i2c_local_info(codec, "cs42l83_unplug_headset_detect_off\n");
+
         // this is AppleHDAMikeyInternalCS8409::enableHSDetection
         // this calls readMikey/writeMikey with 0x8 arg and 0x9 arg
 
@@ -1296,6 +1398,9 @@ static void cs42l83_unplug_headset_detect_off(struct hda_codec *codec)
  
 static void cs42l83_headset_switch_control(struct hda_codec *codec)
 {
+
+	mycodec_i2c_local_info(codec, "cs42l83_headset_switch_control\n");
+
         // from AppleHDAMikeyInternalCS8409::handleJackDisconnectUR
 
         // this is likely writeMikey 0x9, 0xa making it plausibly AppleHDAMikeyInternalCS8409::configureForUSHeadset
@@ -1324,6 +1429,8 @@ static void cs42l83_headset_switch_control(struct hda_codec *codec)
 static void cs42l83_headset_enable_off(struct hda_codec *codec)
 {
 
+	mycodec_i2c_local_info(codec, "cs42l83_headset_enable_off\n");
+
         // in AppleHDATDM_CS42L83::enable - 0x22cb
         // from AppleHDATDM_CS42L83::_powerOffCodecOutput
         // AppleHDATDM_CS42L83::enableHeadphones(bool)
@@ -1339,7 +1446,7 @@ static void cs42l83_headset_enable_off(struct hda_codec *codec)
         //          0x107e - undocumented Global
         //                   set to 0x00
 
-        printk("snd_hda_intel: cs42l83_headset_enable_off start\n");
+        myprintk("snd_hda_intel: cs42l83_headset_enable_off start\n");
 
 //      snd_hda i2cPagedRead  i2c address 0x90 i2c reg hi 0x20 lo 0x0100 i2c data 0x0101
 //      snd_hda i2cPagedWrite i2c address 0x90 i2c reg hi 0x20 lo 0x010d i2c data 0x000d
@@ -1358,14 +1465,17 @@ static void cs42l83_headset_enable_off(struct hda_codec *codec)
         cs_8409_vendor_i2cWrite(codec, 0x90, 0x2102, 0x0020, 1); // snd_hda
         cs_8409_vendor_i2cWrite(codec, 0x90, 0x107e, 0x0000, 1); // snd_hda
 
-        printk("snd_hda_intel: cs42l83_headset_enable_off end\n");
+        myprintk("snd_hda_intel: cs42l83_headset_enable_off end\n");
 
 }
 
 
 static void cs42l83_power_off_codec_output(struct hda_codec *codec)
 {
-        // in AppleHDATDM_CS42L83::enable
+
+	mycodec_i2c_local_info(codec, "cs42l83_power_off_codec_output\n");
+
+        // in AppleHDATDM_CS42L83::enable or AppleHDATDM_CS42L83::setPowerState
         // AppleHDATDM_CS42L83::_powerOffCodecOutput
 
         // register 0x1101 - Power Down Control 1
@@ -1373,7 +1483,7 @@ static void cs42l83_power_off_codec_output(struct hda_codec *codec)
         //                   changed from 0x96 to 0x9e (0x40 ASP Input, 0x20 Mixer, 0x08 HPOut, 0x1 codec powered to
         //                                              0x40 ASP Input, 0x20 Mixer, 0x1 codec powered)
         // register 0x1101 - Power Down Control 1       
-        //                   changed from 0x9e (0x40 ASP Input, 0x20 Mixer, 0x1 codec powered to 0x1 codec powered) to 0xfe (default)
+        //                   changed from 0x9e (0x40 ASP Input, 0x20 Mixer, 0x1 codec powered) to 0xfe (default - 0x1 codec powered))
 
 //      snd_hda i2cPagedRead  i2c address 0x90 i2c reg hi 0x11 lo 0x0100 i2c data 0x0196
 //      snd_hda i2cPagedWrite i2c address 0x90 i2c reg hi 0x11 lo 0x019e i2c data 0x009e
@@ -1391,8 +1501,45 @@ static void cs42l83_power_off_codec_output(struct hda_codec *codec)
         cs_8409_vendor_i2cWriteMask(codec, 0x90, 0x1101, 0x60, 0x60, 1); // snd_hda
 }
 
+static void cs42l83_power_off_codec_input(struct hda_codec *codec)
+{
+
+	mycodec_i2c_local_info(codec, "cs42l83_power_off_codec_input\n");
+
+        // in AppleHDATDM_CS42L83::enable or AppleHDATDM_CS42L83::setPowerState
+        // AppleHDATDM_CS42L83::_powerOffCodecInput
+
+	// note there is a call to AppleHDATDM_CS42L83::enableExtMicrophone(0) in this routine
+	// ah - thats the 0x1d03 mute/unmute volume register
+
+        // register 0x1101 - Power Down Control 1
+        //                   0xff powered down 0x00 powered up
+        //                   changed from 0x12 to 0x16 (0x80 ASP Output, 0x40 ASP Input, 0x20 Mixer, 0x08 HPOut, 0x4 ADC, 0x1 codec powered to
+        //                                              0x80 ASP Output, 0x40 ASP Input, 0x20 Mixer, 0x08 HPout, 0x1 codec powered)
+        // register 0x1101 - Power Down Control 1
+        //                   changed from 0x16 (0x80 ASP Output, 0x40 ASP Input, 0x20 Mixer, 0x08 HPOut, 0x1 codec powered) to
+        //                                0x96 (0x40 ASP Input, 0x20 Mixer, 0x08 HPOut, 0x1 codec powered)
+
+//      snd_hda i2cPagedRead  i2c address 0x90 i2c reg hi 0x11 lo 0x0100 i2c data 0x0112
+//      snd_hda i2cPagedWrite i2c address 0x90 i2c reg hi 0x11 lo 0x0116 i2c data 0x0016
+//      snd_hda i2cPagedRead  i2c address 0x90 i2c reg hi 0x11 lo 0x0100 i2c data 0x0116
+//      snd_hda i2cPagedWrite i2c address 0x90 i2c reg hi 0x11 lo 0x0196 i2c data 0x0096
+
+        //cs_8409_vendor_i2cRead(codec, 0x90, 0x1101, 1); // snd_hda
+        //cs_8409_vendor_i2cWrite(codec, 0x90, 0x1101, 0x0016, 1); // snd_hda
+
+        cs_8409_vendor_i2cWriteMask(codec, 0x90, 0x1101, 0x04, 0x04, 1); // snd_hda
+
+        //cs_8409_vendor_i2cRead(codec, 0x90, 0x1101, 1); // snd_hda
+        //cs_8409_vendor_i2cWrite(codec, 0x90, 0x1101, 0x0096, 1); // snd_hda
+
+        cs_8409_vendor_i2cWriteMask(codec, 0x90, 0x1101, 0x80, 0x80, 1); // snd_hda
+}
+
 static void cs42l83_headset_rcv_enable_off(struct hda_codec *codec)
 {
+
+	mycodec_i2c_local_info(codec, "cs42l83_headset_rcv_enable_off\n");
 
         // in AppleHDATDM_CS42L83::enable
         // this is only place we have a 0x2a01
@@ -1410,6 +1557,8 @@ static void cs42l83_headset_rcv_enable_off(struct hda_codec *codec)
 
 static void cs42l83_headset_power_off(struct hda_codec *codec)
 {
+
+	mycodec_i2c_local_info(codec, "cs42l83_headset_power_off\n");
 
         // in AppleHDATDM_CS42L83::enable
 
@@ -1430,8 +1579,18 @@ static void cs42l83_headset_power_off(struct hda_codec *codec)
 
 }
 
-static void cs42l83_line_or_mike_set_sample_rate(struct hda_codec *codec)
+//static void cs42l83_line_or_mike_set_sample_rate(struct hda_codec *codec)
+static void cs42l83_input_set_output_sample_rate(struct hda_codec *codec)
 {
+	// changed name from cs42l83_line_or_mike_set_sample_rate
+	// NOTA BENE - it says input sample rate because its the sample rate for data
+	//             from analog inputs converted to digital and going out of the cs42l83
+	//             - so the register is labelled the Output sample rate!!
+
+        int ret_fs_rate;
+
+	mycodec_i2c_local_info(codec, "cs42l83_input_set_output_sample_rate\n");
+
         // in AppleHDATDM_CS42L83::enable
 
         // AppleHDATDM_CS42L83::_setSampleRate
@@ -1441,11 +1600,11 @@ static void cs42l83_line_or_mike_set_sample_rate(struct hda_codec *codec)
         // register 0x2609 - SRC Output Sample Rate
         //                   changed from 0x40 to 0x4a (0x0a is 44.1 kHz)
         // register 0x2506 - Serial Port Transmit Sample Rate
-        //                   changed from 0xca to 0xca (0x0a is 48 kHz)
+        //                   changed from 0xca to 0xca (0x0a is 44.1 kHz)
         // register 0x120b - Output ASRC Clock Select
         //                   changed from 0x00 to 0x00 (0x00 6 MHz)
         // register 0x1209 - FS Rate Enable
-        //                   changed from 0x00 to 0x01 (0x01 Enable IASRC 96K and lower rates)
+        //                   changed from 0x00 to 0x03 (0x01 Enable IASRC 96K and lower rates, 0x02 Enable OASRC96K and lower rates)
 
 //      snd_hda i2cPagedRead  i2c address 0x90 i2c reg hi 0x26 lo 0x0900 i2c data 0x0940
 //      snd_hda i2cPagedWrite i2c address 0x90 i2c reg hi 0x26 lo 0x094a i2c data 0x004a
@@ -1462,13 +1621,21 @@ static void cs42l83_line_or_mike_set_sample_rate(struct hda_codec *codec)
         cs_8409_vendor_i2cWrite(codec, 0x90, 0x2506, 0x00ca, 1); // snd_hda
         cs_8409_vendor_i2cRead(codec, 0x90, 0x120b, 1); // snd_hda
         cs_8409_vendor_i2cWrite(codec, 0x90, 0x120b, 0x0000, 1); // snd_hda
-        cs_8409_vendor_i2cRead(codec, 0x90, 0x1209, 1); // snd_hda
-        cs_8409_vendor_i2cWrite(codec, 0x90, 0x1209, 0x0003, 1); // snd_hda
+
+	// correctly implement this to mask in the right bit as per docs
+        //cs_8409_vendor_i2cRead(codec, 0x90, 0x1209, 1); // snd_hda
+        //cs_8409_vendor_i2cWrite(codec, 0x90, 0x1209, 0x0003, 1); // snd_hda
+        ret_fs_rate = cs_8409_vendor_i2cRead(codec, 0x90, 0x1209, 1); // snd_hda
+        ret_fs_rate |= 0x2;
+        cs_8409_vendor_i2cWrite(codec, 0x90, 0x1209, ret_fs_rate, 1); // snd_hda
 
 }
 
 static void cs42l83_mike_setup_audio_input(struct hda_codec *codec)
 {
+
+	mycodec_i2c_local_info(codec, "cs42l83_mike_setup_audio_input\n");
+
         // in AppleHDATDM_CS42L83::enable
 
         // AppleHDATDM_CS42L83::_setupAudioInput
@@ -1491,6 +1658,9 @@ static void cs42l83_mike_setup_audio_input(struct hda_codec *codec)
 
 static void cs42l83_mike_enable(struct hda_codec *codec)
 {
+
+	mycodec_i2c_local_info(codec, "cs42l83_mike_enable\n");
+
         // in AppleHDATDM_CS42L83::enable
 
         // register 0x2902 - ASP Transmit Channel Enable
@@ -1509,6 +1679,9 @@ static void cs42l83_mike_enable(struct hda_codec *codec)
 
 static void cs42l83_mike_disable(struct hda_codec *codec)
 {
+
+	mycodec_i2c_local_info(codec, "cs42l83_mike_disable\n");
+
         // in AppleHDATDM_CS42L83::enable
 
         // register 0x2901 - ASP Transmit Size and Enable
@@ -1524,8 +1697,17 @@ static void cs42l83_mike_disable(struct hda_codec *codec)
 
 }
 
-static void cs42l83_line_or_mike_set_sample_rate1(struct hda_codec *codec)
+//static void cs42l83_line_or_mike_set_sample_rate1(struct hda_codec *codec)
+static void cs42l83_input_set_output_sample_rate1(struct hda_codec *codec)
 {
+	// changed name from cs42l83_line_or_mike_set_sample_rate1
+	// NOTA BENE - it says input sample rate because its the sample rate for data
+	//             from analog inputs converted to digital and going out of the cs42l83
+	//             - so the register is labelled the Output sample rate!!
+	// NOTA BENE - NOT fixed to do bit op for 0x1209 register!!!
+
+	mycodec_i2c_local_info(codec, "cs42l83_input_set_output_sample_rate1\n");
+
         // in AppleHDATDM_CS42L83::enable
 
         // AppleHDATDM_CS42L83::_setSampleRate
@@ -1535,7 +1717,7 @@ static void cs42l83_line_or_mike_set_sample_rate1(struct hda_codec *codec)
         // register 0x2609 - SRC Output Sample Rate
         //                   changed from 0x4a to 0x4a (0x0a is 44.1 kHz)
         // register 0x2506 - Serial Port Transmit Sample Rate
-        //                   changed from 0xca to 0xca (0x0a is 48 kHz)
+        //                   changed from 0xca to 0xca (0x0a is 44.1 kHz)
         // register 0x120b - Output ASRC Clock Select
         //                   changed from 0x00 to 0x00 (0x00 6 MHz)
         // register 0x1209 - FS Rate Enable
@@ -1563,6 +1745,9 @@ static void cs42l83_line_or_mike_set_sample_rate1(struct hda_codec *codec)
 
 static void cs42l83_line_or_mike_setup_audio_input(struct hda_codec *codec)
 {
+
+	mycodec_i2c_local_info(codec, "cs42l83_line_or_mike_setup_audio_input\n");
+
         // in AppleHDATDM_CS42L83::enable
 
         // AppleHDATDM_CS42L83::_setupAudioInput
@@ -1583,8 +1768,11 @@ static void cs42l83_line_or_mike_setup_audio_input(struct hda_codec *codec)
 
 }
 
-static void cs42l83_line_or_mike_enable(struct hda_codec *codec)
+static void cs42l83_line_or_mike_enable_nouse(struct hda_codec *codec)
 {
+
+	mycodec_i2c_local_info(codec, "cs42l83_line_or_mike_enable_nouse\n");
+
         // in AppleHDATDM_CS42L83::enable
 
         // register 0x2902 - ASP Transmit Channel Enable
@@ -1604,6 +1792,8 @@ static void cs42l83_headset_mike_pin_enable(struct hda_codec *codec)
 {
         int retval = 0;
 
+	mycodec_i2c_local_info(codec, "cs42l83_headset_mike_pin_enable\n");
+
         // why twice??
 
         retval = snd_hda_codec_read_check(codec, 0x3c, 0, AC_VERB_GET_PIN_WIDGET_CONTROL, 0x00000000, 0x00000020, 14146); // 0x03cf0700
@@ -1621,6 +1811,8 @@ static void cs42l83_headset_mike_pin_enable(struct hda_codec *codec)
 static void cs42l83_configure_headset_button_interrupts(struct hda_codec *codec)
 {
         //int retval;
+
+	mycodec_i2c_local_info(codec, "cs42l83_configure_headset_button_interrupts\n");
 
         // from AppleHDAMikeyInternalCS8409::handleButtonDetectUR(unsigned int)
 
@@ -1647,6 +1839,8 @@ static void cs42l83_enable_hsbias_auto_clamp_off2(struct hda_codec *codec)
 
         //int retval;
 
+	mycodec_i2c_local_info(codec, "cs42l83_enable_hsbias_auto_clamp_off2\n");
+
         // in AppleHDAMikeyInternalCS8409::setupButtonDetection
 
         //  AppleHDAMikeyInternalCS8409::enableHSBIASautoclamp
@@ -1661,6 +1855,7 @@ static void cs42l83_enable_hsbias_auto_clamp_off2(struct hda_codec *codec)
 
         cs_8409_vendor_i2cRead(codec, 0x90, 0x1b70, 1); // snd_hda
         cs_8409_vendor_i2cWrite(codec, 0x90, 0x1b70, 0x0006, 1); // snd_hda
+
         cs_8409_vendor_i2cWrite(codec, 0x90, 0x1b70, 0x0046, 1); // snd_hda
 
 }
@@ -1669,6 +1864,8 @@ static void cs42l83_enable_hsbias_auto_clamp_on3(struct hda_codec *codec)
 {
 
         //int retval;
+
+	mycodec_i2c_local_info(codec, "cs42l83_enable_hsbias_auto_clamp_on3\n");
 
         // in AppleHDAMikeyInternalCS8409::setupButtonDetection
 
@@ -1683,5 +1880,19 @@ static void cs42l83_enable_hsbias_auto_clamp_on3(struct hda_codec *codec)
         cs_8409_vendor_i2cRead(codec, 0x90, 0x1b70, 1); // snd_hda
         cs_8409_vendor_i2cWrite(codec, 0x90, 0x1b70, 0x00c6, 1); // snd_hda
 
+}
+
+
+static void cs42l83_headset_mike_adc_unmutevol(struct hda_codec *codec, int unmute)
+{
+
+	mycodec_i2c_local_info(codec, "cs42l83_headset_mike_adc_unmutevol\n");
+
+	// in AppleHDATDM_CS42L83::enableExtMicrophone
+
+	if (unmute)
+		cs_8409_vendor_i2cWrite(codec, 0x90, 0x1d03, 0x0000, 1); // snd_hda
+	else
+		cs_8409_vendor_i2cWrite(codec, 0x90, 0x1d03, 0x0080, 1); // snd_hda
 }
 

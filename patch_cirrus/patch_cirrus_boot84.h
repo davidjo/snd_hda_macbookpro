@@ -10,7 +10,7 @@ static void setup_reset_and_clear(struct hda_codec *codec)
         int retval;
 
 
-        dev_info(hda_codec_dev(codec), "command nid start setup_node_reset_and_clear\n");
+        mycodec_info(codec, "command nid start setup_node_reset_and_clear\n");
 
         retval = snd_hda_codec_read_check(codec, 0x00, 0, AC_VERB_PARAMETERS, 0x00000000, 0x10138409, 1); // 0x000f0000
         retval = snd_hda_codec_read_check(codec, 0x00, 0, AC_VERB_PARAMETERS, 0x00000002, 0x00100100, 2); // 0x000f0002
@@ -66,7 +66,7 @@ static void setup_reset_and_clear(struct hda_codec *codec)
         retval = snd_hda_codec_read_check(codec, codec->core.afg, 0, AC_VERB_PARAMETERS, 0x00000011, 0xc0000008, 25); // 0x001f0011
 //      snd_hda:     gpio params 1 [('GPIO', 8), ('GPIO_WAKE', 1), ('GPO', 0), ('GPI', 0), ('GPIO_UNSOL', 1)]
 
-        dev_info(hda_codec_dev(codec), "command nid start setup_node_reset_and_clear end\n");
+        mycodec_info(codec, "command nid start setup_node_reset_and_clear end\n");
 
 }
 
@@ -1559,7 +1559,7 @@ static void read_virtual_widgets(struct hda_codec *codec)
 
         unsigned int retval;
 
-        dev_info(hda_codec_dev(codec), "command nid start read_virtual_widgets\n");
+        mycodec_info(codec, "command nid start read_virtual_widgets\n");
 
         // copied to outer routine
         //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_POWER_STATE, 0x00000000); // 0x00170500
@@ -1626,7 +1626,7 @@ static void read_virtual_widgets(struct hda_codec *codec)
 //      snd_hda:     75 AC_WID_AUD_OUT ['AC_WCAP_CHAN_CNT_EXT', 'AC_WCAP_DELAY', 'AC_WCAP_TYPE'] 0 0 0
 
 
-        dev_info(hda_codec_dev(codec), "command nid end   read_virtual_widgets\n");
+        mycodec_info(codec, "command nid end   read_virtual_widgets\n");
 
 }
 
@@ -1696,7 +1696,7 @@ static void init_for_node_vendor(struct hda_codec *codec)
 
         // this is AppleHDAFunctionGroupCS8409::initForNodeID
 
-        dev_info(hda_codec_dev(codec), "command init_for_node_vendor start\n");
+        mycodec_info(codec, "command init_for_node_vendor start\n");
 
         // these 2 items seem to enable the i2c clock - but we havent enabled i2c yet!!
         // whats the difference??
@@ -1737,7 +1737,7 @@ static void init_for_node_vendor(struct hda_codec *codec)
         snd_hda_coef_item(codec, 1, CS8409_VENDOR_NID, 0x0082, 0x0000, 0x00000000, 1667 ); //   coef write 1667
 
 
-        dev_info(hda_codec_dev(codec), "command init_for_node_vendor end\n");
+        mycodec_info(codec, "command init_for_node_vendor end\n");
 
 }
 
@@ -1748,7 +1748,7 @@ static void determine_speaker_id(struct hda_codec *codec, int mask)
         // this is determineSpeakerID
         // this does not make sense - this just checks a GPIO pin??
 
-        dev_info(hda_codec_dev(codec), "command determine_speaker_id start\n");
+        mycodec_info(codec, "command determine_speaker_id start\n");
 
         // this is call AppleHDAFunctionGroup::setGPIOEnable in determineSpeakerID
         //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_GPIO_MASK, 0x00000004); // 0x00171604
@@ -1761,9 +1761,9 @@ static void determine_speaker_id(struct hda_codec *codec, int mask)
 
         retval = snd_hda_codec_read(codec, codec->core.afg, 0, AC_VERB_GET_GPIO_DATA, 0x00000000); // 0x001f1500
 
-        dev_info(hda_codec_dev(codec), "command determine_speaker_id gpio data 0x%08x\n", retval);
+        mycodec_info(codec, "command determine_speaker_id gpio data 0x%08x\n", retval);
 
-        dev_info(hda_codec_dev(codec), "command determine_speaker_id end\n");
+        mycodec_info(codec, "command determine_speaker_id end\n");
 
 }
 
@@ -1775,7 +1775,7 @@ static void enable_GPIforUR(struct hda_codec *codec, int mask)
 
         // AppleHDAFunctionGroupCS8409::enableGPIforUR
 
-        dev_info(hda_codec_dev(codec), "command enable_GPIforUR start\n");
+        mycodec_info(codec, "command enable_GPIforUR start\n");
 
         //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_POWER_STATE, 0x00000000); // 0x00170500
         //hda_set_node_power_state(codec, codec->core.afg, AC_PWRST_D0);
@@ -1819,7 +1819,7 @@ static void enable_GPIforUR(struct hda_codec *codec, int mask)
         //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_POWER_STATE, 0x00000003); // 0x00170503
         //hda_set_node_power_state(codec, codec->core.afg, AC_PWRST_D3);
 
-        dev_info(hda_codec_dev(codec), "command enable_GPIforUR end\n");
+        mycodec_info(codec, "command enable_GPIforUR end\n");
 
 }
 
@@ -1866,7 +1866,7 @@ static void cs42l83_external_control_GPIO(struct hda_codec *codec,int mask)
         // has an IOSleep() as the first call depending on a value - if non-zero time to sleep
         // if 0 IOSleep() call ignored 
 
-        dev_info(hda_codec_dev(codec), "command cs42l83_external_control_GPIO start\n");
+        mycodec_info(codec, "command cs42l83_external_control_GPIO start\n");
 
         // this clearing then setting gpio bit 2
 
@@ -1879,7 +1879,7 @@ static void cs42l83_external_control_GPIO(struct hda_codec *codec,int mask)
         cs42l83_external_control_GPIO_set_2(codec,mask);
 
 
-        dev_info(hda_codec_dev(codec), "command cs42l83_external_control_GPIO end\n");
+        mycodec_info(codec, "command cs42l83_external_control_GPIO end\n");
 
 }
 
@@ -1982,7 +1982,7 @@ static void cs42l83_reset(struct hda_codec *codec)
         cs_8409_vendor_i2cRead(codec, 0x90, 0x1308, 1); // snd_hda
         cs_8409_vendor_i2cRead(codec, 0x90, 0x130f, 1); // snd_hda
 
-        dev_info(hda_codec_dev(codec), "command cs42l83_reset end\n");
+        mycodec_info(codec, "command cs42l83_reset end\n");
 }
 
 static int cs42l83_device_id(struct hda_codec *codec)
@@ -1999,9 +1999,9 @@ static int cs42l83_device_id(struct hda_codec *codec)
         retval_dev = cs_8409_vendor_i2cRead(codec, 0x90, 0x1001, 1); // snd_hda
         retval_rev = cs_8409_vendor_i2cRead(codec, 0x90, 0x1005, 1); // snd_hda
 
-        ret_id = ((retval_dev & 0xff) << 16) || (retval_rev & 0xff);
+        ret_id = ((retval_dev & 0xff) << 16) | (retval_rev & 0xff);
 
-        dev_info(hda_codec_dev(codec), "command cs42l83_device_id end\n");
+        mycodec_info(codec, "command cs42l83_device_id end\n");
 
         return ret_id;
 }
@@ -2013,7 +2013,7 @@ static void cs42l83_inithw(struct hda_codec *codec)
 
         // this triggers the 1st UNSOL response
 
-        dev_info(hda_codec_dev(codec), "command cs42l83_inithw start\n");
+        mycodec_info(codec, "command cs42l83_inithw start\n");
 
 
 //      snd_hda i2cPagedRead  i2c address 0x90 i2c reg hi 0x11 lo 0x0300 i2c data 0x0320
@@ -2108,7 +2108,7 @@ static void cs42l83_inithw(struct hda_codec *codec)
         cs_8409_vendor_i2cWrite(codec, 0x90, 0x1b75, 0x009f, 1); // snd_hda
 
 
-        dev_info(hda_codec_dev(codec), "command cs42l83_inithw end\n");
+        mycodec_info(codec, "command cs42l83_inithw end\n");
 }
 
 static void setup_gpio_set_20(struct hda_codec *codec);
@@ -2154,7 +2154,7 @@ static void setup_gpio_set_20(struct hda_codec *codec)
         // its either applying power to the amps or taking them out of reset
         // (note that unlike GPIO 2 there doesnt seem to be a clear 20)
 
-        dev_info(hda_codec_dev(codec), "command setup_gpio_set_20 start\n");
+        mycodec_info(codec, "command setup_gpio_set_20 start\n");
 
         //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_POWER_STATE, 0x00000000); // 0x00170500
         //hda_set_node_power_state(codec, codec->core.afg, AC_PWRST_D0);
@@ -2174,7 +2174,7 @@ static void setup_gpio_set_20(struct hda_codec *codec)
         //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_POWER_STATE, 0x00000003); // 0x00170503
         //hda_set_node_power_state(codec, codec->core.afg, AC_PWRST_D3);
 
-        dev_info(hda_codec_dev(codec), "command setup_gpio_set_20 end\n");
+        mycodec_info(codec, "command setup_gpio_set_20 end\n");
 }
 
 
@@ -2234,7 +2234,7 @@ static void cs42l83_mic_detect(struct hda_codec *codec)
 
         cs_8409_vendor_i2cWrite(codec, 0x90, 0x1b75, 0x009f, 1); // snd_hda
 
-        dev_info(hda_codec_dev(codec), "command cs42l83_mic_detect end\n");
+        mycodec_info(codec, "command cs42l83_mic_detect end\n");
 }
 
 static void cs42l83_tip_sense(struct hda_codec *codec)
@@ -2266,7 +2266,7 @@ static void cs42l83_tip_sense(struct hda_codec *codec)
 
         cs_8409_vendor_i2cWrite(codec, 0x90, 0x1b73, 0x00c0, 1); // snd_hda
 
-        dev_info(hda_codec_dev(codec), "command cs42l83_tip_sense end\n");
+        mycodec_info(codec, "command cs42l83_tip_sense end\n");
 }
 
 

@@ -1,21 +1,8 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 /*
  * HD audio interface patch for Cirrus Logic CS420x chip
  *
  * Copyright (c) 2009 Takashi Iwai <tiwai@suse.de>
- *
- *  This driver is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2 of the License, or
- *  (at your option) any later version.
- *
- *  This driver is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with this program; if not, write to the Free Software
- *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
  */
 
 #include <linux/init.h>
@@ -23,15 +10,49 @@
 #include <linux/module.h>
 #include <sound/core.h>
 #include <sound/tlv.h>
+#include <sound/hda_codec.h>
 #include <linux/ctype.h>
 #include <linux/timer.h>
-#include <sound/hda_codec.h>
 #include "hda_local.h"
 #include "hda_auto_parser.h"
 #include "hda_jack.h"
 #include "hda_generic.h"
 
 #include <linux/bitops.h>
+
+
+// define some explicit debugging print functions
+// under flag control so can be easily turned off
+
+
+#ifdef MYSOUNDDEBUGFULL
+#define mycodec_info(codec, fmt, args...) \
+        dev_info(hda_codec_dev(codec), fmt, ##args)
+#define mycodec_i2c_info(codec, fmt, args...) \
+        dev_info(hda_codec_dev(codec), fmt, ##args)
+#define mycodec_dbg(codec, fmt, args...) \
+        dev_info(hda_codec_dev(codec), fmt, ##args)
+#define myprintk_dbg(fmt, args...) \
+        printk(fmt, ##args)
+#define myprintk(fmt, args...) \
+        printk(fmt, ##args)
+#else
+#define mycodec_dbg(...)
+#define myprintk_dbg(...)
+#ifdef MYSOUNDDEBUG
+#define mycodec_info(codec, fmt, args...) \
+        dev_info(hda_codec_dev(codec), fmt, ##args)
+#define mycodec_i2c_info(codec, fmt, args...) \
+        dev_info(hda_codec_dev(codec), fmt, ##args)
+#define myprintk(fmt, args...) \
+        printk(fmt, ##args)
+#else
+#define mycodec_info(...)
+#define mycodec_i2c_info(...)
+#define myprintk(...)
+#endif
+#endif
+
 
 /*
  */
@@ -95,6 +116,9 @@ struct cs_spec {
 	// set when playing for plug/unplug events while playing
 	int playing;
 
+	// set when capturing for plug/unplug events while capturing
+	int capturing;
+
 	// changing coding - OSX sets up the format on plugin
 	// then does some minimal setup when start play
 	// initial coding delayed any format setup till actually play
@@ -102,7 +126,11 @@ struct cs_spec {
 	// the mike on plugin
 	// this flag will be set when we have done the format setup
 	// so know if need to do it on play or not
-	int format_setup_needed;
+	// now need 2 flags - one for play and one for capture
+	int headset_play_format_setup_needed;
+	int headset_capture_format_setup_needed;
+
+	int headset_presetup_done;
 
 
 	int use_data;
@@ -116,9 +144,11 @@ struct cs_spec {
 	// another dirty hack item to manage the different headset enable codes
 	int headset_enable;
 
+	int play_init;
+	int capture_init;
+
 	// new item to limit times we redo unmute/play
 	struct timespec last_play_time;
-	int play_init;
 	// record the first play time - we have a problem there
 	// some initial plays that I dont understand - so skip any setup
 	// till sometime after the first play
@@ -1184,25 +1214,6 @@ static int cs421x_init(struct hda_codec *codec)
 	return 0;
 }
 
-static int cs421x_build_controls(struct hda_codec *codec)
-{
-	struct cs_spec *spec = codec->spec;
-	int err;
-
-	err = snd_hda_gen_build_controls(codec);
-	if (err < 0)
-		return err;
-
-	if (spec->gen.autocfg.speaker_outs &&
-	    spec->vendor_nid == CS4210_VENDOR_NID) {
-		err = snd_hda_ctl_add(codec, 0,
-			snd_ctl_new1(&cs421x_speaker_boost_ctl, codec));
-		if (err < 0)
-			return err;
-	}
-	return 0;
-}
-
 static void fix_volume_caps(struct hda_codec *codec, hda_nid_t dac)
 {
 	unsigned int caps;
@@ -1232,6 +1243,14 @@ static int cs421x_parse_auto_config(struct hda_codec *codec)
 		return err;
 
 	parse_cs421x_digital(codec);
+
+	if (spec->gen.autocfg.speaker_outs &&
+	    spec->vendor_nid == CS4210_VENDOR_NID) {
+		if (!snd_hda_gen_add_kctl(&spec->gen, NULL,
+					  &cs421x_speaker_boost_ctl))
+			return -ENOMEM;
+	}
+
 	return 0;
 }
 
@@ -1263,7 +1282,7 @@ static int cs421x_suspend(struct hda_codec *codec)
 #endif
 
 static const struct hda_codec_ops cs421x_patch_ops = {
-	.build_controls = cs421x_build_controls,
+	.build_controls = snd_hda_gen_build_controls,
 	.build_pcms = snd_hda_gen_build_pcms,
 	.init = cs421x_init,
 	.free = cs_free,
@@ -1403,6 +1422,84 @@ static int cs_8409_playback_pcm_prepare(struct hda_pcm_stream *hinfo,
         return err;
 }
 
+
+static void cs_8409_pcm_capture_pre_prepare_hook(struct hda_pcm_stream *hinfo, struct hda_codec *codec, 
+                               unsigned int stream_tag, unsigned int format, struct snd_pcm_substream *substream,
+                               int action);
+
+
+// this is a copy from capture_pcm_prepare in hda_generic.c
+// NOTA BENE - if capture_pcm_prepare is changed in hda_generic.c then
+// those changes must be re-implemented here
+static int cs_8409_capture_pcm_prepare(struct hda_pcm_stream *hinfo,
+                               struct hda_codec *codec,
+                               unsigned int stream_tag,
+                               unsigned int format,
+                               struct snd_pcm_substream *substream)
+{
+        struct hda_gen_spec *spec = codec->spec;
+
+        codec_dbg(codec, "cs_8409_capture_pcm_prepare\n");
+
+        codec_dbg(codec, "cs_8409_capture_pcm_prepare: NID=0x%x, stream=0x%x, format=0x%x\n",
+                  hinfo->nid, stream_tag, format);
+
+
+        cs_8409_pcm_capture_pre_prepare_hook(hinfo, codec, stream_tag, format, substream,
+                              HDA_GEN_PCM_ACT_PREPARE);
+
+	// we have a problem - this has to handle 2 different types of stream - the internal mike
+	// and the external headset mike (cs42l83)
+
+
+	// NOTE - the following snd_hda_codec_stream no longer do anything
+	//        we have already set the stream data in the pre prepare hook
+	//        - so as the format here is same (or at least should be!!) as that setup there is no format difference to that
+	//        cached and snd_hda_coded_setup_stream does nothing
+
+	if (hinfo->nid == 0x22)
+	{
+
+	// so this is getting stranger and stranger
+	// the most valid recording is S24_3LE (0x4031) - except that the data we get out is S32_LE (low byte 0)
+	// - so it doesnt play right - and it messes with arecords vumeter
+	// (S32_LE is officially 0x4041 - but using that format doesnt seem to have valid data - audio very low)
+	//// so now try forcing the format here to 0x4031
+	//// well that fails miserably - the format mismatch stops data totally
+	// it now appears we get the same data with either 0x4031 or 0x4041 - both are low volume
+	// - however scaling (normalizing) in audacity we get the right sound with similar quality to OSX
+	// so now think the low volume is right - and OSX must be scaling/processing the data in CoreAudio
+	// (is the internal mike a fake 24 bits - ie its actually 16 bits but stuffed in the low end of the
+	//  24 bits - hence low volume - preliminary scaling attempts in audacity suggest this might be true!!)
+
+        snd_hda_codec_setup_stream(codec, hinfo->nid, stream_tag, 0, format);
+
+	}
+	else if (hinfo->nid == 0x1a)
+	{
+
+	// do we need a pre-prepare function??
+	// maybe for this the external mike ie cs42l83 input
+
+        snd_hda_codec_setup_stream(codec, hinfo->nid, stream_tag, 0, format);
+
+	}
+	else
+		dev_info(hda_codec_dev(codec), "cs_8409_capture_pcm_prepare - UNIMPLEMENTED input nid 0x%x\n",hinfo->nid);
+
+	// we cant call directly as call_pcm_capture_hook is local to hda_generic.c
+        //call_pcm_capture_hook(hinfo, codec, substream,
+        //                      HDA_GEN_PCM_ACT_PREPARE);
+	// but its a trivial function - at least for the moment!!
+	// note this hook if defined also needs to switch between the 2 versions of input!!
+        if (spec->pcm_capture_hook)
+                spec->pcm_capture_hook(hinfo, codec, substream, HDA_GEN_PCM_ACT_PREPARE);
+
+        return 0;
+}
+
+
+
 // another copied routine as this is local to hda_jack.c
 static struct hda_jack_tbl *
 cs_8409_hda_jack_tbl_new(struct hda_codec *codec, hda_nid_t nid)
@@ -1473,10 +1570,16 @@ static int cs_8409_init(struct hda_codec *codec)
 	struct hda_pcm *info = NULL;
 	struct hda_pcm_stream *hinfo = NULL;
 	struct cs_spec *spec = NULL;
+	//struct snd_kcontrol *kctl = NULL;
 	int pcmcnt = 0;
 	int ret_unsol_enable = 0;
 
-        printk("snd_hda_intel: cs_8409_init\n");
+	// so apparently if we do not define a resume function
+	// then this init function will be called on resume
+	// is that what we want here??
+	// NOTE this is called for either playback or capture
+
+        myprintk("snd_hda_intel: cs_8409_init\n");
 
 	//if (spec->vendor_nid == CS420X_VENDOR_NID) {
 	//	/* init_verb sequence for C0/C1/C2 errata*/
@@ -1485,6 +1588,18 @@ static int cs_8409_init(struct hda_codec *codec)
 	//} else if (spec->vendor_nid == CS4208_VENDOR_NID) {
 	//	snd_hda_sequence_write(codec, cs4208_coef_init_verbs);
 	//}
+
+
+	//// so it looks as tho we have an issue when using headsets
+	//// - because the 8409 is totally messed up it does not switch the inputs
+	//// when a headset is plugged in
+	//// not sure about this here - maybe move to where disable internal mike nodes
+	//if (spec->jack_present) {
+	//}
+
+
+	// so the following powers on all active nodes - but if we have just plugged
+	// in a headset thats still the internal mike and amps
 
 	snd_hda_gen_init(codec);
 
@@ -1495,10 +1610,10 @@ static int cs_8409_init(struct hda_codec *codec)
         hinfo = spec->gen.stream_analog_playback;
 	if (hinfo != NULL)
 	{
-		codec_dbg(codec, "playback stream nid 0x%02x rates 0x%08x formats 0x%016llx\n",hinfo->nid,hinfo->rates,hinfo->formats);
+		codec_dbg(codec, "hinfo stream nid 0x%02x rates 0x%08x formats 0x%016llx\n",hinfo->nid,hinfo->rates,hinfo->formats);
 	}
 	else
-		codec_dbg(codec, "playback stream NULL\n");
+		codec_dbg(codec, "hinfo stream NULL\n");
 
 	// think this is what I need to fixup
 
@@ -1529,6 +1644,11 @@ static int cs_8409_init(struct hda_codec *codec)
 	// update the streams specifically by nid
 	// we seem to have only 1 stream here with the nid of 0x02
 	// (I still dont really understand the linux generic coding here)
+	// with capture devices we seem to get 2 pcm streams (0 and 1)
+	// each pcm stream has an output stream (0) and an input stream (1)
+	// the 1st pcm stream (0) is assigned nid 0x02 for output and nid 0x22 for input (internal mike)
+	// the 2nd pcm stream (1) has a dummy output stream and nid 0x1a for input (headset mike via cs42l83)
+	// (NOTE this means the line input stream (0x45->0x32) is not assigned currently ie not useable)
 
         list_for_each_entry(info, &codec->pcm_list_head, list) {
                 int stream;
@@ -1538,25 +1658,71 @@ static int cs_8409_init(struct hda_codec *codec)
 
 			if (hinfo != NULL)
 			{
-				if (stream == SNDRV_PCM_STREAM_PLAYBACK && hinfo->nid == 0x02)
+				if (stream == SNDRV_PCM_STREAM_PLAYBACK)
 				{
-					codec_dbg(codec, "cs_8409_init info stream %d pointer %p\n",stream,hinfo);
-					// so now we need to force the rates and formats to the single one Apple defines ie 44.1 kHz and S24_LE
-					// probably can leave S32_LE
-					// we can still handle 2/4 channel (what about 1 channel?)
-					hinfo->rates = SNDRV_PCM_RATE_44100;
-					hinfo->formats = SNDRV_PCM_FMTBIT_S32_LE | SNDRV_PCM_FMTBIT_S24_LE;
-					codec_dbg(codec, "playback info stream forced nid 0x%02x rates 0x%08x formats 0x%016llx\n",hinfo->nid,hinfo->rates,hinfo->formats);
+					if (hinfo->nid == 0x02)
+					{
+						codec_dbg(codec, "cs_8409_init info playback stream %d pointer %p\n",stream,hinfo);
+						// so now we need to force the rates and formats to the single one Apple defines ie 44.1 kHz and S24_LE
+						// probably can leave S32_LE
+						// we can still handle 2/4 channel (what about 1 channel?)
+						hinfo->rates = SNDRV_PCM_RATE_44100;
+						hinfo->formats = SNDRV_PCM_FMTBIT_S32_LE | SNDRV_PCM_FMTBIT_S24_LE;
+						codec_dbg(codec, "playback info stream forced nid 0x%02x rates 0x%08x formats 0x%016llx\n",hinfo->nid,hinfo->rates,hinfo->formats);
 
-					// update the playback function
-					hinfo->ops.prepare = cs_8409_playback_pcm_prepare;
+						// update the playback function
+						hinfo->ops.prepare = cs_8409_playback_pcm_prepare;
+					}
+				}
+				else if (stream == SNDRV_PCM_STREAM_CAPTURE)
+				{
+					if (hinfo->nid == 0x22)
+					{
+						// this is the internal mike
+						// this is a bit weird - the output nodes are id'ed by output input pin nid
+						// but the input nodes are done by the input (adc) nid - not the input pin nid
+						codec_dbg(codec, "cs_8409_init info capture stream %d pointer %p\n",stream,hinfo);
+						// so now we could force the rates and formats to the single one Apple defines ie 44.1 kHz and S24_LE
+						// but this internal mike seems to be a standard HDA input setup so we could have any format here
+						//hinfo->rates = SNDRV_PCM_RATE_44100;
+						//hinfo->formats = SNDRV_PCM_FMTBIT_S32_LE | SNDRV_PCM_FMTBIT_S24_LE;
+						hinfo->rates = SNDRV_PCM_RATE_44100;
+						//hinfo->formats = SNDRV_PCM_FMTBIT_S24_3LE;
+						hinfo->formats = SNDRV_PCM_FMTBIT_S32_LE | SNDRV_PCM_FMTBIT_S24_LE | SNDRV_PCM_FMTBIT_S24_3LE;
+						//hinfo->maxbps = 24;
+						codec_dbg(codec, "capture info stream forced nid 0x%02x rates 0x%08x formats 0x%016llx maxbps %d\n",hinfo->nid,hinfo->rates,hinfo->formats,hinfo->maxbps);
+						// update the capture function
+						hinfo->ops.prepare = cs_8409_capture_pcm_prepare;
+					}
+					else if (hinfo->nid == 0x1a)
+					{
+						// this is the external mike ie headset mike
+						// this is a bit weird - the output nodes are id'ed by output input pin nid
+						// but the input nodes are done by the input (adc) nid - not the input pin nid
+						codec_dbg(codec, "cs_8409_init info capture stream %d pointer %p\n",stream,hinfo);
+						// so now we force the rates and formats to the single one Apple defines ie 44.1 kHz and S24_LE
+						// - because this format is the one being returned by the cs42l83 which is setup by undocumented i2c commands
+						hinfo->rates = SNDRV_PCM_RATE_44100;
+						//hinfo->formats = SNDRV_PCM_FMTBIT_S24_LE;
+						hinfo->formats = SNDRV_PCM_FMTBIT_S32_LE | SNDRV_PCM_FMTBIT_S24_LE | SNDRV_PCM_FMTBIT_S24_3LE;
+						//hinfo->maxbps = 24;
+						codec_dbg(codec, "capture info stream forced nid 0x%02x rates 0x%08x formats 0x%016llx maxbps %d\n",hinfo->nid,hinfo->rates,hinfo->formats,hinfo->maxbps);
+						// update the capture function
+						hinfo->ops.prepare = cs_8409_capture_pcm_prepare;
+					}
+					// still not sure what we do about the linein nid
+					// is this bidirectional - because we have no lineout as far as I can see
 				}
 			}
 			else
-				codec_dbg(codec, "cs_8409_init info stream %d NULL\n", stream);
+				codec_dbg(codec, "cs_8409_init info pcm stream %d NULL\n", stream);
 		}
 		pcmcnt++;
 	}
+
+
+	//list_for_each_entry(kctl, &codec->card->controls, list) {
+	//}
 
 
 	// read UNSOL enable data to see what initial setup is
@@ -1585,7 +1751,7 @@ static int cs_8409_init(struct hda_codec *codec)
 #endif
 
 
-        printk("snd_hda_intel: end cs_8409_init\n");
+        myprintk("snd_hda_intel: end cs_8409_init\n");
 
 	return 0;
 }
@@ -1594,14 +1760,14 @@ static int cs_8409_build_controls(struct hda_codec *codec)
 {
 	int err;
 
-        printk("snd_hda_intel: cs_8409_build_controls\n");
+        myprintk("snd_hda_intel: cs_8409_build_controls\n");
 
 	err = snd_hda_gen_build_controls(codec);
 	if (err < 0)
 		return err;
 	snd_hda_apply_fixup(codec, HDA_FIXUP_ACT_BUILD);
 
-        printk("snd_hda_intel: end cs_8409_build_controls\n");
+        myprintk("snd_hda_intel: end cs_8409_build_controls\n");
 	return 0;
 }
 
@@ -1611,13 +1777,13 @@ int cs_8409_build_pcms(struct hda_codec *codec)
 	//struct cs_spec *spec = codec->spec;
 	//struct hda_pcm *info = NULL;
 	//struct hda_pcm_stream *hinfo = NULL;
-        printk("snd_hda_intel: cs_8409_build_pcms\n");
+        myprintk("snd_hda_intel: cs_8409_build_pcms\n");
 	retval =  snd_hda_gen_build_pcms(codec);
 	// we still dont have the pcm streams defined by here
 	// ah this is all done in snd_hda_codec_build_pcms
 	// which calls this patch routine or snd_hda_gen_build_pcms
 	// but the query supported pcms is only done after this
-        printk("snd_hda_intel: end cs_8409_build_pcms\n");
+        myprintk("snd_hda_intel: end cs_8409_build_pcms\n");
 	return retval;
 }
 
@@ -1657,7 +1823,7 @@ void cs_8409_jack_unsol_event(struct hda_codec *codec, unsigned int res)
 	// so it seems the low order byte of the res for the 8409 is a copy of the GPIO register state
 	// - except that we dont seem to pass this to the callback functions!!
 
-        dev_info(hda_codec_dev(codec), "cs_8409_jack_unsol_event UNSOL 0x%08x tag 0x%02x\n",res,tag);
+        mycodec_info(codec, "cs_8409_jack_unsol_event UNSOL 0x%08x tag 0x%02x\n",res,tag);
 
         event = snd_hda_jack_tbl_get_from_tag(codec, tag);
         if (!event)
@@ -1689,7 +1855,7 @@ void cs_8409_jack_unsol_event(struct hda_codec *codec, unsigned int res)
 
 //static void cs_8409_hp_timer_callback(struct timer_list *tlist)
 //{
-//        printk("snd_hda_intel: cs_8409_hp_timer_callback\n");
+//        myprintk("snd_hda_intel: cs_8409_hp_timer_callback\n");
 //}
 
 // have an explict one for 8409
@@ -1715,13 +1881,16 @@ static const struct hda_codec_ops cs_8409_patch_ops = {
 };
 
 
+static int cs_8409_create_input_ctls(struct hda_codec *codec);
+
+
 static int cs_8409_parse_auto_config(struct hda_codec *codec)
 {
 	struct cs_spec *spec = codec->spec;
 	int err;
 	int i;
 
-        printk("snd_hda_intel: cs_8409_parse_auto_config\n");
+        myprintk("snd_hda_intel: cs_8409_parse_auto_config\n");
 
 	err = snd_hda_parse_pin_defcfg(codec, &spec->gen.autocfg, NULL, 0);
 	if (err < 0)
@@ -1730,6 +1899,27 @@ static int cs_8409_parse_auto_config(struct hda_codec *codec)
 	err = snd_hda_gen_parse_auto_config(codec, &spec->gen.autocfg);
 	if (err < 0)
 		return err;
+
+	// note that create_input_ctls is called towards the end of snd_hda_gen_parse_auto_config
+
+	// so it appears the auto config assumes that inputs are connected to ADCs
+	// (not true for outputs)
+
+	// I dont really get these - but they dont seem to be useful for the 8409 - seem to allocate nids that are never used
+	// they dont seem to be line inputs either
+	// well setting num_adc_nids to 0 doesnt work - no inputs defined
+	// because it appears the auto config assumes the inputs are connected to an ADC (or audio input converter widget)
+	// (NOTE - although these are labelled ADC nodes in the code they may not have an actual analog to digital
+	//  converter - may just be a digital sample formatter eg S/PDIF input - for the 8409 the internal mike
+	//  seems to be a standard ADC node (0x22) but the headphone input node (0x1a) is a digital input as digitization
+	//  has already occurred in the cs42l83)
+	// now recoding the input setup in separate function
+	//spec->gen.num_adc_nids = 0;
+
+
+	// new routine to setup inputs - based on the hda_generic code
+	cs_8409_create_input_ctls(codec);
+
 
         // so do I keep this or not??
 	/* keep the ADCs powered up when it's dynamically switchable */
@@ -1745,16 +1935,271 @@ static int cs_8409_parse_auto_config(struct hda_codec *codec)
 		}
 	}
 
-        printk("snd_hda_intel: end cs_8409_parse_auto_config\n");
+        myprintk("snd_hda_intel: end cs_8409_parse_auto_config\n");
 
 	return 0;
 }
+
+// pigs - we need a lot of hda_generic local functions
+#include "patch_cirrus_hda_generic_copy.h"
+
+// so we need to hack this code because we have more adcs than AUTO_CFG_MAX_INS
+// adcs (8) - actual number is 18
+// no good way to do this - except to check connection list for each adc and
+// see if connected to nid we are looking at
+// so define new function
+
+static int cs_8409_add_adc_nid(struct hda_codec *codec, hda_nid_t pin)
+{
+	struct hda_gen_spec *spec = codec->spec;
+	hda_nid_t nid;
+	hda_nid_t *adc_nids = spec->adc_nids;
+	int max_nums = ARRAY_SIZE(spec->adc_nids);
+	int nums = 0;
+	int itm = 0;
+
+        myprintk("snd_hda_intel: cs_8409_add_adc_nid pin 0x%x\n",pin);
+
+	for_each_hda_codec_node(nid, codec) {
+		unsigned int caps = get_wcaps(codec, nid);
+		int type = get_wcaps_type(caps);
+		int fndnid = 0;
+
+		if (type != AC_WID_AUD_IN || (caps & AC_WCAP_DIGITAL))
+			continue;
+
+		//myprintk("snd_hda_intel: cs_8409_add_adc_nid nid 0x%x\n",nid);
+
+		{
+		const hda_nid_t *connptr = NULL;
+		int num_conns = snd_hda_get_conn_list(codec, nid, &connptr);
+		int i;
+		fndnid = 0;
+		for (i = 0; i < num_conns; i++) {
+			//myprintk("snd_hda_intel: cs_8409_add_adc_nid %d 0x%x\n",num_conns,connptr[i]);
+			if (connptr[i] == pin) {
+				fndnid = nid;
+			}
+		}
+		}
+		if (fndnid == 0)
+			continue;
+
+		// save only 1st one we match
+		if (spec->num_adc_nids+1 >= max_nums)
+			break;
+		adc_nids[spec->num_adc_nids] = nid;
+		spec->num_adc_nids += 1;
+		break;
+	}
+
+
+	codec_dbg(codec, "snd_hda_intel: cs_8409_add_adc_nid num nids %d\n",nums);
+
+	for (itm = 0; itm < spec->num_adc_nids; itm++) {
+		myprintk("snd_hda_intel: cs_8409_add_adc_nid 0x%02x\n", spec->adc_nids[itm]);
+	}
+
+	myprintk("snd_hda_intel: end cs_8409_add_adc_nid\n");
+
+	return nums;
+}
+
+
+
+// copied from parse_capture_source in hda_generic.c
+// we need this although not changed (apart from printks) because local to hda_generic.c
+
+/* parse capture source paths from the given pin and create imux items */
+static int cs_8409_parse_capture_source(struct hda_codec *codec, hda_nid_t pin,
+				int cfg_idx, int num_adcs,
+				const char *label, int anchor)
+{
+	struct hda_gen_spec *spec = codec->spec;
+	struct hda_input_mux *imux = &spec->input_mux;
+	int imux_idx = imux->num_items;
+	bool imux_added = false;
+	int c;
+
+	myprintk("snd_hda_intel: cs_8409_parse_capture_source pin 0x%x\n",pin);
+
+	for (c = 0; c < num_adcs; c++) {
+		struct nid_path *path;
+		hda_nid_t adc = spec->adc_nids[c];
+
+		myprintk("snd_hda_intel: cs_8409_parse_capture_source pin 0x%x adc 0x%x check reachable\n",pin,adc);
+
+		if (!is_reachable_path(codec, pin, adc))
+			continue;
+		myprintk("snd_hda_intel: cs_8409_parse_capture_source pin 0x%x adc 0x%x reachable\n",pin,adc);
+		path = snd_hda_add_new_path(codec, pin, adc, anchor);
+		if (!path)
+			continue;
+		print_nid_path(codec, "input", path);
+		spec->input_paths[imux_idx][c] =
+			snd_hda_get_path_idx(codec, path);
+
+		if (!imux_added) {
+			if (spec->hp_mic_pin == pin)
+				spec->hp_mic_mux_idx = imux->num_items;
+			spec->imux_pins[imux->num_items] = pin;
+			snd_hda_add_imux_item(codec, imux, label, cfg_idx, NULL);
+			imux_added = true;
+			if (spec->dyn_adc_switch)
+				spec->dyn_adc_idx[imux_idx] = c;
+		}
+	}
+
+        myprintk("snd_hda_intel: end cs_8409_parse_capture_source\n");
+
+	return 0;
+}
+
+
+#define CFG_IDX_MIX	99	/* a dummy cfg->input idx for stereo mix */
+
+// copied from create_input_ctls in hda_generic.c
+
+static int cs_8409_create_input_ctls(struct hda_codec *codec)
+{
+	struct hda_gen_spec *spec = codec->spec;
+	const struct auto_pin_cfg *cfg = &spec->autocfg;
+	hda_nid_t mixer = spec->mixer_nid;
+	int num_adcs = 0;
+	int i, err;
+	unsigned int val;
+
+        myprintk("snd_hda_intel: cs_8409_create_input_ctls\n");
+
+	// we cannot do this
+	//num_adcs = cs_8409_fill_adc_nids(codec);
+	//if (num_adcs < 0)
+	//	return 0;
+
+	// clear out the auto config setup
+	// hope that all_adcs is not different from adc_nids - doesnt seem to be for auto config only
+	memset(spec->adc_nids, 0, sizeof(spec->adc_nids));
+	memset(spec->all_adcs, 0, sizeof(spec->all_adcs));
+	spec->num_adc_nids = 0;
+
+	for (i = 0; i < cfg->num_inputs; i++) {
+		hda_nid_t pin;
+		int fndadc = 0;
+
+		myprintk("snd_hda_intel: cs_8409_create_input_ctls - input %d\n",i);
+
+		pin = cfg->inputs[i].pin;
+		if (!is_input_pin(codec, pin))
+			continue;
+
+		myprintk("snd_hda_intel: cs_8409_create_input_ctls - input %d pin 0x%x\n",i,pin);
+
+		// now scan all nodes for adc nodes and find one connected to this pin
+		fndadc = cs_8409_add_adc_nid(codec, pin);
+		if (!fndadc)
+			continue;
+	}
+
+	num_adcs = spec->num_adc_nids;
+
+	/* copy the detected ADCs to all_adcs[] */
+	spec->num_all_adcs = spec->num_adc_nids;
+	memcpy(spec->all_adcs, spec->adc_nids,  spec->num_adc_nids* sizeof(hda_nid_t));
+
+	err = fill_input_pin_labels(codec);
+	if (err < 0)
+		return err;
+
+	for (i = 0; i < cfg->num_inputs; i++) {
+		hda_nid_t pin;
+		int fndadc = 0;
+
+		myprintk("snd_hda_intel: cs_8409_create_input_ctls - input %d\n",i);
+
+		pin = cfg->inputs[i].pin;
+		if (!is_input_pin(codec, pin))
+			continue;
+
+		myprintk("snd_hda_intel: cs_8409_create_input_ctls - input %d pin 0x%x\n",i,pin);
+
+		//// now scan the adc nodes and find one connected to this pin
+		//fndadc = cs_8409_add_adc_nid(codec, pin);
+		//if (!fndadc)
+		//	continue;
+
+		val = PIN_IN;
+		if (cfg->inputs[i].type == AUTO_PIN_MIC)
+			val |= snd_hda_get_default_vref(codec, pin);
+
+		myprintk("snd_hda_intel: cs_8409_create_input_ctls - input %d pin 0x%x val 0x%x\n",i,pin,val);
+
+		if (pin != spec->hp_mic_pin &&
+		    !snd_hda_codec_get_pin_target(codec, pin))
+			set_pin_target(codec, pin, val, false);
+
+		myprintk("snd_hda_intel: cs_8409_create_input_ctls - input %d pin 0x%x val 0x%x mixer 0x%x\n",i,pin,val,mixer);
+
+		if (mixer) {
+			if (is_reachable_path(codec, pin, mixer)) {
+				err = new_analog_input(codec, i, pin,
+						       spec->input_labels[i],
+						       spec->input_label_idxs[i],
+						       mixer);
+				if (err < 0)
+					return err;
+			}
+		}
+
+		// so connections are from the adc nid to the input pin nid
+		//{
+		//const hda_nid_t conn[256];
+		//const hda_nid_t *connptr = conn;
+		//int num_conns = snd_hda_get_conn_list(codec, pin, &connptr);
+		//int i;
+		//myprintk("snd_hda_intel: cs_8409_create_input_ctls pin 0x%x num conn %d\n",pin,num_conns);
+		//for (i = 0; i < num_conns; i++) {
+		//	myprintk("snd_hda_intel: cs_8409_create_input_ctls pin 0x%x conn 0x%x\n",pin,conn[i]);
+		//}
+		//}
+
+
+		// this is the problem routine - this loops over the adcs to do anything
+		// so if num_adcs is 0 or none of the adc entries are used this does nothing
+
+		err = cs_8409_parse_capture_source(codec, pin, i, num_adcs,
+					   spec->input_labels[i], -mixer);
+		if (err < 0)
+			return err;
+
+		// comment for the moment as needs lots of other functions
+		//if (spec->add_jack_modes) {
+		//	err = create_in_jack_mode(codec, pin);
+		//	if (err < 0)
+		//		return err;
+		//}
+	}
+
+	/* add stereo mix when explicitly enabled via hint */
+	if (mixer && spec->add_stereo_mix_input == HDA_HINT_STEREO_MIX_ENABLE) {
+		err = cs_8409_parse_capture_source(codec, mixer, CFG_IDX_MIX, num_adcs,
+					   "Stereo Mix", 0);
+		if (err < 0)
+			return err;
+		else
+			spec->suppress_auto_mic = 1;
+	}
+
+        myprintk("snd_hda_intel: end cs_8409_create_input_ctls\n");
+
+	return 0;
+}
+
 
 /* do I need this for 8409 - I certainly need some gpio patching */
 static void cs_8409_fixup_gpio(struct hda_codec *codec,
                                const struct hda_fixup *fix, int action)
 {
-       printk("snd_hda_intel: cs_8409_fixup_gpio\n");
+       myprintk("snd_hda_intel: cs_8409_fixup_gpio\n");
 
        // allowable states
        // HDA_FIXUP_ACT_PRE_PROBE,
@@ -1768,9 +2213,9 @@ static void cs_8409_fixup_gpio(struct hda_codec *codec,
        if (action == HDA_FIXUP_ACT_PRE_PROBE) {
                //struct cs_spec *spec = codec->spec;
 
-               printk("snd_hda_intel: cs_8409_fixup_gpio pre probe\n");
+               myprintk("snd_hda_intel: cs_8409_fixup_gpio pre probe\n");
 
-               //printk("fixup gpio hp=0x%x speaker=0x%x\n", hp_out_mask, speaker_out_mask);
+               //myprintk("fixup gpio hp=0x%x speaker=0x%x\n", hp_out_mask, speaker_out_mask);
                //spec->gpio_eapd_hp = hp_out_mask;
                //spec->gpio_eapd_speaker = speaker_out_mask;
                //spec->gpio_mask = 0xff;
@@ -1779,18 +2224,18 @@ static void cs_8409_fixup_gpio(struct hda_codec *codec,
                //  spec->gpio_eapd_hp | spec->gpio_eapd_speaker;
        }
        else if (action == HDA_FIXUP_ACT_PROBE) {
-               printk("snd_hda_intel: cs_8409_fixup_gpio probe\n");
+               myprintk("snd_hda_intel: cs_8409_fixup_gpio probe\n");
        }
        else if (action == HDA_FIXUP_ACT_INIT) {
-               printk("snd_hda_intel: cs_8409_fixup_gpio init\n");
+               myprintk("snd_hda_intel: cs_8409_fixup_gpio init\n");
        }
        else if (action == HDA_FIXUP_ACT_BUILD) {
-               printk("snd_hda_intel: cs_8409_fixup_gpio build\n");
+               myprintk("snd_hda_intel: cs_8409_fixup_gpio build\n");
        }
        else if (action == HDA_FIXUP_ACT_FREE) {
-               printk("snd_hda_intel: cs_8409_fixup_gpio free\n");
+               myprintk("snd_hda_intel: cs_8409_fixup_gpio free\n");
        }
-       printk("snd_hda_intel: end cs_8409_fixup_gpio\n");
+       myprintk("snd_hda_intel: end cs_8409_fixup_gpio\n");
 }
 
 static const struct hda_model_fixup cs8409_models[] = {
@@ -1843,16 +2288,16 @@ static void cs_8409_cs42l83_callback(struct hda_codec *codec, struct hda_jack_ca
 {
 	struct cs_spec *spec = codec->spec;
 
-        dev_info(hda_codec_dev(codec), "cs_8409_cs42l83_callback\n");
+        mycodec_info(codec, "cs_8409_cs42l83_callback\n");
 
 	// so we have confirmed that these unsol responses are not in linux kernel interrupt state
 	//if (in_interrupt())
-	//	dev_info(hda_codec_dev(codec), "cs_8409_cs42l83_callback - INTERRUPT\n");
+	//	mycodec_info(codec, "cs_8409_cs42l83_callback - INTERRUPT\n");
 	//else
-	//	dev_info(hda_codec_dev(codec), "cs_8409_cs42l83_callback - not interrupt\n");
+	//	mycodec_info(codec, "cs_8409_cs42l83_callback - not interrupt\n");
 
 	// print the stored unsol res which seems to be the GPIO pins state
-	dev_info(hda_codec_dev(codec), "cs_8409_cs42l83_callback - event private data 0x%08x\n",event->private_data);
+	mycodec_info(codec, "cs_8409_cs42l83_callback - event private data 0x%08x\n",event->private_data);
 
 
 	cs_8409_cs42l83_unsolicited_response(codec, event->private_data);
@@ -1865,7 +2310,7 @@ static void cs_8409_cs42l83_callback(struct hda_codec *codec, struct hda_jack_ca
 
         // the delayed_work feature might be a way to go tho
 
-        dev_info(hda_codec_dev(codec), "cs_8409_cs42l83_callback end\n");
+        mycodec_info(codec, "cs_8409_cs42l83_callback end\n");
 }
 
 
@@ -1888,10 +2333,17 @@ static void cs_8409_automute(struct hda_codec *codec)
 
 static int cs_8409_boot_setup(struct hda_codec *codec);
 
+
 static void cs_8409_playback_pcm_hook(struct hda_pcm_stream *hinfo,
                                       struct hda_codec *codec,
                                       struct snd_pcm_substream *substream,
                                       int action);
+
+static void cs_8409_capture_pcm_hook(struct hda_pcm_stream *hinfo,
+                                     struct hda_codec *codec,
+                                     struct snd_pcm_substream *substream,
+                                     int action);
+
 
 
 static int patch_cs8409(struct hda_codec *codec)
@@ -1906,8 +2358,8 @@ static int patch_cs8409(struct hda_codec *codec)
        //struct hda_pcm *info = NULL;
        //struct hda_pcm_stream *hinfo = NULL;
 
-       printk("snd_hda_intel: Patching for CS8409 explicit %d\n", explicit);
-       //dev_info(hda_codec_dev(codec), "Patching for CS8409 %d\n", explicit);
+       myprintk("snd_hda_intel: Patching for CS8409 explicit %d\n", explicit);
+       //mycodec_info(codec, "Patching for CS8409 %d\n", explicit);
 
        //dump_stack();
 
@@ -1928,22 +2380,24 @@ static int patch_cs8409(struct hda_codec *codec)
 
        spec->gen.pcm_playback_hook = cs_8409_playback_pcm_hook;
 
+       spec->gen.pcm_capture_hook = cs_8409_capture_pcm_hook;
+
        spec->gen.automute_hook = cs_8409_automute;
 
        // so it appears we need to explicitly apply pre probe fixups here
        // note that if the pinconfigs lists are empty the pin config fixup
        // is effectively ignored
 
-       //printk("cs8409 - 1\n");
+       //myprintk("cs8409 - 1\n");
        //snd_hda_pick_fixup(codec, cs8409_models, cs8409_fixup_tbl,
        //                   cs8409_fixups);
-       //printk("cs8409 - 2\n");
+       //myprintk("cs8409 - 2\n");
        //snd_hda_apply_fixup(codec, HDA_FIXUP_ACT_PRE_PROBE);
 
 
        //timer_setup(&cs_8409_hp_timer, cs_8409_hp_timer_callback, 0);
 
-       printk("snd_hda_intel: cs 8409 jack used %d\n",codec->jacktbl.used);
+       myprintk("snd_hda_intel: cs 8409 jack used %d\n",codec->jacktbl.used);
 
        // use this to cause unsolicited responses to be stored
        // but not run
@@ -1967,8 +2421,12 @@ static int patch_cs8409(struct hda_codec *codec)
        spec->have_buttons = 0;
 
        spec->playing = 0;
+       spec->capturing = 0;
 
-       spec->format_setup_needed = 1;
+       spec->headset_play_format_setup_needed = 1;
+       spec->headset_capture_format_setup_needed = 1;
+
+       spec->headset_presetup_done = 0;
 
 
        // use this to distinguish which unsolicited phase we are in
@@ -1987,7 +2445,7 @@ static int patch_cs8409(struct hda_codec *codec)
        // so far the tag seems to be 0x37
        cs_8409_hda_jack_detect_enable_callback(codec, 0x01, 0x37, cs_8409_cs42l83_callback);
 
-       printk("snd_hda_intel: cs 8409 jack used callback %d\n",codec->jacktbl.used);
+       myprintk("snd_hda_intel: cs 8409 jack used callback %d\n",codec->jacktbl.used);
 
 
        //      cs8409_pinmux_init(codec);
@@ -1995,80 +2453,81 @@ static int patch_cs8409(struct hda_codec *codec)
        if (!explicit)
        {
 
-              printk("snd_hda_intel: pre cs_8409_parse_auto_config\n");
+              myprintk("snd_hda_intel: pre cs_8409_parse_auto_config\n");
 
               err = cs_8409_parse_auto_config(codec);
               if (err < 0)
                       goto error;
 
-              printk("snd_hda_intel: post cs_8409_parse_auto_config\n");
+              myprintk("snd_hda_intel: post cs_8409_parse_auto_config\n");
        }
 
        // dump headphone config
-       printk("snd_hda_intel: headphone config hp_jack_present %d\n",spec->gen.hp_jack_present);
-       printk("snd_hda_intel: headphone config line_jack_present %d\n",spec->gen.line_jack_present);
-       printk("snd_hda_intel: headphone config speaker_muted %d\n",spec->gen.speaker_muted);
-       printk("snd_hda_intel: headphone config line_out_muted %d\n",spec->gen.line_out_muted);
-       printk("snd_hda_intel: headphone config auto_mic %d\n",spec->gen.auto_mic);
-       printk("snd_hda_intel: headphone config automute_speaker %d\n",spec->gen.automute_speaker);
-       printk("snd_hda_intel: headphone config automute_lo %d\n",spec->gen.automute_lo);
-       printk("snd_hda_intel: headphone config detect_hp %d\n",spec->gen.detect_hp);
-       printk("snd_hda_intel: headphone config detect_lo %d\n",spec->gen.detect_lo);
-       printk("snd_hda_intel: headphone config keep_vref_in_automute %d\n",spec->gen.keep_vref_in_automute);
-       printk("snd_hda_intel: headphone config line_in_auto_switch %d\n",spec->gen.line_in_auto_switch);
-       printk("snd_hda_intel: headphone config auto_mute_via_amp %d\n",spec->gen.auto_mute_via_amp);
-       printk("snd_hda_intel: headphone config suppress_auto_mute %d\n",spec->gen.suppress_auto_mute);
-       printk("snd_hda_intel: headphone config suppress_auto_mic %d\n",spec->gen.suppress_auto_mic);
+       myprintk("snd_hda_intel: headphone config hp_jack_present %d\n",spec->gen.hp_jack_present);
+       myprintk("snd_hda_intel: headphone config line_jack_present %d\n",spec->gen.line_jack_present);
+       myprintk("snd_hda_intel: headphone config speaker_muted %d\n",spec->gen.speaker_muted);
+       myprintk("snd_hda_intel: headphone config line_out_muted %d\n",spec->gen.line_out_muted);
+       myprintk("snd_hda_intel: headphone config auto_mic %d\n",spec->gen.auto_mic);
+       myprintk("snd_hda_intel: headphone config automute_speaker %d\n",spec->gen.automute_speaker);
+       myprintk("snd_hda_intel: headphone config automute_lo %d\n",spec->gen.automute_lo);
+       myprintk("snd_hda_intel: headphone config detect_hp %d\n",spec->gen.detect_hp);
+       myprintk("snd_hda_intel: headphone config detect_lo %d\n",spec->gen.detect_lo);
+       myprintk("snd_hda_intel: headphone config keep_vref_in_automute %d\n",spec->gen.keep_vref_in_automute);
+       myprintk("snd_hda_intel: headphone config line_in_auto_switch %d\n",spec->gen.line_in_auto_switch);
+       myprintk("snd_hda_intel: headphone config auto_mute_via_amp %d\n",spec->gen.auto_mute_via_amp);
+       myprintk("snd_hda_intel: headphone config suppress_auto_mute %d\n",spec->gen.suppress_auto_mute);
+       myprintk("snd_hda_intel: headphone config suppress_auto_mic %d\n",spec->gen.suppress_auto_mic);
 
-       printk("snd_hda_intel: headphone config hp_mic %d\n",spec->gen.hp_mic);
+       myprintk("snd_hda_intel: headphone config hp_mic %d\n",spec->gen.hp_mic);
 
-       printk("snd_hda_intel: headphone config suppress_hp_mic_detect %d\n",spec->gen.suppress_hp_mic_detect);
+       myprintk("snd_hda_intel: headphone config suppress_hp_mic_detect %d\n",spec->gen.suppress_hp_mic_detect);
 
 
-       printk("snd_hda_intel: auto config pins line_outs %d\n", spec->gen.autocfg.line_outs);
-       printk("snd_hda_intel: auto config pins line_outs 0x%02x\n", spec->gen.autocfg.line_out_pins[0]);
-       printk("snd_hda_intel: auto config pins line_outs 0x%02x\n", spec->gen.autocfg.line_out_pins[1]);
-       printk("snd_hda_intel: auto config pins speaker_outs %d\n", spec->gen.autocfg.speaker_outs);
-       printk("snd_hda_intel: auto config pins speaker_outs 0x%02x\n", spec->gen.autocfg.speaker_pins[0]);
-       printk("snd_hda_intel: auto config pins speaker_outs 0x%02x\n", spec->gen.autocfg.speaker_pins[1]);
-       printk("snd_hda_intel: auto config pins hp_outs %d\n", spec->gen.autocfg.hp_outs);
-       printk("snd_hda_intel: auto config pins hp_outs 0x%02x\n", spec->gen.autocfg.hp_pins[0]);
-       printk("snd_hda_intel: auto config pins inputs %d\n", spec->gen.autocfg.num_inputs);
+       myprintk("snd_hda_intel: auto config pins line_outs %d\n", spec->gen.autocfg.line_outs);
+       myprintk("snd_hda_intel: auto config pins line_outs 0x%02x\n", spec->gen.autocfg.line_out_pins[0]);
+       myprintk("snd_hda_intel: auto config pins line_outs 0x%02x\n", spec->gen.autocfg.line_out_pins[1]);
+       myprintk("snd_hda_intel: auto config pins speaker_outs %d\n", spec->gen.autocfg.speaker_outs);
+       myprintk("snd_hda_intel: auto config pins speaker_outs 0x%02x\n", spec->gen.autocfg.speaker_pins[0]);
+       myprintk("snd_hda_intel: auto config pins speaker_outs 0x%02x\n", spec->gen.autocfg.speaker_pins[1]);
+       myprintk("snd_hda_intel: auto config pins hp_outs %d\n", spec->gen.autocfg.hp_outs);
+       myprintk("snd_hda_intel: auto config pins hp_outs 0x%02x\n", spec->gen.autocfg.hp_pins[0]);
+       myprintk("snd_hda_intel: auto config pins inputs %d\n", spec->gen.autocfg.num_inputs);
 
-       printk("snd_hda_intel: auto config pins inputs  pin 0x%02x\n", spec->gen.autocfg.inputs[0].pin);
-       printk("snd_hda_intel: auto config pins inputs type %d\n", spec->gen.autocfg.inputs[0].type);
-       printk("snd_hda_intel: auto config pins inputs is head set mic %d\n", spec->gen.autocfg.inputs[0].is_headset_mic);
-       printk("snd_hda_intel: auto config pins inputs is head phn mic %d\n", spec->gen.autocfg.inputs[0].is_headphone_mic);
-       printk("snd_hda_intel: auto config pins inputs is        boost %d\n", spec->gen.autocfg.inputs[0].has_boost_on_pin);
+       myprintk("snd_hda_intel: auto config pins inputs  pin 0x%02x\n", spec->gen.autocfg.inputs[0].pin);
+       myprintk("snd_hda_intel: auto config pins inputs type %d\n", spec->gen.autocfg.inputs[0].type);
+       myprintk("snd_hda_intel: auto config pins inputs is head set mic %d\n", spec->gen.autocfg.inputs[0].is_headset_mic);
+       myprintk("snd_hda_intel: auto config pins inputs is head phn mic %d\n", spec->gen.autocfg.inputs[0].is_headphone_mic);
+       myprintk("snd_hda_intel: auto config pins inputs is        boost %d\n", spec->gen.autocfg.inputs[0].has_boost_on_pin);
 
-       printk("snd_hda_intel: auto config pins inputs  pin 0x%02x\n", spec->gen.autocfg.inputs[1].pin);
-       printk("snd_hda_intel: auto config pins inputs type %d\n", spec->gen.autocfg.inputs[1].type);
-       printk("snd_hda_intel: auto config pins inputs is head set mic %d\n", spec->gen.autocfg.inputs[1].is_headset_mic);
-       printk("snd_hda_intel: auto config pins inputs is head phn mic %d\n", spec->gen.autocfg.inputs[1].is_headphone_mic);
-       printk("snd_hda_intel: auto config pins inputs is        boost %d\n", spec->gen.autocfg.inputs[1].has_boost_on_pin);
+       myprintk("snd_hda_intel: auto config pins inputs  pin 0x%02x\n", spec->gen.autocfg.inputs[1].pin);
+       myprintk("snd_hda_intel: auto config pins inputs type %d\n", spec->gen.autocfg.inputs[1].type);
+       myprintk("snd_hda_intel: auto config pins inputs is head set mic %d\n", spec->gen.autocfg.inputs[1].is_headset_mic);
+       myprintk("snd_hda_intel: auto config pins inputs is head phn mic %d\n", spec->gen.autocfg.inputs[1].is_headphone_mic);
+       myprintk("snd_hda_intel: auto config pins inputs is        boost %d\n", spec->gen.autocfg.inputs[1].has_boost_on_pin);
 
-       printk("snd_hda_intel: auto config inputs num_adc_nids %d\n", spec->gen.num_adc_nids);
-       printk("snd_hda_intel: auto config inputs adc_nids 0x%02x\n", spec->gen.adc_nids[0]);
-       printk("snd_hda_intel: auto config inputs adc_nids 0x%02x\n", spec->gen.adc_nids[1]);
-       printk("snd_hda_intel: auto config inputs adc_nids 0x%02x\n", spec->gen.adc_nids[2]);
-       printk("snd_hda_intel: auto config inputs adc_nids 0x%02x\n", spec->gen.adc_nids[3]);
+       myprintk("snd_hda_intel: auto config inputs num_adc_nids %d\n", spec->gen.num_adc_nids);
+       for (itm = 0; itm < spec->gen.num_adc_nids; itm++) {
+		myprintk("snd_hda_intel: auto config inputs adc_nids 0x%02x\n", spec->gen.adc_nids[itm]);
+       }
 
-       printk("snd_hda_intel: auto config multiout is num_dacs %d\n", spec->gen.multiout.num_dacs);
-       printk("snd_hda_intel: auto config multiout is    dac_nids 0x%02x\n", spec->gen.multiout.dac_nids[0]);
-       printk("snd_hda_intel: auto config multiout is    dac_nids 0x%02x\n", spec->gen.multiout.dac_nids[1]);
-       printk("snd_hda_intel: auto config multiout is    dac_nids 0x%02x\n", spec->gen.multiout.dac_nids[2]);
-       printk("snd_hda_intel: auto config multiout is    dac_nids 0x%02x\n", spec->gen.multiout.dac_nids[3]);
-       printk("snd_hda_intel: auto config multiout is      hp_nid 0x%02x\n", spec->gen.multiout.hp_nid);
-       printk("snd_hda_intel: auto config multiout is  hp_out_nid 0x%02x\n", spec->gen.multiout.hp_out_nid[0]);
-       printk("snd_hda_intel: auto config multiout is  hp_out_nid 0x%02x\n", spec->gen.multiout.hp_out_nid[1]);
-       printk("snd_hda_intel: auto config multiout is  hp_out_nid 0x%02x\n", spec->gen.multiout.hp_out_nid[2]);
-       printk("snd_hda_intel: auto config multiout is  hp_out_nid 0x%02x\n", spec->gen.multiout.hp_out_nid[3]);
-       printk("snd_hda_intel: auto config multiout is xtr_out_nid 0x%02x\n", spec->gen.multiout.extra_out_nid[0]);
-       printk("snd_hda_intel: auto config multiout is xtr_out_nid 0x%02x\n", spec->gen.multiout.extra_out_nid[1]);
-       printk("snd_hda_intel: auto config multiout is xtr_out_nid 0x%02x\n", spec->gen.multiout.extra_out_nid[2]);
-       printk("snd_hda_intel: auto config multiout is xtr_out_nid 0x%02x\n", spec->gen.multiout.extra_out_nid[3]);
-       printk("snd_hda_intel: auto config multiout is dif_out_nid 0x%02x\n", spec->gen.multiout.dig_out_nid);
-       printk("snd_hda_intel: auto config multiout is slv_dig_out %p\n", spec->gen.multiout.slave_dig_outs);
+       myprintk("snd_hda_intel: auto config multiout is num_dacs %d\n", spec->gen.multiout.num_dacs);
+       for (itm = 0; itm < spec->gen.multiout.num_dacs; itm++) {
+		myprintk("snd_hda_intel: auto config multiout is    dac_nids 0x%02x\n", spec->gen.multiout.dac_nids[itm]);
+       }
+
+       myprintk("snd_hda_intel: auto config multiout is      hp_nid 0x%02x\n", spec->gen.multiout.hp_nid);
+
+       for (itm = 0; itm < ARRAY_SIZE(spec->gen.multiout.hp_out_nid); itm++) {
+	        if (spec->gen.multiout.hp_out_nid[itm])
+			myprintk("snd_hda_intel: auto config multiout is  hp_out_nid 0x%02x\n", spec->gen.multiout.hp_out_nid[itm]);
+       }
+       for (itm = 0; itm < ARRAY_SIZE(spec->gen.multiout.extra_out_nid); itm++) {
+	        if (spec->gen.multiout.extra_out_nid[itm])
+			myprintk("snd_hda_intel: auto config multiout is xtr_out_nid 0x%02x\n", spec->gen.multiout.extra_out_nid[itm]);
+       }
+
+       myprintk("snd_hda_intel: auto config multiout is dig_out_nid 0x%02x\n", spec->gen.multiout.dig_out_nid);
+       myprintk("snd_hda_intel: auto config multiout is slv_dig_out %p\n", spec->gen.multiout.slave_dig_outs);
 
 
        // dump the rates/format of the afg node
@@ -2089,10 +2548,20 @@ static int patch_cs8409(struct hda_codec *codec)
 
 
        // try removing the unused nodes
-       spec->gen.autocfg.line_outs = 0;
+       //spec->gen.autocfg.line_outs = 0;
        //spec->gen.autocfg.hp_outs = 0;
-       spec->gen.autocfg.num_inputs = 0;
-       spec->gen.num_adc_nids = 0;
+
+       // I dont really get these - but they dont seem to be useful for the 8409 - seem to allocate nids that are never used
+       // they dont seem to be line inputs either
+       // well setting num_adc_nids to 0 doesnt work - no inputs defined
+       // - because all input pin nodes need to be connected to an audio input converter node
+       // - which in the hda_generic.c code are labelled as adc nodes/nids
+       // now recoding the input setup in separate function
+       //spec->gen.num_adc_nids = 0;
+
+       // these seem to be the primary mike inputs ? maybe line inputs??
+       //spec->gen.autocfg.num_inputs = 0;
+
        // to clobber the headphone output we would need to clear the hp_out_nid array
        //spec->gen.multiout.hp_out_nid[0] = 0x00;
        // do this to prevent copying to other streams
@@ -2117,7 +2586,7 @@ static int patch_cs8409(struct hda_codec *codec)
        //spec->gen.multiout.dac_nids[1] = 0x00;
 
 
-       printk("snd_hda_intel: cs 8409 jack used post %d\n",codec->jacktbl.used);
+       myprintk("snd_hda_intel: cs 8409 jack used post %d\n",codec->jacktbl.used);
 
 
        err = cs_8409_boot_setup(codec);
@@ -2128,14 +2597,15 @@ static int patch_cs8409(struct hda_codec *codec)
        spec->headset_phase = 1;
 
        spec->play_init = 0;
+       spec->capture_init = 0;
 
        // init the last play time
        getnstimeofday(&(spec->last_play_time));
 
        getnstimeofday(&(spec->first_play_time));
 
-       printk("snd_hda_intel: Post Patching for CS8409\n");
-       //dev_info(codec->dev, "Post Patching for CS8409\n");
+       myprintk("snd_hda_intel: Post Patching for CS8409\n");
+       //mycodec_info(codec, "Post Patching for CS8409\n");
 
        return 0;
 
@@ -2167,7 +2637,7 @@ cs_8409_extended_codec_verb(struct hda_codec *codec, hda_nid_t nid,
 	unsigned int retval4 = 0;
 	unsigned int retval = 0;
 
-        printk("snd_hda_intel: cs_8409_extended_codec_verb nid 0x%02x flags 0x%x verb 0x%03x parm 0x%04x\n", nid, flags, verb, parm);
+        myprintk("snd_hda_intel: cs_8409_extended_codec_verb nid 0x%02x flags 0x%x verb 0x%03x parm 0x%04x\n", nid, flags, verb, parm);
 
 	if ((verb & 0x0ff8) == 0xf78)
 	{
@@ -2176,10 +2646,10 @@ cs_8409_extended_codec_verb(struct hda_codec *codec, hda_nid_t nid,
 		retval3 = cs_8409_vendor_i2cWrite(codec, 0x74, 0x2d, parm, 0);
 		retval4 = cs_8409_vendor_i2cWrite(codec, 0x72, 0x2d, parm, 0);
 
-		printk("snd_hda_intel: cs_8409_extended_codec_verb wr ret 1 0x%x\n",retval1);
-		printk("snd_hda_intel: cs_8409_extended_codec_verb wr ret 2 0x%x\n",retval2);
-		printk("snd_hda_intel: cs_8409_extended_codec_verb wr ret 3 0x%x\n",retval3);
-		printk("snd_hda_intel: cs_8409_extended_codec_verb wr ret 4 0x%x\n",retval4);
+		myprintk("snd_hda_intel: cs_8409_extended_codec_verb wr ret 1 0x%x\n",retval1);
+		myprintk("snd_hda_intel: cs_8409_extended_codec_verb wr ret 2 0x%x\n",retval2);
+		myprintk("snd_hda_intel: cs_8409_extended_codec_verb wr ret 3 0x%x\n",retval3);
+		myprintk("snd_hda_intel: cs_8409_extended_codec_verb wr ret 4 0x%x\n",retval4);
 	}
 	else if ((verb & 0x0ff8) == 0xff8)
 	{
@@ -2188,10 +2658,10 @@ cs_8409_extended_codec_verb(struct hda_codec *codec, hda_nid_t nid,
 		retval3 = cs_8409_vendor_i2cRead(codec, 0x74, 0x2d, 0);
 		retval4 = cs_8409_vendor_i2cRead(codec, 0x72, 0x2d, 0);
 
-		printk("snd_hda_intel: cs_8409_extended_codec_verb rd ret 1 0x%x\n",retval1);
-		printk("snd_hda_intel: cs_8409_extended_codec_verb rd ret 2 0x%x\n",retval2);
-		printk("snd_hda_intel: cs_8409_extended_codec_verb rd ret 3 0x%x\n",retval3);
-		printk("snd_hda_intel: cs_8409_extended_codec_verb rd ret 4 0x%x\n",retval4);
+		myprintk("snd_hda_intel: cs_8409_extended_codec_verb rd ret 1 0x%x\n",retval1);
+		myprintk("snd_hda_intel: cs_8409_extended_codec_verb rd ret 2 0x%x\n",retval2);
+		myprintk("snd_hda_intel: cs_8409_extended_codec_verb rd ret 3 0x%x\n",retval3);
+		myprintk("snd_hda_intel: cs_8409_extended_codec_verb rd ret 4 0x%x\n",retval4);
 	}
 
 
