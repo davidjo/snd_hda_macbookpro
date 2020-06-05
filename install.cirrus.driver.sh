@@ -41,7 +41,7 @@ cp $patch_dir/Makefile $patch_dir/patch_cirrus* $hda_dir/
 # if kernel version >= 5.6 then
 # change timespec to timespec64
 # change getnstimeofday to ktime_get_real_ts64
-if [ [ $major_version -eq 5 ] && [ $minor_version -ge 6 ] ]; then
+if [ $major_version -eq 5 -a $minor_version -ge 6 ]; then
    sed -i 's/timespec/timespec64/' $hda_dir/patch_cirrus.c
    sed -i 's/timespec/timespec64/' $hda_dir/patch_cirrus_new84.h
    sed -i 's/getnstimeofday/ktime_get_real_ts64/' $hda_dir/patch_cirrus.c
