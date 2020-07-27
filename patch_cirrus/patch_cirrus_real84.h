@@ -886,26 +886,26 @@ static void play_setup_TDM_amps12(struct hda_codec *codec, int setrate)
 }
 
 
-static void cs_8409_setup_amp_max(struct hda_codec *codec, int amp_address, int amp_volume);
+static void cs_8409_setup_amp_max(struct hda_codec *codec, int amp_address, int amp_volume, int channel);
 
-static void cs_8409_setup_amp_ssm3(struct hda_codec *codec, int amp_address, int amp_volume);
+static void cs_8409_setup_amp_ssm3(struct hda_codec *codec, int amp_address, int amp_volume, int channel);
 
 static void cs_8409_setup_amps12(struct hda_codec *codec)
 {
         if (codec->core.subsystem_id == 0x106b3900) {
                 // use reduced volume - from 0x01 to 0x30 - now passing as argument
-                //cs_8409_setup_amp_max(codec, 0x64, 0x30);
-                //cs_8409_setup_amp_max(codec, 0x62, 0x30);
-                cs_8409_setup_amp_max(codec, 0x64, 0x01);
-                cs_8409_setup_amp_max(codec, 0x62, 0x01);
+                //cs_8409_setup_amp_max(codec, 0x64, 0x30, 0x00);
+                //cs_8409_setup_amp_max(codec, 0x62, 0x30, 0x01);
+                cs_8409_setup_amp_max(codec, 0x64, 0x01, 0x00);
+                cs_8409_setup_amp_max(codec, 0x62, 0x01, 0x01);
         }
         else if (codec->core.subsystem_id == 0x106b3300 || codec->core.subsystem_id == 0x106b3600) {
                 //setup_node_alpha_ssm3(codec);
                 // use reduced volume - from 0x48 to 0x80 - same reduction as for MAXs -24dB
-                //cs_8409_setup_amp_ssm3(codec, 0x28, 0x80);
-                //cs_8409_setup_amp_ssm3(codec, 0x2a, 0x80);
-                cs_8409_setup_amp_ssm3(codec, 0x28, 0x48);
-                cs_8409_setup_amp_ssm3(codec, 0x2a, 0x48);
+                //cs_8409_setup_amp_ssm3(codec, 0x28, 0x80, 0x00);
+                //cs_8409_setup_amp_ssm3(codec, 0x2a, 0x80, 0x01);
+                cs_8409_setup_amp_ssm3(codec, 0x28, 0x48, 0x00);
+                cs_8409_setup_amp_ssm3(codec, 0x2a, 0x48, 0x01);
         }
         else {
                 dev_info(hda_codec_dev(codec), "UNKNOWN subsystem id 0x%08x",codec->core.subsystem_id);
@@ -1004,18 +1004,18 @@ static void cs_8409_setup_amps34(struct hda_codec *codec)
 {
         if (codec->core.subsystem_id == 0x106b3900) {
                 // use reduced volume - from 0x01 to 0x30 - now passing as argument
-                //cs_8409_setup_amp_max(codec, 0x74, 0x30);
-                //cs_8409_setup_amp_max(codec, 0x72, 0x30);
-                cs_8409_setup_amp_max(codec, 0x74, 0x01);
-                cs_8409_setup_amp_max(codec, 0x72, 0x01);
+                //cs_8409_setup_amp_max(codec, 0x74, 0x30, 0x02);
+                //cs_8409_setup_amp_max(codec, 0x72, 0x30, 0x03);
+                cs_8409_setup_amp_max(codec, 0x74, 0x01, 0x02);
+                cs_8409_setup_amp_max(codec, 0x72, 0x01, 0x03);
         }
         else if (codec->core.subsystem_id == 0x106b3300 || codec->core.subsystem_id == 0x106b3600) {
                 //setup_node_alpha_ssm3(codec);
                 // use reduced volume - from 0x48 to 0x80 - same reduction as for MAXs -24dB
-                //cs_8409_setup_amp_ssm3(codec, 0x2c, 0x80);
-                //cs_8409_setup_amp_ssm3(codec, 0x2e, 0x80);
-                cs_8409_setup_amp_ssm3(codec, 0x2c, 0x48);
-                cs_8409_setup_amp_ssm3(codec, 0x2e, 0x48);
+                //cs_8409_setup_amp_ssm3(codec, 0x2c, 0x80, 0x02);
+                //cs_8409_setup_amp_ssm3(codec, 0x2e, 0x80, 0x03);
+                cs_8409_setup_amp_ssm3(codec, 0x2c, 0x48, 0x02);
+                cs_8409_setup_amp_ssm3(codec, 0x2e, 0x48, 0x03);
         }
         else {
                 dev_info(hda_codec_dev(codec), "UNKNOWN subsystem id 0x%08x",codec->core.subsystem_id);
@@ -1102,7 +1102,7 @@ static void play_sync_converters_on(struct hda_codec *codec)
 
 
 
-static void cs_8409_setup_amp_max(struct hda_codec *codec, int amp_address, int amp_volume)
+static void cs_8409_setup_amp_max(struct hda_codec *codec, int amp_address, int amp_volume, int channel)
 {
         //int retval;
 
@@ -1134,9 +1134,9 @@ static void cs_8409_setup_amp_max(struct hda_codec *codec, int amp_address, int 
         cs_8409_vendor_i2cWrite(codec, amp_address, 0x001c, 0x0001, 0); // snd_hda
         cs_8409_vendor_i2cWrite(codec, amp_address, 0x0010, 0x0008, 0); // snd_hda
         cs_8409_vendor_i2cWrite(codec, amp_address, 0x0014, 0x00e4, 0); // snd_hda
-        cs_8409_vendor_i2cWrite(codec, amp_address, 0x0015, 0x0001, 0); // snd_hda
+        cs_8409_vendor_i2cWrite(codec, amp_address, 0x0015, (1<<channel), 0); // snd_hda
         cs_8409_vendor_i2cWrite(codec, amp_address, 0x0016, 0x0000, 0); // snd_hda
-        cs_8409_vendor_i2cWrite(codec, amp_address, 0x0018, 0x0000, 0); // snd_hda
+        cs_8409_vendor_i2cWrite(codec, amp_address, 0x0018, channel, 0); // snd_hda
         cs_8409_vendor_i2cWrite(codec, amp_address, 0x0019, 0x0000, 0); // snd_hda
         cs_8409_vendor_i2cWrite(codec, amp_address, 0x002d, amp_volume, 0); // snd_hda
         cs_8409_vendor_i2cWrite(codec, amp_address, 0x002e, 0x0005, 0); // snd_hda
@@ -1152,7 +1152,7 @@ static void cs_8409_setup_amp_max(struct hda_codec *codec, int amp_address, int 
 
 }
 
-static void cs_8409_setup_amp_ssm3(struct hda_codec *codec, int amp_address, int amp_volume)
+static void cs_8409_setup_amp_ssm3(struct hda_codec *codec, int amp_address, int amp_volume, int channel)
 {
         //int retval;
 
@@ -1167,7 +1167,7 @@ static void cs_8409_setup_amp_ssm3(struct hda_codec *codec, int amp_address, int
 //      snd_hda i2cWrite      i2c address 0x28 i2c            reg 0x0232 i2c data 0x0032   reg anal: DACControl              : 32-48kHz SampleRate DACLowPower DACHighPass DACSoftVol
 //      snd_hda i2cWrite      i2c address 0x28 i2c            reg 0x0000 i2c data 0x0000   reg anal: PowerControl            : PowerOn BVSenseOn
 
-        cs_8409_vendor_i2cWrite(codec, amp_address, 0x0005, 0x0000, 1); // snd_hda
+        cs_8409_vendor_i2cWrite(codec, amp_address, 0x0005, channel, 1); // snd_hda
         cs_8409_vendor_i2cWrite(codec, amp_address, 0x0001, 0x0011, 1); // snd_hda
         cs_8409_vendor_i2cWrite(codec, amp_address, 0x0003, amp_volume, 1); // snd_hda
         cs_8409_vendor_i2cWrite(codec, amp_address, 0x0004, 0x0051, 1); // snd_hda
@@ -1790,7 +1790,7 @@ static int cs_8409_boot_setup_real(struct hda_codec *codec)
         }
 
         // this is best guess what these volume functions are doing
-	// as from the log there is no change in output volume or muting
+        // as from the log there is no change in output volume or muting
         // - but if already unmuted thats what you would expect
 
         //setup_mic_vol2(codec);
