@@ -85,23 +85,23 @@ struct cs_spec {
 	int (*spdif_sw_put)(struct snd_kcontrol *kcontrol,
 			    struct snd_ctl_elem_value *ucontrol);
 
-        // so it appears we have "concurrency" in the linux HDA code
-        // in that if unsolicited responses occur which perform extensive verbs
-        // the hda verbs are intermixed with eg extensive start playback verbs
-        // on OSX we appear to have blocks of verbs during which unsolicited responses
-        // are logged but the unsolicited verbs occur after the verb block
-        // this flag is used to flag such verb blocks and the list will store the
-        // responses
-        // we use a pre-allocated list - if we have more than 10 outstanding unsols
-        // we will drop
-        // not clear if mutexes would be the way to go
-        int block_unsol;
-        struct list_head unsol_list;
-        struct unsol_item unsol_items_prealloc[10];
-        int unsol_items_prealloc_used[10];
+	// so it appears we have "concurrency" in the linux HDA code
+	// in that if unsolicited responses occur which perform extensive verbs
+	// the hda verbs are intermixed with eg extensive start playback verbs
+	// on OSX we appear to have blocks of verbs during which unsolicited responses
+	// are logged but the unsolicited verbs occur after the verb block
+	// this flag is used to flag such verb blocks and the list will store the
+	// responses
+	// we use a pre-allocated list - if we have more than 10 outstanding unsols
+	// we will drop
+	// not clear if mutexes would be the way to go
+	int block_unsol;
+	struct list_head unsol_list;
+	struct unsol_item unsol_items_prealloc[10];
+	int unsol_items_prealloc_used[10];
 
-        // new item to deal with jack presence as Apple seems to have barfed
-        // the HDA spec by using a separate headphone chip
+	// new item to deal with jack presence as Apple seems to have barfed
+	// the HDA spec by using a separate headphone chip
 	int jack_present;
 
 	// save the type of headphone connected
@@ -2348,107 +2348,107 @@ static void cs_8409_capture_pcm_hook(struct hda_pcm_stream *hinfo,
 
 static int patch_cs8409(struct hda_codec *codec)
 {
-       struct cs_spec *spec;
-       int err;
-       int itm;
-       //hda_nid_t *dac_nids_ptr = NULL;
+        struct cs_spec *spec;
+        int err;
+        int itm;
+        //hda_nid_t *dac_nids_ptr = NULL;
 
-       int explicit = 0;
+        int explicit = 0;
 
-       //struct hda_pcm *info = NULL;
-       //struct hda_pcm_stream *hinfo = NULL;
+        //struct hda_pcm *info = NULL;
+        //struct hda_pcm_stream *hinfo = NULL;
 
-       myprintk("snd_hda_intel: Patching for CS8409 explicit %d\n", explicit);
-       //mycodec_info(codec, "Patching for CS8409 %d\n", explicit);
+        myprintk("snd_hda_intel: Patching for CS8409 explicit %d\n", explicit);
+        //mycodec_info(codec, "Patching for CS8409 %d\n", explicit);
 
-       //dump_stack();
+        //dump_stack();
 
-       spec = cs_alloc_spec(codec, CS8409_VENDOR_NID);
-       if (!spec)
-               return -ENOMEM;
+        spec = cs_alloc_spec(codec, CS8409_VENDOR_NID);
+        if (!spec)
+                return -ENOMEM;
 
-       spec->beep_nid = CS8409_BEEP_NID;
+        spec->beep_nid = CS8409_BEEP_NID;
 
-       spec->use_data = 0;
+        spec->use_data = 0;
 
-       if (explicit)
-	      {
-              //codec->patch_ops = cs_8409_patch_ops_explicit;
-	      }
-       else
-              codec->patch_ops = cs_8409_patch_ops;
+        if (explicit)
+               {
+               //codec->patch_ops = cs_8409_patch_ops_explicit;
+               }
+        else
+               codec->patch_ops = cs_8409_patch_ops;
 
-       spec->gen.pcm_playback_hook = cs_8409_playback_pcm_hook;
+        spec->gen.pcm_playback_hook = cs_8409_playback_pcm_hook;
 
-       spec->gen.pcm_capture_hook = cs_8409_capture_pcm_hook;
+        spec->gen.pcm_capture_hook = cs_8409_capture_pcm_hook;
 
-       spec->gen.automute_hook = cs_8409_automute;
+        spec->gen.automute_hook = cs_8409_automute;
 
-       // so it appears we need to explicitly apply pre probe fixups here
-       // note that if the pinconfigs lists are empty the pin config fixup
-       // is effectively ignored
+        // so it appears we need to explicitly apply pre probe fixups here
+        // note that if the pinconfigs lists are empty the pin config fixup
+        // is effectively ignored
 
-       //myprintk("cs8409 - 1\n");
-       //snd_hda_pick_fixup(codec, cs8409_models, cs8409_fixup_tbl,
-       //                   cs8409_fixups);
-       //myprintk("cs8409 - 2\n");
-       //snd_hda_apply_fixup(codec, HDA_FIXUP_ACT_PRE_PROBE);
-
-
-       //timer_setup(&cs_8409_hp_timer, cs_8409_hp_timer_callback, 0);
-
-       myprintk("snd_hda_intel: cs 8409 jack used %d\n",codec->jacktbl.used);
-
-       // use this to cause unsolicited responses to be stored
-       // but not run
-       spec->block_unsol = 0;
-
-       INIT_LIST_HEAD(&spec->unsol_list);
-
-       for (itm=0; itm<10; itm++)
-               { spec->unsol_items_prealloc_used[itm] = 0; }
+        //myprintk("cs8409 - 1\n");
+        //snd_hda_pick_fixup(codec, cs8409_models, cs8409_fixup_tbl,
+        //                   cs8409_fixups);
+        //myprintk("cs8409 - 2\n");
+        //snd_hda_apply_fixup(codec, HDA_FIXUP_ACT_PRE_PROBE);
 
 
-       // for the moment set initial jack status to not present
-       // we will detect if have jack plugged in on boot later
-       spec->jack_present = 0;
+        //timer_setup(&cs_8409_hp_timer, cs_8409_hp_timer_callback, 0);
+
+        myprintk("snd_hda_intel: cs 8409 jack used %d\n",codec->jacktbl.used);
+
+        // use this to cause unsolicited responses to be stored
+        // but not run
+        spec->block_unsol = 0;
+
+        INIT_LIST_HEAD(&spec->unsol_list);
+
+        for (itm=0; itm<10; itm++)
+                { spec->unsol_items_prealloc_used[itm] = 0; }
 
 
-       spec->headset_type = 0;
-
-       spec->have_mike = 0;
-
-       spec->have_buttons = 0;
-
-       spec->playing = 0;
-       spec->capturing = 0;
-
-       spec->headset_play_format_setup_needed = 1;
-       spec->headset_capture_format_setup_needed = 1;
-
-       spec->headset_presetup_done = 0;
+        // for the moment set initial jack status to not present
+        // we will detect if have jack plugged in on boot later
+        spec->jack_present = 0;
 
 
-       // use this to distinguish which unsolicited phase we are in
-       // for the moment - we only seem to get a tag of 0x37 and dont see any
-       // different tags being setup in OSX logs
-       spec->headset_phase = 0;
+        spec->headset_type = 0;
 
-       spec->headset_enable = 0;
+        spec->have_mike = 0;
 
+        spec->have_buttons = 0;
 
-       // so it appears we dont get interrupts in the auto config stage
+        spec->playing = 0;
+        spec->capturing = 0;
 
-       // we need to figure out how to setup the jack detect callback
-       // not clear what nid should be used - 0x01 or 0x47
-       // added a tag argument because we seem to get a tag
-       // so far the tag seems to be 0x37
-       cs_8409_hda_jack_detect_enable_callback(codec, 0x01, 0x37, cs_8409_cs42l83_callback);
+        spec->headset_play_format_setup_needed = 1;
+        spec->headset_capture_format_setup_needed = 1;
 
-       myprintk("snd_hda_intel: cs 8409 jack used callback %d\n",codec->jacktbl.used);
+        spec->headset_presetup_done = 0;
 
 
-       //      cs8409_pinmux_init(codec);
+        // use this to distinguish which unsolicited phase we are in
+        // for the moment - we only seem to get a tag of 0x37 and dont see any
+        // different tags being setup in OSX logs
+        spec->headset_phase = 0;
+
+        spec->headset_enable = 0;
+
+
+        // so it appears we dont get interrupts in the auto config stage
+
+        // we need to figure out how to setup the jack detect callback
+        // not clear what nid should be used - 0x01 or 0x47
+        // added a tag argument because we seem to get a tag
+        // so far the tag seems to be 0x37
+        cs_8409_hda_jack_detect_enable_callback(codec, 0x01, 0x37, cs_8409_cs42l83_callback);
+
+        myprintk("snd_hda_intel: cs 8409 jack used callback %d\n",codec->jacktbl.used);
+
+
+        //      cs8409_pinmux_init(codec);
 
        if (!explicit)
        {
@@ -2507,23 +2507,23 @@ static int patch_cs8409(struct hda_codec *codec)
 
        myprintk("snd_hda_intel: auto config inputs num_adc_nids %d\n", spec->gen.num_adc_nids);
        for (itm = 0; itm < spec->gen.num_adc_nids; itm++) {
-		myprintk("snd_hda_intel: auto config inputs adc_nids 0x%02x\n", spec->gen.adc_nids[itm]);
+               myprintk("snd_hda_intel: auto config inputs adc_nids 0x%02x\n", spec->gen.adc_nids[itm]);
        }
 
        myprintk("snd_hda_intel: auto config multiout is num_dacs %d\n", spec->gen.multiout.num_dacs);
        for (itm = 0; itm < spec->gen.multiout.num_dacs; itm++) {
-		myprintk("snd_hda_intel: auto config multiout is    dac_nids 0x%02x\n", spec->gen.multiout.dac_nids[itm]);
+               myprintk("snd_hda_intel: auto config multiout is    dac_nids 0x%02x\n", spec->gen.multiout.dac_nids[itm]);
        }
 
        myprintk("snd_hda_intel: auto config multiout is      hp_nid 0x%02x\n", spec->gen.multiout.hp_nid);
 
        for (itm = 0; itm < ARRAY_SIZE(spec->gen.multiout.hp_out_nid); itm++) {
-	        if (spec->gen.multiout.hp_out_nid[itm])
-			myprintk("snd_hda_intel: auto config multiout is  hp_out_nid 0x%02x\n", spec->gen.multiout.hp_out_nid[itm]);
+               if (spec->gen.multiout.hp_out_nid[itm])
+                       myprintk("snd_hda_intel: auto config multiout is  hp_out_nid 0x%02x\n", spec->gen.multiout.hp_out_nid[itm]);
        }
        for (itm = 0; itm < ARRAY_SIZE(spec->gen.multiout.extra_out_nid); itm++) {
-	        if (spec->gen.multiout.extra_out_nid[itm])
-			myprintk("snd_hda_intel: auto config multiout is xtr_out_nid 0x%02x\n", spec->gen.multiout.extra_out_nid[itm]);
+               if (spec->gen.multiout.extra_out_nid[itm])
+                       myprintk("snd_hda_intel: auto config multiout is xtr_out_nid 0x%02x\n", spec->gen.multiout.extra_out_nid[itm]);
        }
 
        myprintk("snd_hda_intel: auto config multiout is dig_out_nid 0x%02x\n", spec->gen.multiout.dig_out_nid);
@@ -2544,7 +2544,7 @@ static int patch_cs8409(struct hda_codec *codec)
        //              codec_dbg(codec, "playback info stream NULL\n");
        //}
        //else
-       //	       codec_dbg(codec, "playback info NULL\n");
+       //       codec_dbg(codec, "playback info NULL\n");
 
 
        // try removing the unused nodes
@@ -2591,7 +2591,7 @@ static int patch_cs8409(struct hda_codec *codec)
 
        err = cs_8409_boot_setup(codec);
        if (err < 0)
-	       goto error;
+               goto error;
 
        // update the headset phase
        spec->headset_phase = 1;
@@ -2630,7 +2630,7 @@ cs_8409_extended_codec_verb(struct hda_codec *codec, hda_nid_t nid,
                                 unsigned int verb, unsigned int parm)
 {
 	//static inline unsigned int cs_8409_vendor_i2cRead(struct hda_codec *codec, unsigned int i2c_address,
-        //                                    unsigned int i2c_reg, unsigned int paged)
+	//                                    unsigned int i2c_reg, unsigned int paged)
 	unsigned int retval1 = 0;
 	unsigned int retval2 = 0;
 	unsigned int retval3 = 0;
