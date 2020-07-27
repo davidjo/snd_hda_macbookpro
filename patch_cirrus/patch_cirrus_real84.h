@@ -1548,9 +1548,9 @@ static int cs_8409_boot_setup_real(struct hda_codec *codec)
         init_for_node_vendor(codec);
 
         // this is determineSpeakerID
-        // this does not make sense - this just checks a GPIO pin??
+        // this does not make sense - this just checks GPIO pin(s)??
 
-        determine_speaker_id(codec, 0x4);
+        determine_speaker_id(codec);
 
         //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_POWER_STATE, 0x00000003); // 0x00170503
         //hda_set_node_power_state(codec, codec->core.afg, AC_PWRST_D3);

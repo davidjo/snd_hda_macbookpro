@@ -1741,7 +1741,7 @@ static void init_for_node_vendor(struct hda_codec *codec)
 
 }
 
-static void determine_speaker_id(struct hda_codec *codec, int mask)
+static void determine_speaker_id(struct hda_codec *codec)
 {
         int retval;
 
@@ -1751,17 +1751,49 @@ static void determine_speaker_id(struct hda_codec *codec, int mask)
         mycodec_info(codec, "command determine_speaker_id start\n");
 
         // this is call AppleHDAFunctionGroup::setGPIOEnable in determineSpeakerID
-        //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_GPIO_MASK, 0x00000004); // 0x00171604
-//      snd_hda:     gpio enable 1 0x04
 
-        //retval = snd_hda_codec_read_check(codec, codec->core.afg, 0, AC_VERB_GET_GPIO_DATA, 0x00000000, 0x00000004, 1672); // 0x001f1500
-//      snd_hda:     gpio data 1 0x04
+        if (codec->core.subsystem_id == 0x106b3900)
+        {
+                //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_GPIO_MASK, 0x00000008); // 0x00171608
+//              snd_hda:     gpio enable 1 0x08
 
-        snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_GPIO_MASK, mask); // 0x00171604
+                //retval = snd_hda_codec_read_check(codec, codec->core.afg, 0, AC_VERB_GET_GPIO_DATA, 0x00000000, 0x00000000, 1672); // 0x001f1500
+//              snd_hda:     gpio data 1 0x00
 
-        retval = snd_hda_codec_read(codec, codec->core.afg, 0, AC_VERB_GET_GPIO_DATA, 0x00000000); // 0x001f1500
+                //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_GPIO_MASK, 0x0000000c); // 0x0017160c
+//              snd_hda:     gpio enable 1 0x0c
 
-        mycodec_info(codec, "command determine_speaker_id gpio data 0x%08x\n", retval);
+                //retval = snd_hda_codec_read_check(codec, codec->core.afg, 0, AC_VERB_GET_GPIO_DATA, 0x00000000, 0x00000000, 1674); // 0x001f1500
+//              snd_hda:     gpio data 1 0x00
+
+                snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_GPIO_MASK, 0x00000008); // 0x00171608
+
+                retval = snd_hda_codec_read(codec, codec->core.afg, 0, AC_VERB_GET_GPIO_DATA, 0x00000000); // 0x001f1500
+
+                mycodec_info(codec, "command determine_speaker_id gpio data 0x%08x\n", retval);
+
+                snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_GPIO_MASK, 0x0000000c); // 0x0017160c
+
+                retval = snd_hda_codec_read(codec, codec->core.afg, 0, AC_VERB_GET_GPIO_DATA, 0x00000000); // 0x001f1500
+
+                mycodec_info(codec, "command determine_speaker_id gpio data 0x%08x\n", retval);
+
+	}
+	else
+        {
+                //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_GPIO_MASK, 0x00000004); // 0x00171604
+//              snd_hda:     gpio enable 1 0x04
+
+                //retval = snd_hda_codec_read_check(codec, codec->core.afg, 0, AC_VERB_GET_GPIO_DATA, 0x00000000, 0x00000004, 1672); // 0x001f1500
+//              snd_hda:     gpio data 1 0x04
+
+                snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_GPIO_MASK, 0x04); // 0x00171604
+
+                retval = snd_hda_codec_read(codec, codec->core.afg, 0, AC_VERB_GET_GPIO_DATA, 0x00000000); // 0x001f1500
+
+                mycodec_info(codec, "command determine_speaker_id gpio data 0x%08x\n", retval);
+
+	}
 
         mycodec_info(codec, "command determine_speaker_id end\n");
 
