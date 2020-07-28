@@ -1,0 +1,19 @@
+
+Test waveforms for speakers
+
+StereoTest32_reduced_m24dB.wav is reduced volume level for testing via the direct hardware device
+
+Run:
+
+aplay StereoTest32.wav
+
+or
+
+aplay -D hw:0,0 StereoTest32_reduced_m24dB.wav
+
+
+NOTA BENE - do NOT use -D hw:0,0 with StereoTest32.wav
+
+
+waveform provided by milan475
+
