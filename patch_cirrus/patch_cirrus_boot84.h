@@ -1634,17 +1634,18 @@ static void setup_jack_pin_config(struct hda_codec *codec)
 {
 
         //int retval;
+        struct cs_spec *spec = codec->spec;
 
         // this is likely some call of setPinConfigDefault
-	// 0x45 -> 0x23 is the line in path - so why does it say its a mike??
+	// 0x45 -> 0x23 (macbook pro) is the line in path - so why does it say its a mike??
 
         //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_POWER_STATE, 0x00000000); // 0x00170500
         //hda_set_node_power_state(codec, codec->core.afg, AC_PWRST_D0);
 
-        snd_hda_codec_write(codec, 0x45, 0, AC_VERB_SET_CONFIG_DEFAULT_BYTES_0, 0x00000001); // 0x04571c01
-        snd_hda_codec_write(codec, 0x45, 0, AC_VERB_SET_CONFIG_DEFAULT_BYTES_1, 0x00000001); // 0x04571d01
-        snd_hda_codec_write(codec, 0x45, 0, AC_VERB_SET_CONFIG_DEFAULT_BYTES_2, 0x000000a0); // 0x04571ea0
-        snd_hda_codec_write(codec, 0x45, 0, AC_VERB_SET_CONFIG_DEFAULT_BYTES_3, 0x00000090); // 0x04571f90
+        snd_hda_codec_write(codec, spec->linein_nid, 0, AC_VERB_SET_CONFIG_DEFAULT_BYTES_0, 0x00000001); // 0x04571c01
+        snd_hda_codec_write(codec, spec->linein_nid, 0, AC_VERB_SET_CONFIG_DEFAULT_BYTES_1, 0x00000001); // 0x04571d01
+        snd_hda_codec_write(codec, spec->linein_nid, 0, AC_VERB_SET_CONFIG_DEFAULT_BYTES_2, 0x000000a0); // 0x04571ea0
+        snd_hda_codec_write(codec, spec->linein_nid, 0, AC_VERB_SET_CONFIG_DEFAULT_BYTES_3, 0x00000090); // 0x04571f90
 //      snd_hda:     pin config 0x90a00101 port conn 2 location 0x10 loc ext 1 loc geom 0 default device 10 conn type 0 color 0 misc 1 def assoc 0 seq 1
 //      snd_hda:     pin config 0x90a00101 port conn Fixed loc ext Int loc geom N/A default device Mic In conn type Unknown color Unknown misc Jack Detect Override def assoc 0 seq 1
 
@@ -2226,6 +2227,148 @@ static void setup_amps_reset_i2c_ssm3(struct hda_codec *codec)
 
 }
 
+
+static void setup_gpio_set_10(struct hda_codec *codec);
+
+static void setup_amps_reset_i2c_tas576(struct hda_codec *codec)
+{
+        // the Texas TAS5764 is undocumented - the nearest seems to be the TAS5760md
+        // which has some similarities but some discrepancies
+        // for the moment using the TAS5760md registers where they seem to be similar
+        // based on info that writing to coef index 0x59 seems to be the i2c address hence the amps i2c address following are
+        // 0xd8, 0xda, 0xdc, 0xde
+
+        setup_gpio_set_10(codec);
+
+//      snd_hda i2cWrite      i2c address 0xd8 i2c            reg 0x01fc i2c data 0x00fc   reg anal: Power Control           : Not Sleep, Spkr Amp Shutdown
+//      snd_hda i2cWrite      i2c address 0xd8 i2c            reg 0x0204 i2c data 0x0004   reg anal: Digital Control         : I2S format
+//      snd_hda i2cWrite      i2c address 0xd8 i2c            reg 0x0380 i2c data 0x0080   reg anal: Volume Control          : Fade
+//      snd_hda i2cWrite      i2c address 0xd8 i2c            reg 0x04cf i2c data 0x00cf   reg anal: Left Chan Vol Control   : 0dB
+//      snd_hda i2cWrite      i2c address 0xd8 i2c            reg 0x0651 i2c data 0x0051   reg anal: Analog Control          : PWM Rate x16
+//      snd_hda i2cWrite      i2c address 0xd8 i2c            reg 0x0800 i2c data 0x0000   reg anal: Fault Config & Error
+//      snd_hda i2cWrite      i2c address 0xd8 i2c            reg 0x10ff i2c data 0x00ff   reg anal: Digital Clipper
+//      snd_hda i2cWrite      i2c address 0xd8 i2c            reg 0x11fc i2c data 0x00fc   reg anal: Undocumented
+//      snd_hda i2cWrite      i2c address 0xd8 i2c            reg 0x1300 i2c data 0x0000   reg anal: Undocumented
+//      snd_hda i2cWrite      i2c address 0xd8 i2c            reg 0x1402 i2c data 0x0002   reg anal: Undocumented
+
+        cs_8409_vendor_i2cWrite(codec, 0xd8, 0x0001, 0x00fc, 0); // snd_hda
+        cs_8409_vendor_i2cWrite(codec, 0xd8, 0x0002, 0x0004, 0); // snd_hda
+        cs_8409_vendor_i2cWrite(codec, 0xd8, 0x0003, 0x0080, 0); // snd_hda
+        cs_8409_vendor_i2cWrite(codec, 0xd8, 0x0004, 0x00cf, 0); // snd_hda
+        cs_8409_vendor_i2cWrite(codec, 0xd8, 0x0006, 0x0051, 0); // snd_hda
+        cs_8409_vendor_i2cWrite(codec, 0xd8, 0x0008, 0x0000, 0); // snd_hda
+        cs_8409_vendor_i2cWrite(codec, 0xd8, 0x0010, 0x00ff, 0); // snd_hda
+        cs_8409_vendor_i2cWrite(codec, 0xd8, 0x0011, 0x00fc, 0); // snd_hda
+        cs_8409_vendor_i2cWrite(codec, 0xd8, 0x0013, 0x0000, 0); // snd_hda
+        cs_8409_vendor_i2cWrite(codec, 0xd8, 0x0014, 0x0002, 0); // snd_hda
+
+        setup_gpio_set_10(codec);
+
+//      snd_hda i2cWrite      i2c address 0xda i2c            reg 0x01fc i2c data 0x00fc   reg anal: Power Control           : Not Sleep, Spkr Amp Shutdown
+//      snd_hda i2cWrite      i2c address 0xda i2c            reg 0x0204 i2c data 0x0004   reg anal: Digital Control         : I2S format
+//      snd_hda i2cWrite      i2c address 0xda i2c            reg 0x0380 i2c data 0x0080   reg anal: Volume Control          : Fade
+//      snd_hda i2cWrite      i2c address 0xda i2c            reg 0x04cf i2c data 0x00cf   reg anal: Left Chan Vol Control   : 0dB
+//      snd_hda i2cWrite      i2c address 0xda i2c            reg 0x0651 i2c data 0x0051   reg anal: Analog Control          : PWM Rate x16
+//      snd_hda i2cWrite      i2c address 0xda i2c            reg 0x0800 i2c data 0x0000   reg anal: Fault Config & Error
+//      snd_hda i2cWrite      i2c address 0xda i2c            reg 0x10ff i2c data 0x00ff   reg anal: Digital Clipper
+//      snd_hda i2cWrite      i2c address 0xda i2c            reg 0x11fc i2c data 0x00fc   reg anal: Undocumented
+//      snd_hda i2cWrite      i2c address 0xda i2c            reg 0x1300 i2c data 0x0000   reg anal: Undocumented
+//      snd_hda i2cWrite      i2c address 0xda i2c            reg 0x1402 i2c data 0x0002   reg anal: Undocumented
+
+        cs_8409_vendor_i2cWrite(codec, 0xda, 0x0001, 0x00fc, 0); // snd_hda
+        cs_8409_vendor_i2cWrite(codec, 0xda, 0x0002, 0x0004, 0); // snd_hda
+        cs_8409_vendor_i2cWrite(codec, 0xda, 0x0003, 0x0080, 0); // snd_hda
+        cs_8409_vendor_i2cWrite(codec, 0xda, 0x0004, 0x00cf, 0); // snd_hda
+        cs_8409_vendor_i2cWrite(codec, 0xda, 0x0006, 0x0051, 0); // snd_hda
+        cs_8409_vendor_i2cWrite(codec, 0xda, 0x0008, 0x0000, 0); // snd_hda
+        cs_8409_vendor_i2cWrite(codec, 0xda, 0x0010, 0x00ff, 0); // snd_hda
+        cs_8409_vendor_i2cWrite(codec, 0xda, 0x0011, 0x00fc, 0); // snd_hda
+        cs_8409_vendor_i2cWrite(codec, 0xda, 0x0013, 0x0000, 0); // snd_hda
+        cs_8409_vendor_i2cWrite(codec, 0xda, 0x0014, 0x0002, 0); // snd_hda
+
+        setup_gpio_set_10(codec);
+
+//      snd_hda i2cWrite      i2c address 0xdc i2c            reg 0x01fc i2c data 0x00fc   reg anal: Power Control           : Not Sleep, Spkr Amp Shutdown
+//      snd_hda i2cWrite      i2c address 0xdc i2c            reg 0x0204 i2c data 0x0004   reg anal: Digital Control         : I2S format
+//      snd_hda i2cWrite      i2c address 0xdc i2c            reg 0x0380 i2c data 0x0080   reg anal: Volume Control          : Fade
+//      snd_hda i2cWrite      i2c address 0xdc i2c            reg 0x04cf i2c data 0x00cf   reg anal: Left Chan Vol Control   : 0dB
+//      snd_hda i2cWrite      i2c address 0xdc i2c            reg 0x0651 i2c data 0x0051   reg anal: Analog Control          : PWM Rate x16
+//      snd_hda i2cWrite      i2c address 0xdc i2c            reg 0x0800 i2c data 0x0000   reg anal: Fault Config & Error
+//      snd_hda i2cWrite      i2c address 0xdc i2c            reg 0x10ff i2c data 0x00ff   reg anal: Digital Clipper
+//      snd_hda i2cWrite      i2c address 0xdc i2c            reg 0x11fc i2c data 0x00fc   reg anal: Undocumented
+//      snd_hda i2cWrite      i2c address 0xdc i2c            reg 0x1300 i2c data 0x0000   reg anal: Undocumented
+//      snd_hda i2cWrite      i2c address 0xdc i2c            reg 0x1402 i2c data 0x0002   reg anal: Undocumented
+
+        cs_8409_vendor_i2cWrite(codec, 0xdc, 0x0001, 0x00fc, 0); // snd_hda
+        cs_8409_vendor_i2cWrite(codec, 0xdc, 0x0002, 0x0004, 0); // snd_hda
+        cs_8409_vendor_i2cWrite(codec, 0xdc, 0x0003, 0x0080, 0); // snd_hda
+        cs_8409_vendor_i2cWrite(codec, 0xdc, 0x0004, 0x00cf, 0); // snd_hda
+        cs_8409_vendor_i2cWrite(codec, 0xdc, 0x0006, 0x0051, 0); // snd_hda
+        cs_8409_vendor_i2cWrite(codec, 0xdc, 0x0008, 0x0000, 0); // snd_hda
+        cs_8409_vendor_i2cWrite(codec, 0xdc, 0x0010, 0x00ff, 0); // snd_hda
+        cs_8409_vendor_i2cWrite(codec, 0xdc, 0x0011, 0x00fc, 0); // snd_hda
+        cs_8409_vendor_i2cWrite(codec, 0xdc, 0x0013, 0x0000, 0); // snd_hda
+        cs_8409_vendor_i2cWrite(codec, 0xdc, 0x0014, 0x0002, 0); // snd_hda
+
+        setup_gpio_set_10(codec);
+
+//      snd_hda i2cWrite      i2c address 0xde i2c            reg 0x01fc i2c data 0x00fc   reg anal: Power Control           : Not Sleep, Spkr Amp Shutdown
+//      snd_hda i2cWrite      i2c address 0xde i2c            reg 0x0204 i2c data 0x0004   reg anal: Digital Control         : I2S format
+//      snd_hda i2cWrite      i2c address 0xde i2c            reg 0x0380 i2c data 0x0080   reg anal: Volume Control          : Fade
+//      snd_hda i2cWrite      i2c address 0xde i2c            reg 0x04cf i2c data 0x00cf   reg anal: Left Chan Vol Control   : 0dB
+//      snd_hda i2cWrite      i2c address 0xde i2c            reg 0x0651 i2c data 0x0051   reg anal: Analog Control          : PWM Rate x16
+//      snd_hda i2cWrite      i2c address 0xde i2c            reg 0x0800 i2c data 0x0000   reg anal: Fault Config & Error
+//      snd_hda i2cWrite      i2c address 0xde i2c            reg 0x10ff i2c data 0x00ff   reg anal: Digital Clipper
+//      snd_hda i2cWrite      i2c address 0xde i2c            reg 0x11fc i2c data 0x00fc   reg anal: Undocumented
+//      snd_hda i2cWrite      i2c address 0xde i2c            reg 0x1300 i2c data 0x0000   reg anal: Undocumented
+//      snd_hda i2cWrite      i2c address 0xde i2c            reg 0x1402 i2c data 0x0002   reg anal: Undocumented
+
+        cs_8409_vendor_i2cWrite(codec, 0xde, 0x0001, 0x00fc, 0); // snd_hda
+        cs_8409_vendor_i2cWrite(codec, 0xde, 0x0002, 0x0004, 0); // snd_hda
+        cs_8409_vendor_i2cWrite(codec, 0xde, 0x0003, 0x0080, 0); // snd_hda
+        cs_8409_vendor_i2cWrite(codec, 0xde, 0x0004, 0x00cf, 0); // snd_hda
+        cs_8409_vendor_i2cWrite(codec, 0xde, 0x0006, 0x0051, 0); // snd_hda
+        cs_8409_vendor_i2cWrite(codec, 0xde, 0x0008, 0x0000, 0); // snd_hda
+        cs_8409_vendor_i2cWrite(codec, 0xde, 0x0010, 0x00ff, 0); // snd_hda
+        cs_8409_vendor_i2cWrite(codec, 0xde, 0x0011, 0x00fc, 0); // snd_hda
+        cs_8409_vendor_i2cWrite(codec, 0xde, 0x0013, 0x0000, 0); // snd_hda
+        cs_8409_vendor_i2cWrite(codec, 0xde, 0x0014, 0x0002, 0); // snd_hda
+
+}
+
+static void setup_gpio_set_10(struct hda_codec *codec)
+{
+
+        // plausibly AppleHDAFunctionGroupExternalControl_GPIO::publicSetExternalControlState(bool)
+
+        // I think this may be associated with the amps
+        // its either applying power to the amps or taking them out of reset
+        // (note that unlike GPIO 2 there doesnt seem to be a clear 10)
+
+	// note that this seems to be following the MAX style setup
+
+        mycodec_info(codec, "command setup_gpio_set_10 start\n");
+
+        //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_POWER_STATE, 0x00000000); // 0x00170500
+        //hda_set_node_power_state(codec, codec->core.afg, AC_PWRST_D0);
+
+        //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_GPIO_DIRECTION, 0x00000012); // 0x00171712
+//      snd_hda:     gpio direction 1 0x12 in in in out in in out in
+        //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_GPIO_DATA, 0x00000012); // 0x00171512
+//      snd_hda:     gpio data 1 0x12
+        //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_GPIO_MASK, 0x0000001f); // 0x0017161f
+//      snd_hda:     gpio enable 1 0x1f
+
+
+        snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_GPIO_DIRECTION, 0x00000012); // 0x00171712
+        snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_GPIO_DATA, 0x00000012); // 0x00171512
+        snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_GPIO_MASK, 0x0000001f); // 0x0017161f
+
+        //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_POWER_STATE, 0x00000003); // 0x00170503
+        //hda_set_node_power_state(codec, codec->core.afg, AC_PWRST_D3);
+
+        mycodec_info(codec, "command setup_gpio_set_10 end\n");
+}
 
 
 static void cs42l83_mic_detect(struct hda_codec *codec)

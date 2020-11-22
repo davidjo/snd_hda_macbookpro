@@ -77,9 +77,12 @@ static void cs_8409_intmike_format_setup_format33_nouse(struct hda_codec *codec)
         int ret_coef9 = 0;
         int new_coef9 = 0;
 
-        // 0x44 -> 0x22 is internal (I think) mike input
+        struct cs_spec *spec = codec->spec;
 
-        snd_hda_codec_write(codec, 0x22, 0, AC_VERB_SET_STREAM_FORMAT, 0x00004033); // 0x02224033
+        // 0x44 -> 0x22 is internal (I think) mike input (macbook pro)
+
+        snd_hda_codec_write(codec, spec->intmike_adc_nid, 0, AC_VERB_SET_STREAM_FORMAT, 0x00004033); // 0x02224033
+        //snd_hda_codec_write(codec, 0x22, 0, AC_VERB_SET_STREAM_FORMAT, 0x00004033); // 0x02224033
 //      snd_hda:     stream format 34 [('CHAN', 4), ('RATE', 44100), ('BITS', 24), ('RATE_MUL', 1), ('RATE_DIV', 1)]
 
 }
@@ -88,7 +91,10 @@ static void cs_8409_intmike_format_setup_format_nouse(struct hda_codec *codec)
 {
         int retval;
 
-        snd_hda_codec_write(codec, 0x22, 0, AC_VERB_SET_STREAM_FORMAT, 0x00004031); // 0x02224031
+        struct cs_spec *spec = codec->spec;
+
+        snd_hda_codec_write(codec, spec->intmike_adc_nid, 0, AC_VERB_SET_STREAM_FORMAT, 0x00004031); // 0x02224031
+        //snd_hda_codec_write(codec, 0x22, 0, AC_VERB_SET_STREAM_FORMAT, 0x00004031); // 0x02224031
 //      snd_hda:     stream format 34 [('CHAN', 2), ('RATE', 44100), ('BITS', 24), ('RATE_MUL', 1), ('RATE_DIV', 1)]
 
 }
@@ -99,7 +105,9 @@ static void cs_8409_intmike_format_setup_enable(struct hda_codec *codec, int hda
         int ret_coef9 = 0;
         int new_coef9 = 0;
 
-        // 0x44 -> 0x22 is internal (I think) mike input
+        struct cs_spec *spec = codec->spec;
+
+        // 0x44 -> 0x22 is internal (I think) mike input (macbook pro)
 
 	// now updated to not write the Apple format but use my format setting routines
 	// (remember we have limited the allowed formats to acceptable ones)
@@ -118,7 +126,8 @@ static void cs_8409_intmike_format_setup_enable(struct hda_codec *codec, int hda
         //retval = snd_hda_codec_read_check(codec, 0x22, 0, AC_VERB_GET_POWER_STATE, 0x00000000, 0x00000033, 10515); // 0x022f0500
         //snd_hda_codec_write(codec, 0x22, 0, AC_VERB_SET_POWER_STATE, 0x00000000); // 0x02270500
         //retval = snd_hda_codec_read_check(codec, 0x22, 0, AC_VERB_GET_POWER_STATE, 0x00000000, 0x00000030, 10518); // 0x022f0500
-        if (powered_down) hda_set_node_power_state(codec, 0x22, AC_PWRST_D0);
+        //if (powered_down) hda_set_node_power_state(codec, 0x22, AC_PWRST_D0);
+        if (powered_down) hda_set_node_power_state(codec, spec->intmike_adc_nid, AC_PWRST_D0);
 
         //snd_hda_codec_write(codec, 0x22, 0, AC_VERB_SET_CHANNEL_STREAMID, 0x00000010); // 0x02270610
 //      snd_hda:     conv stream channel map 34 [('CHAN', 0), ('STREAMID', 1)]
@@ -126,12 +135,14 @@ static void cs_8409_intmike_format_setup_enable(struct hda_codec *codec, int hda
 
         // using the stored stream parameters update nid 0x22 stream parameters
         // we have limited the allowed formats so should only have working formats here
-        cs_8409_really_update_stream_format(codec, 0x22, 1, 1, 0);
+        //cs_8409_really_update_stream_format(codec, 0x22, 1, 1, 0);
+        cs_8409_really_update_stream_format(codec, spec->intmike_adc_nid, 1, 1, 0);
 
 
         //snd_hda_codec_write(codec, 0x22, 0, AC_VERB_SET_POWER_STATE, 0x00000003); // 0x02270503
         //retval = snd_hda_codec_read_check(codec, 0x22, 0, AC_VERB_GET_POWER_STATE, 0x00000000, 0x00000033, 10521); // 0x022f0500
-        if (powered_down) hda_set_node_power_state(codec, 0x22, AC_PWRST_D3);
+        //if (powered_down) hda_set_node_power_state(codec, 0x22, AC_PWRST_D3);
+        if (powered_down) hda_set_node_power_state(codec, spec->intmike_adc_nid, AC_PWRST_D3);
 
 //      snd_hda: # AppleHDAWidgetCS8409::setConnectionSelect: 
         ret_coef9 = snd_hda_coef_item_check(codec, 0, CS8409_VENDOR_NID, 0x0009, 0x0000, 0x000000b3, 0 ); // AppleHDAWidgetCS8409::setConnectionSelect  coef read 10523
@@ -141,7 +152,8 @@ static void cs_8409_intmike_format_setup_enable(struct hda_codec *codec, int hda
         //snd_hda_coef_item(codec, 1, CS8409_VENDOR_NID, 0x0009, 0x00b3, 0x00000000, 10527 ); // AppleHDAWidgetCS8409::setConnectionSelect  coef write 10527
         snd_hda_coef_item(codec, 1, CS8409_VENDOR_NID, 0x0009, new_coef9, 0x00000000, 0 ); // AppleHDAWidgetCS8409::setConnectionSelect  coef write 10527
 
-        snd_hda_codec_write(codec, 0x22, 0, AC_VERB_SET_CONNECT_SEL, 0x00000000); // 0x02270100
+        //snd_hda_codec_write(codec, 0x22, 0, AC_VERB_SET_CONNECT_SEL, 0x00000000); // 0x02270100
+        snd_hda_codec_write(codec, spec->intmike_adc_nid, 0, AC_VERB_SET_CONNECT_SEL, 0x00000000); // 0x02270100
 
 }
 
@@ -205,53 +217,61 @@ static void cs_8409_volume_unmute(struct hda_codec *codec, hda_nid_t nid)
 
 static void cs_8409_intmike_volume_set(struct hda_codec *codec, int volume)
 {
-        cs_8409_volume_set(codec, 0x22, volume);
+        struct cs_spec *spec = codec->spec;
+        cs_8409_volume_set(codec, spec->intmike_adc_nid, volume);
 }
 
 static void cs_8409_linein_volume_set(struct hda_codec *codec, int volume)
 {
-        cs_8409_volume_set(codec, 0x23, volume);
+        struct cs_spec *spec = codec->spec;
+        cs_8409_volume_set(codec, spec->linein_amp_nid, volume);
 }
 
 static void cs_8409_intmike_volume_unmute(struct hda_codec *codec)
 {
-        cs_8409_volume_unmute(codec, 0x22);
+        struct cs_spec *spec = codec->spec;
+        cs_8409_volume_unmute(codec, spec->intmike_adc_nid);
 }
 
 static void cs_8409_linein_volume_unmute(struct hda_codec *codec)
 {
-        cs_8409_volume_unmute(codec, 0x23);
+        struct cs_spec *spec = codec->spec;
+        cs_8409_volume_unmute(codec, spec->linein_amp_nid);
 }
 
 static void cs_8409_intmike_volume_mute(struct hda_codec *codec)
 {
-        cs_8409_volume_mute(codec, 0x22);
+        struct cs_spec *spec = codec->spec;
+        cs_8409_volume_mute(codec, spec->intmike_adc_nid);
 }
 
 static void cs_8409_linein_volume_mute(struct hda_codec *codec)
 {
-        cs_8409_volume_mute(codec, 0x23);
+        struct cs_spec *spec = codec->spec;
+        cs_8409_volume_mute(codec, spec->linein_amp_nid);
 }
 
 static void cs_8409_intmike_volume_setup_new(struct hda_codec *codec, int volume)
 {
+        struct cs_spec *spec = codec->spec;
 
-        cs_8409_volume_set(codec, 0x22, volume);
+        cs_8409_volume_set(codec, spec->intmike_adc_nid, volume);
 
-        cs_8409_volume_mute(codec, 0x22);
+        cs_8409_volume_mute(codec, spec->intmike_adc_nid);
 
-        cs_8409_volume_set(codec, 0x44, 0x00);
+        cs_8409_volume_set(codec, spec->intmike_nid, 0x00);
 
 }
 
 static void cs_8409_linein_volume_setup_new(struct hda_codec *codec, int volume)
 {
+        struct cs_spec *spec = codec->spec;
 
-        cs_8409_volume_set(codec, 0x23, volume);
+        cs_8409_volume_set(codec, spec->linein_amp_nid, volume);
 
-        cs_8409_volume_mute(codec, 0x23);
+        cs_8409_volume_mute(codec, spec->linein_amp_nid);
 
-        cs_8409_volume_set(codec, 0x45, 0x00);
+        cs_8409_volume_set(codec, spec->linein_nid, 0x00);
 
 }
 
@@ -261,26 +281,30 @@ static void cs_8409_intmike_volume_setup(struct hda_codec *codec, int volume)
         int retgain;
         int newgain;
 
+        struct cs_spec *spec = codec->spec;
+
         // plausibly AppleHDAWidget::setWidgetAmplifierGain
 
-        retgain = snd_hda_codec_read_check(codec, 0x22, 0, AC_VERB_GET_AMP_GAIN_MUTE, 0x00002000, 0x00000033, 0); // 0x022b2000
+        //retgain = snd_hda_codec_read_check(codec, 0x22, 0, AC_VERB_GET_AMP_GAIN_MUTE, 0x00002000, 0x00000033, 0); // 0x022b2000
+        retgain = snd_hda_codec_read_check(codec, spec->intmike_adc_nid, 0, AC_VERB_GET_AMP_GAIN_MUTE, 0x00002000, 0x00000033, 0); // 0x022b2000
 //      snd_hda:     amp gain/mute 34 0x2000 index 0x00 left/right 1 left output/input 0 input
 //      snd_hda:     amp gain/mute 34 0x0033 mute 0 gain 0x33 51
 
         newgain = (retgain & 0x80) | (volume & 0x7f) | 0x6000;
 
-        snd_hda_codec_write(codec, 0x22, 0, AC_VERB_SET_AMP_GAIN_MUTE, newgain); // 0x02236027
+        snd_hda_codec_write(codec, spec->intmike_adc_nid, 0, AC_VERB_SET_AMP_GAIN_MUTE, newgain); // 0x02236027
 
         //snd_hda_codec_write(codec, 0x22, 0, AC_VERB_SET_AMP_GAIN_MUTE, 0x00006027); // 0x02236027
 //      snd_hda:     amp gain/mute 34 0x6027 mute 0 gain 0x27 39 index 0x00 left 1 right 0 output 0 input 1 left   input
 
-        retgain = snd_hda_codec_read_check(codec, 0x22, 0, AC_VERB_GET_AMP_GAIN_MUTE, 0x00000000, 0x00000033, 0); // 0x022b0000
+        //retgain = snd_hda_codec_read_check(codec, 0x22, 0, AC_VERB_GET_AMP_GAIN_MUTE, 0x00000000, 0x00000033, 0); // 0x022b0000
+        retgain = snd_hda_codec_read_check(codec, spec->intmike_adc_nid, 0, AC_VERB_GET_AMP_GAIN_MUTE, 0x00000000, 0x00000033, 0); // 0x022b0000
 //      snd_hda:     amp gain/mute 34 0x0000 index 0x00 left/right 0 right output/input 0 input
 //      snd_hda:     amp gain/mute 34 0x0033 mute 0 gain 0x33 51
 
         newgain = (retgain & 0x80) | (volume & 0x7f) | 0x5000;
 
-        snd_hda_codec_write(codec, 0x22, 0, AC_VERB_SET_AMP_GAIN_MUTE, newgain); // 0x02235027
+        snd_hda_codec_write(codec, spec->intmike_adc_nid, 0, AC_VERB_SET_AMP_GAIN_MUTE, newgain); // 0x02235027
 
         //snd_hda_codec_write(codec, 0x22, 0, AC_VERB_SET_AMP_GAIN_MUTE, 0x00005027); // 0x02235027
 //      snd_hda:     amp gain/mute 34 0x5027 mute 0 gain 0x27 39 index 0x00 left 0 right 1 output 0 input 1  right  input
@@ -289,50 +313,54 @@ static void cs_8409_intmike_volume_setup(struct hda_codec *codec, int volume)
         // mute
         // plausibly AppleHDAWidget::setWidgetAmplifierMute
 
-        retgain = snd_hda_codec_read_check(codec, 0x22, 0, AC_VERB_GET_AMP_GAIN_MUTE, 0x00002000, 0x00000027, 0); // 0x022b2000
+        //retgain = snd_hda_codec_read_check(codec, 0x22, 0, AC_VERB_GET_AMP_GAIN_MUTE, 0x00002000, 0x00000027, 0); // 0x022b2000
+        retgain = snd_hda_codec_read_check(codec, spec->intmike_adc_nid, 0, AC_VERB_GET_AMP_GAIN_MUTE, 0x00002000, 0x00000027, 0); // 0x022b2000
 //      snd_hda:     amp gain/mute 34 0x2000 index 0x00 left/right 1 left output/input 0 input
 //      snd_hda:     amp gain/mute 34 0x0027 mute 0 gain 0x27 39
 
         newgain = (retgain & 0x7f) | 0x80 | 0x6000;
 
-        snd_hda_codec_write(codec, 0x22, 0, AC_VERB_SET_AMP_GAIN_MUTE, newgain); // 0x022360a7
+        snd_hda_codec_write(codec, spec->intmike_adc_nid, 0, AC_VERB_SET_AMP_GAIN_MUTE, newgain); // 0x022360a7
 
         //snd_hda_codec_write(codec, 0x22, 0, AC_VERB_SET_AMP_GAIN_MUTE, 0x000060a7); // 0x022360a7
 //      snd_hda:     amp gain/mute 34 0x60a7 mute 1 gain 0x27 39 index 0x00 left 1 right 0 output 0 input 1 left   input
 
-        retgain = snd_hda_codec_read_check(codec, 0x22, 0, AC_VERB_GET_AMP_GAIN_MUTE, 0x00000000, 0x00000027, 0); // 0x022b0000
+        //retgain = snd_hda_codec_read_check(codec, 0x22, 0, AC_VERB_GET_AMP_GAIN_MUTE, 0x00000000, 0x00000027, 0); // 0x022b0000
+        retgain = snd_hda_codec_read_check(codec, spec->intmike_adc_nid, 0, AC_VERB_GET_AMP_GAIN_MUTE, 0x00000000, 0x00000027, 0); // 0x022b0000
 //      snd_hda:     amp gain/mute 34 0x0000 index 0x00 left/right 0 right output/input 0 input
 //      snd_hda:     amp gain/mute 34 0x0027 mute 0 gain 0x27 39
 
         newgain = (retgain & 0x7f) | 0x80 | 0x5000;
 
-        snd_hda_codec_write(codec, 0x22, 0, AC_VERB_SET_AMP_GAIN_MUTE, newgain); // 0x022350a7
+        snd_hda_codec_write(codec, spec->intmike_adc_nid, 0, AC_VERB_SET_AMP_GAIN_MUTE, newgain); // 0x022350a7
 
         //snd_hda_codec_write(codec, 0x22, 0, AC_VERB_SET_AMP_GAIN_MUTE, 0x000050a7); // 0x022350a7
 //      snd_hda:     amp gain/mute 34 0x50a7 mute 1 gain 0x27 39 index 0x00 left 0 right 1 output 0 input 1  right  input
 
 
-        // this is working on node 0x44
+        // this is working on node 0x44 macbook pro
         // plausibly AppleHDAWidget::setWidgetAmplifierGain
 
-        retgain = snd_hda_codec_read_check(codec, 0x44, 0, AC_VERB_GET_AMP_GAIN_MUTE, 0x00002000, 0x00000000, 0); // 0x044b2000
+        //retgain = snd_hda_codec_read_check(codec, 0x44, 0, AC_VERB_GET_AMP_GAIN_MUTE, 0x00002000, 0x00000000, 0); // 0x044b2000
+        retgain = snd_hda_codec_read_check(codec, spec->intmike_nid, 0, AC_VERB_GET_AMP_GAIN_MUTE, 0x00002000, 0x00000000, 0); // 0x044b2000
 //      snd_hda:     amp gain/mute 68 0x2000 index 0x00 left/right 1 left output/input 0 input
 //      snd_hda:     amp gain/mute 68 0x0000 mute 0 gain 0x0 0
 
         newgain = (retgain & 0x80) | (volume & 0x7f) | 0x6000;
 
-        snd_hda_codec_write(codec, 0x44, 0, AC_VERB_SET_AMP_GAIN_MUTE, newgain); // 0x04436000
+        snd_hda_codec_write(codec, spec->intmike_nid, 0, AC_VERB_SET_AMP_GAIN_MUTE, newgain); // 0x04436000
 
         //snd_hda_codec_write(codec, 0x44, 0, AC_VERB_SET_AMP_GAIN_MUTE, 0x00006000); // 0x04436000
 //      snd_hda:     amp gain/mute 68 0x6000 mute 0 gain 0x0 0 index 0x00 left 1 right 0 output 0 input 1 left   input
 
-        retgain = snd_hda_codec_read_check(codec, 0x44, 0, AC_VERB_GET_AMP_GAIN_MUTE, 0x00000000, 0x00000000, 0); // 0x044b0000
+        //retgain = snd_hda_codec_read_check(codec, 0x44, 0, AC_VERB_GET_AMP_GAIN_MUTE, 0x00000000, 0x00000000, 0); // 0x044b0000
+        retgain = snd_hda_codec_read_check(codec, spec->intmike_nid, 0, AC_VERB_GET_AMP_GAIN_MUTE, 0x00000000, 0x00000000, 0); // 0x044b0000
 //      snd_hda:     amp gain/mute 68 0x0000 index 0x00 left/right 0 right output/input 0 input
 //      snd_hda:     amp gain/mute 68 0x0000 mute 0 gain 0x0 0
 
         newgain = (retgain & 0x80) | (volume & 0x7f) | 0x5000;
 
-        snd_hda_codec_write(codec, 0x44, 0, AC_VERB_SET_AMP_GAIN_MUTE, newgain); // 0x04435000
+        snd_hda_codec_write(codec, spec->intmike_nid, 0, AC_VERB_SET_AMP_GAIN_MUTE, newgain); // 0x04435000
 
         //snd_hda_codec_write(codec, 0x44, 0, AC_VERB_SET_AMP_GAIN_MUTE, 0x00005000); // 0x04435000
 //      snd_hda:     amp gain/mute 68 0x5000 mute 0 gain 0x0 0 index 0x00 left 0 right 1 output 0 input 1  right  input
@@ -344,6 +372,8 @@ static void cs_8409_linein_volume_setup(struct hda_codec *codec, int volume)
         int retgain;
         int newgain;
 
+        struct cs_spec *spec = codec->spec;
+
         // so as far as I can see the 1st section sets the gain and the second section sets the mute
         // it appears we do masked updates 
 
@@ -351,24 +381,26 @@ static void cs_8409_linein_volume_setup(struct hda_codec *codec, int volume)
 
         // plausibly AppleHDAWidget::setWidgetAmplifierGain
 
-        retgain = snd_hda_codec_read_check(codec, 0x23, 0, AC_VERB_GET_AMP_GAIN_MUTE, 0x00002000, 0x000000b3, 0); // 0x023b2000
+        //retgain = snd_hda_codec_read_check(codec, 0x23, 0, AC_VERB_GET_AMP_GAIN_MUTE, 0x00002000, 0x000000b3, 0); // 0x023b2000
+        retgain = snd_hda_codec_read_check(codec, spec->linein_amp_nid, 0, AC_VERB_GET_AMP_GAIN_MUTE, 0x00002000, 0x000000b3, 0); // 0x023b2000
 //      snd_hda:     amp gain/mute 35 0x2000 index 0x00 left/right 1 left output/input 0 input
 //      snd_hda:     amp gain/mute 35 0x00b3 mute 1 gain 0x33 51
 
         newgain = (retgain & 0x80) | (volume & 0x7f) | 0x6000;
 
-        snd_hda_codec_write(codec, 0x23, 0, AC_VERB_SET_AMP_GAIN_MUTE, 0x000060a7); // 0x023360a7
+        snd_hda_codec_write(codec, spec->linein_amp_nid, 0, AC_VERB_SET_AMP_GAIN_MUTE, 0x000060a7); // 0x023360a7
 
         //snd_hda_codec_write(codec, 0x23, 0, AC_VERB_SET_AMP_GAIN_MUTE, 0x000060a7); // 0x023360a7
 //      snd_hda:     amp gain/mute 35 0x60a7 mute 1 gain 0x27 39 index 0x00 left 1 right 0 output 0 input 1 left   input
 
-        retgain = snd_hda_codec_read_check(codec, 0x23, 0, AC_VERB_GET_AMP_GAIN_MUTE, 0x00000000, 0x000000b3, 0); // 0x023b0000
+        //retgain = snd_hda_codec_read_check(codec, 0x23, 0, AC_VERB_GET_AMP_GAIN_MUTE, 0x00000000, 0x000000b3, 0); // 0x023b0000
+        retgain = snd_hda_codec_read_check(codec, spec->linein_amp_nid, 0, AC_VERB_GET_AMP_GAIN_MUTE, 0x00000000, 0x000000b3, 0); // 0x023b0000
 //      snd_hda:     amp gain/mute 35 0x0000 index 0x00 left/right 0 right output/input 0 input
 //      snd_hda:     amp gain/mute 35 0x00b3 mute 1 gain 0x33 51
 
         newgain = (retgain & 0x80) | (volume & 0x7f) | 0x5000;
 
-        snd_hda_codec_write(codec, 0x23, 0, AC_VERB_SET_AMP_GAIN_MUTE, newgain); // 0x023350a7
+        snd_hda_codec_write(codec, spec->linein_amp_nid, 0, AC_VERB_SET_AMP_GAIN_MUTE, newgain); // 0x023350a7
 
         //snd_hda_codec_write(codec, 0x23, 0, AC_VERB_SET_AMP_GAIN_MUTE, 0x000050a7); // 0x023350a7
 //      snd_hda:     amp gain/mute 35 0x50a7 mute 1 gain 0x27 39 index 0x00 left 0 right 1 output 0 input 1  right  input
@@ -376,44 +408,52 @@ static void cs_8409_linein_volume_setup(struct hda_codec *codec, int volume)
         // mute
         // plausibly AppleHDAWidget::setWidgetAmplifierMute
 
-        retgain = snd_hda_codec_read_check(codec, 0x23, 0, AC_VERB_GET_AMP_GAIN_MUTE, 0x00002000, 0x000000a7, 0); // 0x023b2000
+        //retgain = snd_hda_codec_read_check(codec, 0x23, 0, AC_VERB_GET_AMP_GAIN_MUTE, 0x00002000, 0x000000a7, 0); // 0x023b2000
+        retgain = snd_hda_codec_read_check(codec, spec->linein_amp_nid, 0, AC_VERB_GET_AMP_GAIN_MUTE, 0x00002000, 0x000000a7, 0); // 0x023b2000
 //      snd_hda:     amp gain/mute 35 0x2000 index 0x00 left/right 1 left output/input 0 input
 //      snd_hda:     amp gain/mute 35 0x00a7 mute 1 gain 0x27 39
 
         newgain = (retgain & 0x7f) | 0x80 | 0x6000;
 
-        snd_hda_codec_write(codec, 0x23, 0, AC_VERB_SET_AMP_GAIN_MUTE, newgain); // 0x023360a7
+        snd_hda_codec_write(codec, spec->linein_amp_nid, 0, AC_VERB_SET_AMP_GAIN_MUTE, newgain); // 0x023360a7
 
         //snd_hda_codec_write(codec, 0x23, 0, AC_VERB_SET_AMP_GAIN_MUTE, 0x000060a7); // 0x023360a7
 //      snd_hda:     amp gain/mute 35 0x60a7 mute 1 gain 0x27 39 index 0x00 left 1 right 0 output 0 input 1 left   input
 
-        retgain = snd_hda_codec_read_check(codec, 0x23, 0, AC_VERB_GET_AMP_GAIN_MUTE, 0x00000000, 0x000000a7, 0); // 0x023b0000
+        //retgain = snd_hda_codec_read_check(codec, 0x23, 0, AC_VERB_GET_AMP_GAIN_MUTE, 0x00000000, 0x000000a7, 0); // 0x023b0000
+        retgain = snd_hda_codec_read_check(codec, spec->linein_amp_nid, 0, AC_VERB_GET_AMP_GAIN_MUTE, 0x00000000, 0x000000a7, 0); // 0x023b0000
 //      snd_hda:     amp gain/mute 35 0x0000 index 0x00 left/right 0 right output/input 0 input
 //      snd_hda:     amp gain/mute 35 0x00a7 mute 1 gain 0x27 39
 
         newgain = (retgain & 0x7f) | 0x80 | 0x5000;
 
-        snd_hda_codec_write(codec, 0x23, 0, AC_VERB_SET_AMP_GAIN_MUTE, newgain); // 0x023350a7
+        snd_hda_codec_write(codec, spec->linein_amp_nid, 0, AC_VERB_SET_AMP_GAIN_MUTE, newgain); // 0x023350a7
 
         //snd_hda_codec_write(codec, 0x23, 0, AC_VERB_SET_AMP_GAIN_MUTE, 0x000050a7); // 0x023350a7
 //      snd_hda:     amp gain/mute 35 0x50a7 mute 1 gain 0x27 39 index 0x00 left 0 right 1 output 0 input 1  right  input
 
-        // this is working on node 0x45
+        // this is working on node 0x45 macbook pro
 
         // plausibly AppleHDAWidget::setWidgetAmplifierGain
 
-        retgain = snd_hda_codec_read_check(codec, 0x45, 0, AC_VERB_GET_AMP_GAIN_MUTE, 0x00002000, 0x00000000, 0); // 0x045b2000
+        //retgain = snd_hda_codec_read_check(codec, 0x45, 0, AC_VERB_GET_AMP_GAIN_MUTE, 0x00002000, 0x00000000, 0); // 0x045b2000
+        retgain = snd_hda_codec_read_check(codec, spec->linein_nid, 0, AC_VERB_GET_AMP_GAIN_MUTE, 0x00002000, 0x00000000, 0); // 0x045b2000
 //      snd_hda:     amp gain/mute 69 0x2000 index 0x00 left/right 1 left output/input 0 input
 //      snd_hda:     amp gain/mute 69 0x0000 mute 0 gain 0x0 0
 
-        snd_hda_codec_write(codec, 0x45, 0, AC_VERB_SET_AMP_GAIN_MUTE, 0x00006000); // 0x04536000
+        snd_hda_codec_write(codec, spec->linein_nid, 0, AC_VERB_SET_AMP_GAIN_MUTE, 0x00006000); // 0x04536000
+
+        //snd_hda_codec_write(codec, 0x45, 0, AC_VERB_SET_AMP_GAIN_MUTE, 0x00006000); // 0x04536000
 //      snd_hda:     amp gain/mute 69 0x6000 mute 0 gain 0x0 0 index 0x00 left 1 right 0 output 0 input 1 left   input
 
-        retgain = snd_hda_codec_read_check(codec, 0x45, 0, AC_VERB_GET_AMP_GAIN_MUTE, 0x00000000, 0x00000000, 0); // 0x045b0000
+        //retgain = snd_hda_codec_read_check(codec, 0x45, 0, AC_VERB_GET_AMP_GAIN_MUTE, 0x00000000, 0x00000000, 0); // 0x045b0000
+        retgain = snd_hda_codec_read_check(codec, spec->linein_nid, 0, AC_VERB_GET_AMP_GAIN_MUTE, 0x00000000, 0x00000000, 0); // 0x045b0000
 //      snd_hda:     amp gain/mute 69 0x0000 index 0x00 left/right 0 right output/input 0 input
 //      snd_hda:     amp gain/mute 69 0x0000 mute 0 gain 0x0 0
 
-        snd_hda_codec_write(codec, 0x45, 0, AC_VERB_SET_AMP_GAIN_MUTE, 0x00005000); // 0x04535000
+        snd_hda_codec_write(codec, spec->linein_nid, 0, AC_VERB_SET_AMP_GAIN_MUTE, 0x00005000); // 0x04535000
+
+        //snd_hda_codec_write(codec, 0x45, 0, AC_VERB_SET_AMP_GAIN_MUTE, 0x00005000); // 0x04535000
 //      snd_hda:     amp gain/mute 69 0x5000 mute 0 gain 0x0 0 index 0x00 left 0 right 1 output 0 input 1  right  input
 
 }
@@ -425,6 +465,8 @@ static void cs_8409_intmike_stream_on_nid(struct hda_codec *codec)
         int reg_coef82 = 0;
         int new_coef82 = 0;
 
+        struct cs_spec *spec = codec->spec;
+
         reg_coef82 = snd_hda_coef_item_check(codec, 0, CS8409_VENDOR_NID, 0x0082, 0x0000, 0x00005400, 0 ); //   coef read 10544
 
         new_coef82 = (reg_coef82 | 0x1);
@@ -433,9 +475,12 @@ static void cs_8409_intmike_stream_on_nid(struct hda_codec *codec)
         //snd_hda_coef_item(codec, 1, CS8409_VENDOR_NID, 0x0082, 0x5401, 0x00000000, 10548 ); //   coef write 10548
         snd_hda_coef_item(codec, 1, CS8409_VENDOR_NID, 0x0082, new_coef82, 0x00000000, 0 ); //   coef write 10548
 
-        retval = snd_hda_codec_read_check(codec, 0x44, 0, AC_VERB_GET_PIN_WIDGET_CONTROL, 0x00000000, 0x00000000, 0); // 0x044f0700
+        //retval = snd_hda_codec_read_check(codec, 0x44, 0, AC_VERB_GET_PIN_WIDGET_CONTROL, 0x00000000, 0x00000000, 0); // 0x044f0700
+        retval = snd_hda_codec_read_check(codec, spec->intmike_nid, 0, AC_VERB_GET_PIN_WIDGET_CONTROL, 0x00000000, 0x00000000, 0); // 0x044f0700
 
-        snd_hda_codec_write(codec, 0x44, 0, AC_VERB_SET_PIN_WIDGET_CONTROL, 0x00000020); // 0x04470720
+        snd_hda_codec_write(codec, spec->intmike_nid, 0, AC_VERB_SET_PIN_WIDGET_CONTROL, 0x00000020); // 0x04470720
+
+        //snd_hda_codec_write(codec, 0x44, 0, AC_VERB_SET_PIN_WIDGET_CONTROL, 0x00000020); // 0x04470720
 //      snd_hda:     68 ['AC_PINCTL_IN_EN']
 
         //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_POWER_STATE, 0x00000003); // 0x00170503
@@ -450,6 +495,8 @@ static void cs_8409_intmike_format_setup_disable(struct hda_codec *codec)
 	int reg_coef82 = 0;
         int new_coef82 = 0;
 
+        struct cs_spec *spec = codec->spec;
+
 
         // set to defaults and disable input
         // note here we really reset to 0 format in addition to stream id 0/channel id 0
@@ -462,16 +509,20 @@ static void cs_8409_intmike_format_setup_disable(struct hda_codec *codec)
         //retval = snd_hda_codec_read_check(codec, 0x22, 0, AC_VERB_GET_POWER_STATE, 0x00000000, 0x00000033, 12217); // 0x022f0500
         //snd_hda_codec_write(codec, 0x22, 0, AC_VERB_SET_POWER_STATE, 0x00000000); // 0x02270500
         //retval = snd_hda_codec_read_check(codec, 0x22, 0, AC_VERB_GET_POWER_STATE, 0x00000000, 0x00000030, 12220); // 0x022f0500
-        hda_set_node_power_state(codec, 0x22, AC_PWRST_D0);
+        hda_set_node_power_state(codec, spec->intmike_adc_nid, AC_PWRST_D0);
 
-        snd_hda_codec_write(codec, 0x22, 0, AC_VERB_SET_CHANNEL_STREAMID, 0x00000000); // 0x02270600
+        snd_hda_codec_write(codec, spec->intmike_adc_nid, 0, AC_VERB_SET_CHANNEL_STREAMID, 0x00000000); // 0x02270600
+
+        //snd_hda_codec_write(codec, 0x22, 0, AC_VERB_SET_CHANNEL_STREAMID, 0x00000000); // 0x02270600
 //      snd_hda:     conv stream channel map 34 [('CHAN', 0), ('STREAMID', 0)]
 
         //snd_hda_codec_write(codec, 0x22, 0, AC_VERB_SET_POWER_STATE, 0x00000003); // 0x02270503
         //retval = snd_hda_codec_read_check(codec, 0x22, 0, AC_VERB_GET_POWER_STATE, 0x00000000, 0x00000033, 12223); // 0x022f0500
-        hda_set_node_power_state(codec, 0x22, AC_PWRST_D3);
+        hda_set_node_power_state(codec, spec->intmike_adc_nid, AC_PWRST_D3);
 
-        snd_hda_codec_write(codec, 0x22, 0, AC_VERB_SET_STREAM_FORMAT, 0x00000000); // 0x02220000
+        snd_hda_codec_write(codec, spec->intmike_adc_nid, 0, AC_VERB_SET_STREAM_FORMAT, 0x00000000); // 0x02220000
+
+        //snd_hda_codec_write(codec, 0x22, 0, AC_VERB_SET_STREAM_FORMAT, 0x00000000); // 0x02220000
 //      snd_hda:     stream format 34 [('CHAN', 1), ('RATE', 48000), ('BITS', 8), ('RATE_MUL', 1), ('RATE_DIV', 1)]
 
 
@@ -484,9 +535,12 @@ static void cs_8409_intmike_format_setup_disable(struct hda_codec *codec)
         //snd_hda_coef_item(codec, 1, CS8409_VENDOR_NID, 0x0082, 0xa800, 0x00000000, 12230 ); //   coef write 12230
         snd_hda_coef_item(codec, 1, CS8409_VENDOR_NID, 0x0082, new_coef82, 0x00000000, 0 ); //   coef write 12230
 
-        retval = snd_hda_codec_read_check(codec, 0x44, 0, AC_VERB_GET_PIN_WIDGET_CONTROL, 0x00000000, 0x00000020, 0); // 0x044f0700
+        //retval = snd_hda_codec_read_check(codec, 0x44, 0, AC_VERB_GET_PIN_WIDGET_CONTROL, 0x00000000, 0x00000020, 0); // 0x044f0700
+        retval = snd_hda_codec_read_check(codec, spec->intmike_nid, 0, AC_VERB_GET_PIN_WIDGET_CONTROL, 0x00000000, 0x00000020, 0); // 0x044f0700
 
-        snd_hda_codec_write(codec, 0x44, 0, AC_VERB_SET_PIN_WIDGET_CONTROL, 0x00000000); // 0x04470700
+        snd_hda_codec_write(codec, spec->intmike_nid, 0, AC_VERB_SET_PIN_WIDGET_CONTROL, 0x00000000); // 0x04470700
+
+        //snd_hda_codec_write(codec, 0x44, 0, AC_VERB_SET_PIN_WIDGET_CONTROL, 0x00000000); // 0x04470700
 //      snd_hda:     68 []
 
 }
@@ -498,7 +552,9 @@ static void cs_8409_linein_format_setup_disable(struct hda_codec *codec)
         int reg_coef82 = 0;
         int new_coef82 = 0;
 
-        // 0x45 -> 0x23 is line input
+        struct cs_spec *spec = codec->spec;
+
+        // 0x45 -> 0x23 is line input (macbook pro)
 
 
         // set to defaults and disable input
@@ -512,16 +568,20 @@ static void cs_8409_linein_format_setup_disable(struct hda_codec *codec)
         //retval = snd_hda_codec_read_check(codec, 0x23, 0, AC_VERB_GET_POWER_STATE, 0x00000000, 0x00000033, 12248); // 0x023f0500
         //snd_hda_codec_write(codec, 0x23, 0, AC_VERB_SET_POWER_STATE, 0x00000000); // 0x02370500
         //retval = snd_hda_codec_read_check(codec, 0x23, 0, AC_VERB_GET_POWER_STATE, 0x00000000, 0x00000030, 12251); // 0x023f0500
-        hda_set_node_power_state(codec, 0x23, AC_PWRST_D0);
+        hda_set_node_power_state(codec, spec->linein_amp_nid, AC_PWRST_D0);
 
-        snd_hda_codec_write(codec, 0x23, 0, AC_VERB_SET_CHANNEL_STREAMID, 0x00000000); // 0x02370600
+        snd_hda_codec_write(codec, spec->linein_amp_nid, 0, AC_VERB_SET_CHANNEL_STREAMID, 0x00000000); // 0x02370600
+
+        //snd_hda_codec_write(codec, 0x23, 0, AC_VERB_SET_CHANNEL_STREAMID, 0x00000000); // 0x02370600
 //      snd_hda:     conv stream channel map 35 [('CHAN', 0), ('STREAMID', 0)]
 
         //snd_hda_codec_write(codec, 0x23, 0, AC_VERB_SET_POWER_STATE, 0x00000003); // 0x02370503
         //retval = snd_hda_codec_read_check(codec, 0x23, 0, AC_VERB_GET_POWER_STATE, 0x00000000, 0x00000033, 12254); // 0x023f0500
-        hda_set_node_power_state(codec, 0x23, AC_PWRST_D3);
+        hda_set_node_power_state(codec, spec->linein_amp_nid, AC_PWRST_D3);
 
-        snd_hda_codec_write(codec, 0x23, 0, AC_VERB_SET_STREAM_FORMAT, 0x00000000); // 0x02320000
+        snd_hda_codec_write(codec, spec->linein_amp_nid, 0, AC_VERB_SET_STREAM_FORMAT, 0x00000000); // 0x02320000
+
+        //snd_hda_codec_write(codec, 0x23, 0, AC_VERB_SET_STREAM_FORMAT, 0x00000000); // 0x02320000
 //      snd_hda:     stream format 35 [('CHAN', 1), ('RATE', 48000), ('BITS', 8), ('RATE_MUL', 1), ('RATE_DIV', 1)]
 
 
@@ -533,9 +593,12 @@ static void cs_8409_linein_format_setup_disable(struct hda_codec *codec)
         //snd_hda_coef_item(codec, 1, CS8409_VENDOR_NID, 0x0082, 0xa800, 0x00000000, 12261 ); //   coef write 12261
         snd_hda_coef_item(codec, 1, CS8409_VENDOR_NID, 0x0082, new_coef82, 0x00000000, 0 ); //   coef write 12261
 
-        retval = snd_hda_codec_read_check(codec, 0x45, 0, AC_VERB_GET_PIN_WIDGET_CONTROL, 0x00000000, 0x00000000, 0); // 0x045f0700
+        //retval = snd_hda_codec_read_check(codec, 0x45, 0, AC_VERB_GET_PIN_WIDGET_CONTROL, 0x00000000, 0x00000000, 0); // 0x045f0700
+        retval = snd_hda_codec_read_check(codec, spec->linein_nid, 0, AC_VERB_GET_PIN_WIDGET_CONTROL, 0x00000000, 0x00000000, 0); // 0x045f0700
 
-        snd_hda_codec_write(codec, 0x45, 0, AC_VERB_SET_PIN_WIDGET_CONTROL, 0x00000000); // 0x04570700
+        snd_hda_codec_write(codec, spec->linein_nid, 0, AC_VERB_SET_PIN_WIDGET_CONTROL, 0x00000000); // 0x04570700
+
+        //snd_hda_codec_write(codec, 0x45, 0, AC_VERB_SET_PIN_WIDGET_CONTROL, 0x00000000); // 0x04570700
 //      snd_hda:     69 []
 
 }
@@ -545,24 +608,30 @@ static void cs_8409_intmike_stream_conn_off(struct hda_codec *codec)
 {
         int retval;
 
+        struct cs_spec *spec = codec->spec;
+
         snd_hda_codec_write(codec, CS8409_VENDOR_NID, 0, AC_VERB_SET_PROC_STATE, 0x00000001); // 0x04770301
 
-        // 0x44 -> 0x22 is internal (I think) mike input
+        // 0x44 -> 0x22 is internal (I think) mike input (macbook pro)
 
-        retval = snd_hda_codec_read_check(codec, 0x22, 0, AC_VERB_GET_CONV, 0x00000000, 0x00000000, 0); // 0x022f0600
+        retval = snd_hda_codec_read_check(codec, spec->intmike_adc_nid, 0, AC_VERB_GET_CONV, 0x00000000, 0x00000000, 0); // 0x022f0600
+
+        //retval = snd_hda_codec_read_check(codec, 0x22, 0, AC_VERB_GET_CONV, 0x00000000, 0x00000000, 0); // 0x022f0600
 //      snd_hda:     conv stream channel map 34 [('CHAN', 0), ('STREAMID', 0)]
 
         //retval = snd_hda_codec_read_check(codec, 0x22, 0, AC_VERB_GET_POWER_STATE, 0x00000000, 0x00000033, 12160); // 0x022f0500
         //snd_hda_codec_write(codec, 0x22, 0, AC_VERB_SET_POWER_STATE, 0x00000000); // 0x02270500
         //retval = snd_hda_codec_read_check(codec, 0x22, 0, AC_VERB_GET_POWER_STATE, 0x00000000, 0x00000030, 12163); // 0x022f0500
-        hda_set_node_power_state(codec, 0x22, AC_PWRST_D0);
+        hda_set_node_power_state(codec, spec->intmike_adc_nid, AC_PWRST_D0);
 
-        snd_hda_codec_write(codec, 0x22, 0, AC_VERB_SET_CHANNEL_STREAMID, 0x00000000); // 0x02270600
+        snd_hda_codec_write(codec, spec->intmike_adc_nid, 0, AC_VERB_SET_CHANNEL_STREAMID, 0x00000000); // 0x02270600
+
+        //snd_hda_codec_write(codec, 0x22, 0, AC_VERB_SET_CHANNEL_STREAMID, 0x00000000); // 0x02270600
 //      snd_hda:     conv stream channel map 34 [('CHAN', 0), ('STREAMID', 0)]
 
         //snd_hda_codec_write(codec, 0x22, 0, AC_VERB_SET_POWER_STATE, 0x00000003); // 0x02270503
         //retval = snd_hda_codec_read_check(codec, 0x22, 0, AC_VERB_GET_POWER_STATE, 0x00000000, 0x00000033, 12166); // 0x022f0500
-        hda_set_node_power_state(codec, 0x22, AC_PWRST_D3);
+        hda_set_node_power_state(codec, spec->intmike_adc_nid, AC_PWRST_D3);
 
         // this seems to be updating the coef index associated with setConnectionSelect
         // unable to figure where this is coming from currently
@@ -575,24 +644,30 @@ static void cs_8409_linein_stream_conn_off(struct hda_codec *codec)
 {
         int retval;
 
+        struct cs_spec *spec = codec->spec;
+
         // Im thinking of a bugfix here to turn off bit 0x80 of index 0x0009
 
-        // 0x45 -> 0x23 is line input
+        // 0x45 -> 0x23 is line input (macbook pro)
 
-        retval = snd_hda_codec_read_check(codec, 0x23, 0, AC_VERB_GET_CONV, 0x00000000, 0x00000000, 0); // 0x023f0600
+        retval = snd_hda_codec_read_check(codec, spec->linein_amp_nid, 0, AC_VERB_GET_CONV, 0x00000000, 0x00000000, 0); // 0x023f0600
+
+        //retval = snd_hda_codec_read_check(codec, 0x23, 0, AC_VERB_GET_CONV, 0x00000000, 0x00000000, 0); // 0x023f0600
 //      snd_hda:     conv stream channel map 35 [('CHAN', 0), ('STREAMID', 0)]
 
         //retval = snd_hda_codec_read_check(codec, 0x23, 0, AC_VERB_GET_POWER_STATE, 0x00000000, 0x00000033, 12175); // 0x023f0500
         //snd_hda_codec_write(codec, 0x23, 0, AC_VERB_SET_POWER_STATE, 0x00000000); // 0x02370500
         //retval = snd_hda_codec_read_check(codec, 0x23, 0, AC_VERB_GET_POWER_STATE, 0x00000000, 0x00000030, 12178); // 0x023f0500
-        hda_set_node_power_state(codec, 0x23, AC_PWRST_D0);
+        hda_set_node_power_state(codec, spec->linein_amp_nid, AC_PWRST_D0);
 
-        snd_hda_codec_write(codec, 0x23, 0, AC_VERB_SET_CHANNEL_STREAMID, 0x00000000); // 0x02370600
+        snd_hda_codec_write(codec, spec->linein_amp_nid, 0, AC_VERB_SET_CHANNEL_STREAMID, 0x00000000); // 0x02370600
+
+        //snd_hda_codec_write(codec, 0x23, 0, AC_VERB_SET_CHANNEL_STREAMID, 0x00000000); // 0x02370600
 //      snd_hda:     conv stream channel map 35 [('CHAN', 0), ('STREAMID', 0)]
 
         //snd_hda_codec_write(codec, 0x23, 0, AC_VERB_SET_POWER_STATE, 0x00000003); // 0x02370503
         //retval = snd_hda_codec_read_check(codec, 0x23, 0, AC_VERB_GET_POWER_STATE, 0x00000000, 0x00000033, 12181); // 0x023f0500
-        hda_set_node_power_state(codec, 0x23, AC_PWRST_D3);
+        hda_set_node_power_state(codec, spec->linein_amp_nid, AC_PWRST_D3);
 
         // this seems to be updating the coef index associated with setConnectionSelect
         // unable to figure where this is coming from currently
@@ -607,17 +682,21 @@ static void cs_8409_intmike_stream_off_nid(struct hda_codec *codec)
 {
         int retval;
 
+        struct cs_spec *spec = codec->spec;
+
         //retval = snd_hda_codec_read_check(codec, 0x22, 0, AC_VERB_GET_POWER_STATE, 0x00000000, 0x00000033, 12189); // 0x022f0500
         //snd_hda_codec_write(codec, 0x22, 0, AC_VERB_SET_POWER_STATE, 0x00000000); // 0x02270500
         //retval = snd_hda_codec_read_check(codec, 0x22, 0, AC_VERB_GET_POWER_STATE, 0x00000000, 0x00000030, 12192); // 0x022f0500
-        hda_set_node_power_state(codec, 0x22, AC_PWRST_D0);
+        hda_set_node_power_state(codec, spec->intmike_adc_nid, AC_PWRST_D0);
 
-        snd_hda_codec_write(codec, 0x22, 0, AC_VERB_SET_CHANNEL_STREAMID, 0x00000000); // 0x02270600
+        snd_hda_codec_write(codec, spec->intmike_adc_nid, 0, AC_VERB_SET_CHANNEL_STREAMID, 0x00000000); // 0x02270600
+
+        //snd_hda_codec_write(codec, 0x22, 0, AC_VERB_SET_CHANNEL_STREAMID, 0x00000000); // 0x02270600
 //      snd_hda:     conv stream channel map 34 [('CHAN', 0), ('STREAMID', 0)]
 
         //snd_hda_codec_write(codec, 0x22, 0, AC_VERB_SET_POWER_STATE, 0x00000003); // 0x02270503
         //retval = snd_hda_codec_read_check(codec, 0x22, 0, AC_VERB_GET_POWER_STATE, 0x00000000, 0x00000033, 12195); // 0x022f0500
-        hda_set_node_power_state(codec, 0x22, AC_PWRST_D3);
+        hda_set_node_power_state(codec, spec->intmike_adc_nid, AC_PWRST_D3);
 
 }
 
@@ -625,17 +704,21 @@ static void cs_8409_linein_stream_off_nid(struct hda_codec *codec)
 {
         int retval;
 
+        struct cs_spec *spec = codec->spec;
+
         //retval = snd_hda_codec_read_check(codec, 0x23, 0, AC_VERB_GET_POWER_STATE, 0x00000000, 0x00000033, 12197); // 0x023f0500
         //snd_hda_codec_write(codec, 0x23, 0, AC_VERB_SET_POWER_STATE, 0x00000000); // 0x02370500
         //retval = snd_hda_codec_read_check(codec, 0x23, 0, AC_VERB_GET_POWER_STATE, 0x00000000, 0x00000030, 12200); // 0x023f0500
-        hda_set_node_power_state(codec, 0x23, AC_PWRST_D0);
+        hda_set_node_power_state(codec, spec->linein_amp_nid, AC_PWRST_D0);
 
-        snd_hda_codec_write(codec, 0x23, 0, AC_VERB_SET_CHANNEL_STREAMID, 0x00000000); // 0x02370600
+        snd_hda_codec_write(codec, spec->linein_amp_nid, 0, AC_VERB_SET_CHANNEL_STREAMID, 0x00000000); // 0x02370600
+
+        //snd_hda_codec_write(codec, 0x23, 0, AC_VERB_SET_CHANNEL_STREAMID, 0x00000000); // 0x02370600
 //      snd_hda:     conv stream channel map 35 [('CHAN', 0), ('STREAMID', 0)]
 
         //snd_hda_codec_write(codec, 0x23, 0, AC_VERB_SET_POWER_STATE, 0x00000003); // 0x02370503
         //retval = snd_hda_codec_read_check(codec, 0x23, 0, AC_VERB_GET_POWER_STATE, 0x00000000, 0x00000033, 12203); // 0x023f0500
-        hda_set_node_power_state(codec, 0x23, AC_PWRST_D3);
+        hda_set_node_power_state(codec, spec->linein_amp_nid, AC_PWRST_D3);
 
 }
 
@@ -644,20 +727,26 @@ static void cs_8409_intmike_volume_mute_nouse(struct hda_codec *codec)
 {
         int retval;
 
-        // nodes 0x44 is connected to 0x22 which is labelled mic input
+        struct cs_spec *spec = codec->spec;
+
+        // nodes 0x44 is connected to 0x22 which is labelled mic input (macbook pro)
 
         //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_POWER_STATE, 0x00000000); // 0x00170500
         //hda_set_node_power_state(codec, codec->core.afg, AC_PWRST_D0);
 
-        retval = snd_hda_codec_read_check(codec, 0x22, 0, AC_VERB_GET_AMP_GAIN_MUTE, 0x00002000, 0x000000a7, 0); // 0x022b2000
+        retval = snd_hda_codec_read_check(codec, spec->intmike_adc_nid, 0, AC_VERB_GET_AMP_GAIN_MUTE, 0x00002000, 0x000000a7, 0); // 0x022b2000
+        //retval = snd_hda_codec_read_check(codec, 0x22, 0, AC_VERB_GET_AMP_GAIN_MUTE, 0x00002000, 0x000000a7, 0); // 0x022b2000
 //      snd_hda:     amp gain/mute 34 0x2000 index 0x00 left/right 1 left output/input 0 input
 //      snd_hda:     amp gain/mute 34 0x00a7 mute 1 gain 0x27 39
-        snd_hda_codec_write(codec, 0x22, 0, AC_VERB_SET_AMP_GAIN_MUTE, 0x000060b3); // 0x022360b3
+        snd_hda_codec_write(codec, spec->intmike_adc_nid, 0, AC_VERB_SET_AMP_GAIN_MUTE, 0x000060b3); // 0x022360b3
+        //snd_hda_codec_write(codec, 0x22, 0, AC_VERB_SET_AMP_GAIN_MUTE, 0x000060b3); // 0x022360b3
 //      snd_hda:     amp gain/mute 34 0x60b3 mute 1 gain 0x33 51 index 0x00 left 1 right 0 output 0 input 1 left   input
-        retval = snd_hda_codec_read_check(codec, 0x22, 0, AC_VERB_GET_AMP_GAIN_MUTE, 0x00000000, 0x000000a7, 0); // 0x022b0000
+        retval = snd_hda_codec_read_check(codec, spec->intmike_adc_nid, 0, AC_VERB_GET_AMP_GAIN_MUTE, 0x00000000, 0x000000a7, 0); // 0x022b0000
+        //retval = snd_hda_codec_read_check(codec, 0x22, 0, AC_VERB_GET_AMP_GAIN_MUTE, 0x00000000, 0x000000a7, 0); // 0x022b0000
 //      snd_hda:     amp gain/mute 34 0x0000 index 0x00 left/right 0 right output/input 0 input
 //      snd_hda:     amp gain/mute 34 0x00a7 mute 1 gain 0x27 39
-        snd_hda_codec_write(codec, 0x22, 0, AC_VERB_SET_AMP_GAIN_MUTE, 0x000050b3); // 0x022350b3
+        snd_hda_codec_write(codec, spec->intmike_adc_nid, 0, AC_VERB_SET_AMP_GAIN_MUTE, 0x000050b3); // 0x022350b3
+        //snd_hda_codec_write(codec, 0x22, 0, AC_VERB_SET_AMP_GAIN_MUTE, 0x000050b3); // 0x022350b3
 //      snd_hda:     amp gain/mute 34 0x50b3 mute 1 gain 0x33 51 index 0x00 left 0 right 1 output 0 input 1  right  input
 
 }
@@ -666,17 +755,23 @@ static void cs_8409_linein_volume_mute_nouse(struct hda_codec *codec)
 {
         int retval;
 
-        // nodes 0x45 which are connected to 0x23 is labelled as line input
+        struct cs_spec *spec = codec->spec;
 
-        retval = snd_hda_codec_read_check(codec, 0x23, 0, AC_VERB_GET_AMP_GAIN_MUTE, 0x00002000, 0x000000a7, 0); // 0x023b2000
+        // nodes 0x45 which are connected to 0x23 is labelled as line input (macbook pro)
+
+        retval = snd_hda_codec_read_check(codec, spec->linein_amp_nid, 0, AC_VERB_GET_AMP_GAIN_MUTE, 0x00002000, 0x000000a7, 0); // 0x023b2000
+        //retval = snd_hda_codec_read_check(codec, 0x23, 0, AC_VERB_GET_AMP_GAIN_MUTE, 0x00002000, 0x000000a7, 0); // 0x023b2000
 //      snd_hda:     amp gain/mute 35 0x2000 index 0x00 left/right 1 left output/input 0 input
 //      snd_hda:     amp gain/mute 35 0x00a7 mute 1 gain 0x27 39
-        snd_hda_codec_write(codec, 0x23, 0, AC_VERB_SET_AMP_GAIN_MUTE, 0x000060b3); // 0x023360b3
+        snd_hda_codec_write(codec, spec->linein_amp_nid, 0, AC_VERB_SET_AMP_GAIN_MUTE, 0x000060b3); // 0x023360b3
+        //snd_hda_codec_write(codec, 0x23, 0, AC_VERB_SET_AMP_GAIN_MUTE, 0x000060b3); // 0x023360b3
 //      snd_hda:     amp gain/mute 35 0x60b3 mute 1 gain 0x33 51 index 0x00 left 1 right 0 output 0 input 1 left   input
-        retval = snd_hda_codec_read_check(codec, 0x23, 0, AC_VERB_GET_AMP_GAIN_MUTE, 0x00000000, 0x000000a7, 0); // 0x023b0000
+        retval = snd_hda_codec_read_check(codec, spec->linein_amp_nid, 0, AC_VERB_GET_AMP_GAIN_MUTE, 0x00000000, 0x000000a7, 0); // 0x023b0000
+        //retval = snd_hda_codec_read_check(codec, 0x23, 0, AC_VERB_GET_AMP_GAIN_MUTE, 0x00000000, 0x000000a7, 0); // 0x023b0000
 //      snd_hda:     amp gain/mute 35 0x0000 index 0x00 left/right 0 right output/input 0 input
 //      snd_hda:     amp gain/mute 35 0x00a7 mute 1 gain 0x27 39
-        snd_hda_codec_write(codec, 0x23, 0, AC_VERB_SET_AMP_GAIN_MUTE, 0x000050b3); // 0x023350b3
+        snd_hda_codec_write(codec, spec->linein_amp_nid, 0, AC_VERB_SET_AMP_GAIN_MUTE, 0x000050b3); // 0x023350b3
+        //snd_hda_codec_write(codec, 0x23, 0, AC_VERB_SET_AMP_GAIN_MUTE, 0x000050b3); // 0x023350b3
 //      snd_hda:     amp gain/mute 35 0x50b3 mute 1 gain 0x33 51 index 0x00 left 0 right 1 output 0 input 1  right  input
 
 }
@@ -685,17 +780,23 @@ static void cs_8409_intmike_volume_unmute_nouse(struct hda_codec *codec)
 {
         int retval;
 
-        // nodes 0x44 is connected to 0x22 which is labelled mic input
+        struct cs_spec *spec = codec->spec;
 
-        retval = snd_hda_codec_read_check(codec, 0x22, 0, AC_VERB_GET_AMP_GAIN_MUTE, 0x00002000, 0x000000b3, 0); // 0x022b2000
+        // nodes 0x44 is connected to 0x22 which is labelled mic input (macbook pro)
+
+        retval = snd_hda_codec_read_check(codec, spec->intmike_adc_nid, 0, AC_VERB_GET_AMP_GAIN_MUTE, 0x00002000, 0x000000b3, 0); // 0x022b2000
+        //retval = snd_hda_codec_read_check(codec, 0x22, 0, AC_VERB_GET_AMP_GAIN_MUTE, 0x00002000, 0x000000b3, 0); // 0x022b2000
 //      snd_hda:     amp gain/mute 34 0x2000 index 0x00 left/right 1 left output/input 0 input
 //      snd_hda:     amp gain/mute 34 0x00b3 mute 1 gain 0x33 51
-        snd_hda_codec_write(codec, 0x22, 0, AC_VERB_SET_AMP_GAIN_MUTE, 0x00006033); // 0x02236033
+        snd_hda_codec_write(codec, spec->intmike_adc_nid, 0, AC_VERB_SET_AMP_GAIN_MUTE, 0x00006033); // 0x02236033
+        //snd_hda_codec_write(codec, 0x22, 0, AC_VERB_SET_AMP_GAIN_MUTE, 0x00006033); // 0x02236033
 //      snd_hda:     amp gain/mute 34 0x6033 mute 0 gain 0x33 51 index 0x00 left 1 right 0 output 0 input 1 left   input
-        retval = snd_hda_codec_read_check(codec, 0x22, 0, AC_VERB_GET_AMP_GAIN_MUTE, 0x00000000, 0x000000b3, 0); // 0x022b0000
+        retval = snd_hda_codec_read_check(codec, spec->intmike_adc_nid, 0, AC_VERB_GET_AMP_GAIN_MUTE, 0x00000000, 0x000000b3, 0); // 0x022b0000
+        //retval = snd_hda_codec_read_check(codec, 0x22, 0, AC_VERB_GET_AMP_GAIN_MUTE, 0x00000000, 0x000000b3, 0); // 0x022b0000
 //      snd_hda:     amp gain/mute 34 0x0000 index 0x00 left/right 0 right output/input 0 input
 //      snd_hda:     amp gain/mute 34 0x00b3 mute 1 gain 0x33 51
-        snd_hda_codec_write(codec, 0x22, 0, AC_VERB_SET_AMP_GAIN_MUTE, 0x00005033); // 0x02235033
+        snd_hda_codec_write(codec, spec->intmike_adc_nid, 0, AC_VERB_SET_AMP_GAIN_MUTE, 0x00005033); // 0x02235033
+        //snd_hda_codec_write(codec, 0x22, 0, AC_VERB_SET_AMP_GAIN_MUTE, 0x00005033); // 0x02235033
 //      snd_hda:     amp gain/mute 34 0x5033 mute 0 gain 0x33 51 index 0x00 left 0 right 1 output 0 input 1  right  input
 
 }
@@ -704,17 +805,23 @@ static void cs_8409_linein_volume_unmute_nouse(struct hda_codec *codec)
 {
         int retval;
 
-        // nodes 0x45 which are connected to 0x23 is labelled as line input
+        struct cs_spec *spec = codec->spec;
 
-        retval = snd_hda_codec_read_check(codec, 0x23, 0, AC_VERB_GET_AMP_GAIN_MUTE, 0x00002000, 0x000000b3, 0); // 0x023b2000
+        // nodes 0x45 which are connected to 0x23 is labelled as line input (macbook pro)
+
+        retval = snd_hda_codec_read_check(codec, spec->linein_amp_nid, 0, AC_VERB_GET_AMP_GAIN_MUTE, 0x00002000, 0x000000b3, 0); // 0x023b2000
+        //retval = snd_hda_codec_read_check(codec, 0x23, 0, AC_VERB_GET_AMP_GAIN_MUTE, 0x00002000, 0x000000b3, 0); // 0x023b2000
 //      snd_hda:     amp gain/mute 35 0x2000 index 0x00 left/right 1 left output/input 0 input
 //      snd_hda:     amp gain/mute 35 0x00b3 mute 1 gain 0x33 51
-        snd_hda_codec_write(codec, 0x23, 0, AC_VERB_SET_AMP_GAIN_MUTE, 0x00006033); // 0x02336033
+        snd_hda_codec_write(codec, spec->linein_amp_nid, 0, AC_VERB_SET_AMP_GAIN_MUTE, 0x00006033); // 0x02336033
+        //snd_hda_codec_write(codec, 0x23, 0, AC_VERB_SET_AMP_GAIN_MUTE, 0x00006033); // 0x02336033
 //      snd_hda:     amp gain/mute 35 0x6033 mute 0 gain 0x33 51 index 0x00 left 1 right 0 output 0 input 1 left   input
-        retval = snd_hda_codec_read_check(codec, 0x23, 0, AC_VERB_GET_AMP_GAIN_MUTE, 0x00000000, 0x000000b3, 0); // 0x023b0000
+        retval = snd_hda_codec_read_check(codec, spec->linein_amp_nid, 0, AC_VERB_GET_AMP_GAIN_MUTE, 0x00000000, 0x000000b3, 0); // 0x023b0000
+        //retval = snd_hda_codec_read_check(codec, 0x23, 0, AC_VERB_GET_AMP_GAIN_MUTE, 0x00000000, 0x000000b3, 0); // 0x023b0000
 //      snd_hda:     amp gain/mute 35 0x0000 index 0x00 left/right 0 right output/input 0 input
 //      snd_hda:     amp gain/mute 35 0x00b3 mute 1 gain 0x33 51
-        snd_hda_codec_write(codec, 0x23, 0, AC_VERB_SET_AMP_GAIN_MUTE, 0x00005033); // 0x02335033
+        snd_hda_codec_write(codec, spec->linein_amp_nid, 0, AC_VERB_SET_AMP_GAIN_MUTE, 0x00005033); // 0x02335033
+        //snd_hda_codec_write(codec, 0x23, 0, AC_VERB_SET_AMP_GAIN_MUTE, 0x00005033); // 0x02335033
 //      snd_hda:     amp gain/mute 35 0x5033 mute 0 gain 0x33 51 index 0x00 left 0 right 1 output 0 input 1  right  input
 
 }
@@ -890,22 +997,40 @@ static void cs_8409_setup_amp_max(struct hda_codec *codec, int amp_address, int 
 
 static void cs_8409_setup_amp_ssm3(struct hda_codec *codec, int amp_address, int amp_volume, int channel);
 
-static void cs_8409_setup_amps12(struct hda_codec *codec)
+static void cs_8409_setup_amp_tas576(struct hda_codec *codec, int amp_address, int amp_volume, int channel, int amp_enable);
+
+static void cs_8409_setup_amp_tas576_amp0(struct hda_codec *codec, int amp_volume, int amp_enable);
+static void cs_8409_setup_amp_tas576_amp1(struct hda_codec *codec, int amp_volume, int amp_enable);
+static void cs_8409_setup_amp_tas576_amp2(struct hda_codec *codec, int amp_volume, int amp_enable);
+static void cs_8409_setup_amp_tas576_amp3(struct hda_codec *codec, int amp_volume, int amp_enable);
+
+static void cs_8409_setup_amps12(struct hda_codec *codec, int amps_enable)
 {
         if (codec->core.subsystem_id == 0x106b3900) {
                 // use reduced volume - from 0x01 to 0x30 - now passing as argument
-                //cs_8409_setup_amp_max(codec, 0x64, 0x30, 0x00);
-                //cs_8409_setup_amp_max(codec, 0x62, 0x30, 0x01);
-                cs_8409_setup_amp_max(codec, 0x64, 0x01, 0x00);
-                cs_8409_setup_amp_max(codec, 0x62, 0x01, 0x01);
+                cs_8409_setup_amp_max(codec, 0x64, 0x30, 0x00);
+                cs_8409_setup_amp_max(codec, 0x62, 0x30, 0x01);
+                //cs_8409_setup_amp_max(codec, 0x64, 0x01, 0x00);
+                //cs_8409_setup_amp_max(codec, 0x62, 0x01, 0x01);
         }
         else if (codec->core.subsystem_id == 0x106b3300 || codec->core.subsystem_id == 0x106b3600) {
                 //setup_node_alpha_ssm3(codec);
                 // use reduced volume - from 0x48 to 0x80 - same reduction as for MAXs -24dB
-                //cs_8409_setup_amp_ssm3(codec, 0x28, 0x80, 0x00);
-                //cs_8409_setup_amp_ssm3(codec, 0x2a, 0x80, 0x01);
-                cs_8409_setup_amp_ssm3(codec, 0x28, 0x48, 0x00);
-                cs_8409_setup_amp_ssm3(codec, 0x2a, 0x48, 0x01);
+                cs_8409_setup_amp_ssm3(codec, 0x28, 0x80, 0x00);
+                cs_8409_setup_amp_ssm3(codec, 0x2a, 0x80, 0x01);
+                //cs_8409_setup_amp_ssm3(codec, 0x28, 0x48, 0x00);
+                //cs_8409_setup_amp_ssm3(codec, 0x2a, 0x48, 0x01);
+        }
+        else if (codec->core.subsystem_id == 0x106b1000) {
+                // NOTE that the TAS57642 amps setup during boot seems to skip the actual speaker power on
+                //      hence the addition of the amps_enable parameter
+                // use reduced volume - from 0xcf to 0x9f - same reduction as for MAXs -24dB (0.5dB steps)
+                //cs_8409_setup_amp_tas576_amp0(codec, 0x9f, amps_enable);
+                //cs_8409_setup_amp_tas576_amp1(codec, 0x9f, amps_enable);
+                cs_8409_setup_amp_tas576(codec, 0xd8, 0x9f, 0x00, amps_enable);
+                cs_8409_setup_amp_tas576(codec, 0xda, 0x9f, 0x01, amps_enable);
+                //cs_8409_setup_amp_tas576(codec, 0xd8, 0xcf, 0x00, amps_enable);
+                //cs_8409_setup_amp_tas576(codec, 0xda, 0xcf, 0x01, amps_enable);
         }
         else {
                 dev_info(hda_codec_dev(codec), "UNKNOWN subsystem id 0x%08x",codec->core.subsystem_id);
@@ -914,7 +1039,7 @@ static void cs_8409_setup_amps12(struct hda_codec *codec)
 
 static void play_setup_amps12(struct hda_codec *codec)
 {
-        cs_8409_setup_amps12(codec);
+        cs_8409_setup_amps12(codec, 1);
 }
 
 
@@ -1000,22 +1125,33 @@ static void play_setup_TDM_amps34(struct hda_codec *codec)
         cs_8409_setup_TDM_amps34(codec, 0);
 }
 
-static void cs_8409_setup_amps34(struct hda_codec *codec)
+static void cs_8409_setup_amps34(struct hda_codec *codec, int amps_enable)
 {
         if (codec->core.subsystem_id == 0x106b3900) {
                 // use reduced volume - from 0x01 to 0x30 - now passing as argument
-                //cs_8409_setup_amp_max(codec, 0x74, 0x30, 0x02);
-                //cs_8409_setup_amp_max(codec, 0x72, 0x30, 0x03);
-                cs_8409_setup_amp_max(codec, 0x74, 0x01, 0x02);
-                cs_8409_setup_amp_max(codec, 0x72, 0x01, 0x03);
+                cs_8409_setup_amp_max(codec, 0x74, 0x30, 0x02);
+                cs_8409_setup_amp_max(codec, 0x72, 0x30, 0x03);
+                //cs_8409_setup_amp_max(codec, 0x74, 0x01, 0x02);
+                //cs_8409_setup_amp_max(codec, 0x72, 0x01, 0x03);
         }
         else if (codec->core.subsystem_id == 0x106b3300 || codec->core.subsystem_id == 0x106b3600) {
                 //setup_node_alpha_ssm3(codec);
                 // use reduced volume - from 0x48 to 0x80 - same reduction as for MAXs -24dB
-                //cs_8409_setup_amp_ssm3(codec, 0x2c, 0x80, 0x02);
-                //cs_8409_setup_amp_ssm3(codec, 0x2e, 0x80, 0x03);
-                cs_8409_setup_amp_ssm3(codec, 0x2c, 0x48, 0x02);
-                cs_8409_setup_amp_ssm3(codec, 0x2e, 0x48, 0x03);
+                cs_8409_setup_amp_ssm3(codec, 0x2c, 0x80, 0x02);
+                cs_8409_setup_amp_ssm3(codec, 0x2e, 0x80, 0x03);
+                //cs_8409_setup_amp_ssm3(codec, 0x2c, 0x48, 0x02);
+                //cs_8409_setup_amp_ssm3(codec, 0x2e, 0x48, 0x03);
+        }
+        else if (codec->core.subsystem_id == 0x106b1000) {
+                // NOTE that the TAS57642 amps setup during boot seems to skip the actual speaker power on
+                //      hence the addition of the amps_enable parameter
+                // use reduced volume - from 0xcf to 0x9f - same reduction as for MAXs -24dB (0.5dB steps)
+                //cs_8409_setup_amp_tas576_amp2(codec, 0x9f, amps_enable);
+                //cs_8409_setup_amp_tas576_amp3(codec, 0x9f, amps_enable);
+                cs_8409_setup_amp_tas576(codec, 0xdc, 0x9f, 0x02, amps_enable);
+                cs_8409_setup_amp_tas576(codec, 0xde, 0x9f, 0x03, amps_enable);
+                //cs_8409_setup_amp_tas576(codec, 0xdc, 0xcf, 0x02, amps_enable);
+                //cs_8409_setup_amp_tas576(codec, 0xde, 0xcf, 0x03, amps_enable);
         }
         else {
                 dev_info(hda_codec_dev(codec), "UNKNOWN subsystem id 0x%08x",codec->core.subsystem_id);
@@ -1024,7 +1160,7 @@ static void cs_8409_setup_amps34(struct hda_codec *codec)
 
 static void play_setup_amps34(struct hda_codec *codec)
 {
-        cs_8409_setup_amps34(codec);
+        cs_8409_setup_amps34(codec, 1);
 }
 
 static void cs_8409_sync_converters_on(struct hda_codec *codec, int nullformat)
@@ -1179,6 +1315,246 @@ static void cs_8409_setup_amp_ssm3(struct hda_codec *codec, int amp_address, int
 
 }
 
+static void cs_8409_setup_amp_tas576(struct hda_codec *codec, int amp_address, int amp_volume, int channel, int amp_enable)
+{
+        //int retval;
+
+        // this data from the TAS5760md spec sheet (closest one I can find)
+        // there are a number of inconsistencies
+        // first - the MAX/SSM amps are mono amps but the TAS5760md seems to be a stereo amp 
+        // (there is a PBTL mode which can use both amps to drive a single speaker which
+        //  may be whats going on - now this can be set in hardware but its does not appear to be done in software)
+        // - note that the HDA node setup seems to be 4 channel audio as 2 left channels (node 0x02) and 2 right channels (0x03)
+        // hence 4 mono amps required
+        // some regs seem valid - others not
+	// reg 0x01 does seem to be the power control and is used to enable/disable the amps and values are consistent
+	// reg 0x04 is labelled the Left Volume but there are no reg 0x05 Right Volume setup calls at all
+        // reg 0x03 is labelled Volume Control and the Fade may be right
+        // but the low order mute bits dont make sense - simply seems to index the amps ie 0,1,2,3
+        // - which according to tas5760 docs would be no mute, mute left, mute right, mute all
+        // what makes more sense is that its indexing the individual channels of the 4 channel TDM stream
+        // so yes I think this is being used in PBTL mode to drive a single speaker with reg 0x04 being
+        // the volume control and reg 0x03 low order bits determining which channel to use
+
+        // NOTE that the TAS57642 amps setup during boot seems to skip the actual speaker power on
+        //      hence the addition of the amp_enable parameter
+
+
+//      snd_hda i2cRead       i2c address 0xd8 i2c            reg 0x0200 i2c data 0x0204   reg anal: Digital Control
+//      snd_hda i2cWrite      i2c address 0xd8 i2c            reg 0x0244 i2c data 0x0044   reg anal: Digital Control         : I2S format, Undocumented
+//      snd_hda i2cRead       i2c address 0xd8 i2c            reg 0x0300 i2c data 0x0380   reg anal: Volume Control
+//      snd_hda i2cWrite      i2c address 0xd8 i2c            reg 0x0380 i2c data 0x0080   reg anal: Volume Control          : Fade, Muted??
+//      snd_hda i2cRead       i2c address 0xd8 i2c            reg 0x0600 i2c data 0x0651   reg anal: Analog Control
+//      snd_hda i2cWrite      i2c address 0xd8 i2c            reg 0x0655 i2c data 0x0055   reg anal: Analog Control          : PWM Rate x16, Gain 22.6dB
+//      snd_hda i2cRead       i2c address 0xd8 i2c            reg 0x0800 i2c data 0x0808   reg anal: Fault Config & Error
+//      snd_hda i2cWrite      i2c address 0xd8 i2c            reg 0x0818 i2c data 0x0018   reg anal: Fault Config & Error    : Threshold 75%, Clock Error??
+//      snd_hda i2cWrite      i2c address 0xd8 i2c            reg 0x04cf i2c data 0x00cf   reg anal: Left Chan Vol Control   : 0dB
+//      snd_hda i2cRead       i2c address 0xd8 i2c            reg 0x1300 i2c data 0x1300   reg anal: Undocumented
+//      snd_hda i2cWrite      i2c address 0xd8 i2c            reg 0x1300 i2c data 0x0000   reg anal: Undocumented
+//      snd_hda i2cRead       i2c address 0xd8 i2c            reg 0x0200 i2c data 0x0244   reg anal: Digital Control
+//      snd_hda i2cWrite      i2c address 0xd8 i2c            reg 0x0244 i2c data 0x0044   reg anal: Digital Control         : I2S format, Undocumented
+
+        // here we have read/write pairs suggesting this is done as masked i2c writes
+        // but we have no idea what the masks are
+
+        cs_8409_vendor_i2cRead(codec, amp_address, 0x0002, 0); // snd_hda
+        cs_8409_vendor_i2cWrite(codec, amp_address, 0x0002, 0x0044, 0); // snd_hda
+        cs_8409_vendor_i2cRead(codec, amp_address, 0x0003, 0); // snd_hda
+        cs_8409_vendor_i2cWrite(codec, amp_address, 0x0003, 0x0080|channel, 0); // snd_hda
+        cs_8409_vendor_i2cRead(codec, amp_address, 0x0006, 0); // snd_hda
+        cs_8409_vendor_i2cWrite(codec, amp_address, 0x0006, 0x0055, 0); // snd_hda
+        cs_8409_vendor_i2cRead(codec, amp_address, 0x0008, 0); // snd_hda
+        cs_8409_vendor_i2cWrite(codec, amp_address, 0x0008, 0x0018, 0); // snd_hda
+        cs_8409_vendor_i2cWrite(codec, amp_address, 0x0004, amp_volume, 0); // snd_hda
+        cs_8409_vendor_i2cRead(codec, amp_address, 0x0013, 0); // snd_hda
+        cs_8409_vendor_i2cWrite(codec, amp_address, 0x0013, 0x0000, 0); // snd_hda
+        cs_8409_vendor_i2cRead(codec, amp_address, 0x0002, 0); // snd_hda
+        cs_8409_vendor_i2cWrite(codec, amp_address, 0x0002, 0x0044, 0); // snd_hda
+
+
+//      snd_hda i2cRead       i2c address 0xd8 i2c            reg 0x0100 i2c data 0x01fc   reg anal: Power Control
+//      snd_hda i2cWrite      i2c address 0xd8 i2c            reg 0x01fd i2c data 0x00fd   reg anal: Power Control           : Not sleep, Spkr Amp On
+
+        if (amp_enable)
+        {
+                cs_8409_vendor_i2cRead(codec, amp_address, 0x0001, 0); // snd_hda
+                cs_8409_vendor_i2cWrite(codec, amp_address, 0x0001, 0x00fd, 0); // snd_hda
+        }
+}
+
+static void cs_8409_setup_amp_tas576_amp0(struct hda_codec *codec, int amp_volume, int amp_enable)
+{
+        //int retval;
+
+//      snd_hda i2cRead       i2c address 0xd8 i2c            reg 0x0200 i2c data 0x0204   reg anal: Digital Control
+//      snd_hda i2cWrite      i2c address 0xd8 i2c            reg 0x0244 i2c data 0x0044   reg anal: Digital Control         : I2S format, Undocumented
+//      snd_hda i2cRead       i2c address 0xd8 i2c            reg 0x0300 i2c data 0x0380   reg anal: Volume Control
+//      snd_hda i2cWrite      i2c address 0xd8 i2c            reg 0x0380 i2c data 0x0080   reg anal: Volume Control          : Fade, Not Muted??
+//      snd_hda i2cRead       i2c address 0xd8 i2c            reg 0x0600 i2c data 0x0651   reg anal: Analog Control
+//      snd_hda i2cWrite      i2c address 0xd8 i2c            reg 0x0655 i2c data 0x0055   reg anal: Analog Control          : PWM Rate x16, Gain 22.6dB
+//      snd_hda i2cRead       i2c address 0xd8 i2c            reg 0x0800 i2c data 0x0808   reg anal: Fault Config & Error
+//      snd_hda i2cWrite      i2c address 0xd8 i2c            reg 0x0818 i2c data 0x0018   reg anal: Fault Config & Error    : Threshold 75%, Clock Error??
+//      snd_hda i2cWrite      i2c address 0xd8 i2c            reg 0x04cf i2c data 0x00cf   reg anal: Left Chan Vol Control   : 0dB
+//      snd_hda i2cRead       i2c address 0xd8 i2c            reg 0x1300 i2c data 0x1300   reg anal: Undocumented
+//      snd_hda i2cWrite      i2c address 0xd8 i2c            reg 0x1300 i2c data 0x0000   reg anal: Undocumented
+//      snd_hda i2cRead       i2c address 0xd8 i2c            reg 0x0200 i2c data 0x0244   reg anal: Digital Control
+//      snd_hda i2cWrite      i2c address 0xd8 i2c            reg 0x0244 i2c data 0x0044   reg anal: Digital Control         : I2S format, Undocumented
+
+        cs_8409_vendor_i2cRead(codec, 0xd8, 0x0002, 0); // snd_hda
+        cs_8409_vendor_i2cWrite(codec, 0xd8, 0x0002, 0x0044, 0); // snd_hda
+        cs_8409_vendor_i2cRead(codec, 0xd8, 0x0003, 0); // snd_hda
+        cs_8409_vendor_i2cWrite(codec, 0xd8, 0x0003, 0x0080, 0); // snd_hda
+        cs_8409_vendor_i2cRead(codec, 0xd8, 0x0006, 0); // snd_hda
+        cs_8409_vendor_i2cWrite(codec, 0xd8, 0x0006, 0x0055, 0); // snd_hda
+        cs_8409_vendor_i2cRead(codec, 0xd8, 0x0008, 0); // snd_hda
+        cs_8409_vendor_i2cWrite(codec, 0xd8, 0x0008, 0x0018, 0); // snd_hda
+        cs_8409_vendor_i2cWrite(codec, 0xd8, 0x0004, 0x00cf, 0); // snd_hda
+        cs_8409_vendor_i2cRead(codec, 0xd8, 0x0013, 0); // snd_hda
+        cs_8409_vendor_i2cWrite(codec, 0xd8, 0x0013, 0x0000, 0); // snd_hda
+        cs_8409_vendor_i2cRead(codec, 0xd8, 0x0002, 0); // snd_hda
+        cs_8409_vendor_i2cWrite(codec, 0xd8, 0x0002, 0x0044, 0); // snd_hda
+
+
+//      snd_hda i2cRead       i2c address 0xd8 i2c            reg 0x0100 i2c data 0x01fc   reg anal: Power Control
+//      snd_hda i2cWrite      i2c address 0xd8 i2c            reg 0x01fd i2c data 0x00fd   reg anal: Power Control           : Not sleep, Spkr Amp On
+
+        if (amp_enable)
+        {
+                cs_8409_vendor_i2cRead(codec, 0xd8, 0x0001, 0); // snd_hda
+                cs_8409_vendor_i2cWrite(codec, 0xd8, 0x0001, 0x00fd, 0); // snd_hda
+        }
+
+}
+
+static void cs_8409_setup_amp_tas576_amp1(struct hda_codec *codec, int amp_volume, int amp_enable)
+{
+        //int retval;
+
+//      snd_hda i2cRead       i2c address 0xda i2c            reg 0x0200 i2c data 0x0204   reg anal: Digital Control
+//      snd_hda i2cWrite      i2c address 0xda i2c            reg 0x0244 i2c data 0x0044   reg anal: Digital Control         : I2S format, Undocumented
+//      snd_hda i2cRead       i2c address 0xda i2c            reg 0x0300 i2c data 0x0380   reg anal: Volume Control
+//      snd_hda i2cWrite      i2c address 0xda i2c            reg 0x0380 i2c data 0x0081   reg anal: Volume Control          : Fade, Left Muted??
+//      snd_hda i2cRead       i2c address 0xda i2c            reg 0x0600 i2c data 0x0651   reg anal: Analog Control
+//      snd_hda i2cWrite      i2c address 0xda i2c            reg 0x0655 i2c data 0x0055   reg anal: Analog Control          : PWM Rate x16, Gain 22.6dB
+//      snd_hda i2cRead       i2c address 0xda i2c            reg 0x0800 i2c data 0x0808   reg anal: Fault Config & Error
+//      snd_hda i2cWrite      i2c address 0xda i2c            reg 0x0818 i2c data 0x0018   reg anal: Fault Config & Error    : Threshold 75%, Clock Error??
+//      snd_hda i2cWrite      i2c address 0xda i2c            reg 0x04cf i2c data 0x00cf   reg anal: Left Chan Vol Control   : 0dB
+//      snd_hda i2cRead       i2c address 0xda i2c            reg 0x1300 i2c data 0x1300   reg anal: Undocumented
+//      snd_hda i2cWrite      i2c address 0xda i2c            reg 0x1300 i2c data 0x0000   reg anal: Undocumented
+//      snd_hda i2cRead       i2c address 0xda i2c            reg 0x0200 i2c data 0x0244   reg anal: Digital Control
+//      snd_hda i2cWrite      i2c address 0xda i2c            reg 0x0244 i2c data 0x0044   reg anal: Digital Control         : I2S format, Undocumented
+
+        cs_8409_vendor_i2cRead(codec, 0xda, 0x0002, 0); // snd_hda
+        cs_8409_vendor_i2cWrite(codec, 0xda, 0x0002, 0x0044, 0); // snd_hda
+        cs_8409_vendor_i2cRead(codec, 0xda, 0x0003, 0); // snd_hda
+        cs_8409_vendor_i2cWrite(codec, 0xda, 0x0003, 0x0081, 0); // snd_hda
+        cs_8409_vendor_i2cRead(codec, 0xda, 0x0006, 0); // snd_hda
+        cs_8409_vendor_i2cWrite(codec, 0xda, 0x0006, 0x0055, 0); // snd_hda
+        cs_8409_vendor_i2cRead(codec, 0xda, 0x0008, 0); // snd_hda
+        cs_8409_vendor_i2cWrite(codec, 0xda, 0x0008, 0x0018, 0); // snd_hda
+        cs_8409_vendor_i2cWrite(codec, 0xda, 0x0004, 0x00cf, 0); // snd_hda
+        cs_8409_vendor_i2cRead(codec, 0xda, 0x0013, 0); // snd_hda
+        cs_8409_vendor_i2cWrite(codec, 0xda, 0x0013, 0x0000, 0); // snd_hda
+        cs_8409_vendor_i2cRead(codec, 0xda, 0x0002, 0); // snd_hda
+        cs_8409_vendor_i2cWrite(codec, 0xda, 0x0002, 0x0044, 0); // snd_hda
+
+//      snd_hda i2cRead       i2c address 0xda i2c            reg 0x0100 i2c data 0x01fc   reg anal: Power Control
+//      snd_hda i2cWrite      i2c address 0xda i2c            reg 0x01fd i2c data 0x00fd   reg anal: Power Control           : Not sleep, Spkr Amp On
+
+        if (amp_enable)
+        {
+                cs_8409_vendor_i2cRead(codec, 0xda, 0x0001, 0); // snd_hda
+                cs_8409_vendor_i2cWrite(codec, 0xda, 0x0001, 0x00fd, 0); // snd_hda
+        }
+
+}
+
+static void cs_8409_setup_amp_tas576_amp2(struct hda_codec *codec, int amp_volume, int amp_enable)
+{
+        //int retval;
+
+//      snd_hda i2cRead       i2c address 0xdc i2c            reg 0x0200 i2c data 0x0204   reg anal: Digital Control
+//      snd_hda i2cWrite      i2c address 0xdc i2c            reg 0x0244 i2c data 0x0044   reg anal: Digital Control         : I2S format, Undocumented
+//      snd_hda i2cRead       i2c address 0xdc i2c            reg 0x0300 i2c data 0x0380   reg anal: Volume Control
+//      snd_hda i2cWrite      i2c address 0xdc i2c            reg 0x0380 i2c data 0x0082   reg anal: Volume Control          : Fade, Right Muted??
+//      snd_hda i2cRead       i2c address 0xdc i2c            reg 0x0600 i2c data 0x0651   reg anal: Analog Control
+//      snd_hda i2cWrite      i2c address 0xdc i2c            reg 0x0655 i2c data 0x0055   reg anal: Analog Control          : PWM Rate x16, Gain 22.6dB
+//      snd_hda i2cRead       i2c address 0xdc i2c            reg 0x0800 i2c data 0x0808   reg anal: Fault Config & Error
+//      snd_hda i2cWrite      i2c address 0xdc i2c            reg 0x0818 i2c data 0x0018   reg anal: Fault Config & Error    : Threshold 75%, Clock Error??
+//      snd_hda i2cWrite      i2c address 0xdc i2c            reg 0x04cf i2c data 0x00cf   reg anal: Left Chan Vol Control   : 0dB
+//      snd_hda i2cRead       i2c address 0xdc i2c            reg 0x1300 i2c data 0x1300   reg anal: Undocumented
+//      snd_hda i2cWrite      i2c address 0xdc i2c            reg 0x1300 i2c data 0x0000   reg anal: Undocumented
+//      snd_hda i2cRead       i2c address 0xdc i2c            reg 0x0200 i2c data 0x0244   reg anal: Digital Control
+//      snd_hda i2cWrite      i2c address 0xdc i2c            reg 0x0244 i2c data 0x0044   reg anal: Digital Control         : I2S format, Undocumented
+
+        cs_8409_vendor_i2cRead(codec, 0xdc, 0x0002, 0); // snd_hda
+        cs_8409_vendor_i2cWrite(codec, 0xdc, 0x0002, 0x0044, 0); // snd_hda
+        cs_8409_vendor_i2cRead(codec, 0xdc, 0x0003, 0); // snd_hda
+        cs_8409_vendor_i2cWrite(codec, 0xdc, 0x0003, 0x0082, 0); // snd_hda
+        cs_8409_vendor_i2cRead(codec, 0xdc, 0x0006, 0); // snd_hda
+        cs_8409_vendor_i2cWrite(codec, 0xdc, 0x0006, 0x0055, 0); // snd_hda
+        cs_8409_vendor_i2cRead(codec, 0xdc, 0x0008, 0); // snd_hda
+        cs_8409_vendor_i2cWrite(codec, 0xdc, 0x0008, 0x0018, 0); // snd_hda
+        cs_8409_vendor_i2cWrite(codec, 0xdc, 0x0004, 0x00cf, 0); // snd_hda
+        cs_8409_vendor_i2cRead(codec, 0xdc, 0x0013, 0); // snd_hda
+        cs_8409_vendor_i2cWrite(codec, 0xdc, 0x0013, 0x0000, 0); // snd_hda
+        cs_8409_vendor_i2cRead(codec, 0xdc, 0x0002, 0); // snd_hda
+        cs_8409_vendor_i2cWrite(codec, 0xdc, 0x0002, 0x0044, 0); // snd_hda
+
+//      snd_hda i2cRead       i2c address 0xdc i2c            reg 0x0100 i2c data 0x01fc   reg anal: Power Control
+//      snd_hda i2cWrite      i2c address 0xdc i2c            reg 0x01fd i2c data 0x00fd   reg anal: Power Control           : Not sleep, Spkr Amp On
+
+        if (amp_enable)
+        {
+                cs_8409_vendor_i2cRead(codec, 0xdc, 0x0001, 0); // snd_hda
+                cs_8409_vendor_i2cWrite(codec, 0xdc, 0x0001, 0x00fd, 0); // snd_hda
+        }
+
+}
+
+static void cs_8409_setup_amp_tas576_amp3(struct hda_codec *codec, int amp_volume, int amp_enable)
+{
+        //int retval;
+
+//      snd_hda i2cRead       i2c address 0xde i2c            reg 0x0200 i2c data 0x0204   reg anal: Digital Control
+//      snd_hda i2cWrite      i2c address 0xde i2c            reg 0x0244 i2c data 0x0044   reg anal: Digital Control         : I2S format, Undocumented
+//      snd_hda i2cRead       i2c address 0xde i2c            reg 0x0300 i2c data 0x0380   reg anal: Volume Control
+//      snd_hda i2cWrite      i2c address 0xde i2c            reg 0x0380 i2c data 0x0083   reg anal: Volume Control          : Fade, Left and Right Muted??
+//      snd_hda i2cRead       i2c address 0xde i2c            reg 0x0600 i2c data 0x0651   reg anal: Analog Control
+//      snd_hda i2cWrite      i2c address 0xde i2c            reg 0x0655 i2c data 0x0055   reg anal: Analog Control          : PWM Rate x16, Gain 22.6dB
+//      snd_hda i2cRead       i2c address 0xde i2c            reg 0x0800 i2c data 0x0808   reg anal: Fault Config & Error
+//      snd_hda i2cWrite      i2c address 0xde i2c            reg 0x0818 i2c data 0x0018   reg anal: Fault Config & Error    : Threshold 75%, Clock Error??
+//      snd_hda i2cWrite      i2c address 0xde i2c            reg 0x04cf i2c data 0x00cf   reg anal: Left Chan Vol Control   : 0dB
+//      snd_hda i2cRead       i2c address 0xde i2c            reg 0x1300 i2c data 0x1300   reg anal: Undocumented
+//      snd_hda i2cWrite      i2c address 0xde i2c            reg 0x1300 i2c data 0x0000   reg anal: Undocumented
+//      snd_hda i2cRead       i2c address 0xde i2c            reg 0x0200 i2c data 0x0244   reg anal: Digital Control
+//      snd_hda i2cWrite      i2c address 0xde i2c            reg 0x0244 i2c data 0x0044   reg anal: Digital Control         : I2S format, Undocumented
+
+        cs_8409_vendor_i2cRead(codec, 0xde, 0x0002, 0); // snd_hda
+        cs_8409_vendor_i2cWrite(codec, 0xde, 0x0002, 0x0044, 0); // snd_hda
+        cs_8409_vendor_i2cRead(codec, 0xde, 0x0003, 0); // snd_hda
+        cs_8409_vendor_i2cWrite(codec, 0xde, 0x0003, 0x0083, 0); // snd_hda
+        cs_8409_vendor_i2cRead(codec, 0xde, 0x0006, 0); // snd_hda
+        cs_8409_vendor_i2cWrite(codec, 0xde, 0x0006, 0x0055, 0); // snd_hda
+        cs_8409_vendor_i2cRead(codec, 0xde, 0x0008, 0); // snd_hda
+        cs_8409_vendor_i2cWrite(codec, 0xde, 0x0008, 0x0018, 0); // snd_hda
+        cs_8409_vendor_i2cWrite(codec, 0xde, 0x0004, 0x00cf, 0); // snd_hda
+        cs_8409_vendor_i2cRead(codec, 0xde, 0x0013, 0); // snd_hda
+        cs_8409_vendor_i2cWrite(codec, 0xde, 0x0013, 0x0000, 0); // snd_hda
+        cs_8409_vendor_i2cRead(codec, 0xde, 0x0002, 0); // snd_hda
+        cs_8409_vendor_i2cWrite(codec, 0xde, 0x0002, 0x0044, 0); // snd_hda
+
+//      snd_hda i2cRead       i2c address 0xde i2c            reg 0x0100 i2c data 0x01fc   reg anal: Power Control
+//      snd_hda i2cWrite      i2c address 0xde i2c            reg 0x01fd i2c data 0x00fd   reg anal: Power Control           : Not sleep, Spkr Amp On
+
+        if (amp_enable)
+        {
+                cs_8409_vendor_i2cRead(codec, 0xde, 0x0001, 0); // snd_hda
+                cs_8409_vendor_i2cWrite(codec, 0xde, 0x0001, 0x00fd, 0); // snd_hda
+        }
+
+}
+
 
 static void cs_8409_sync_converters_off(struct hda_codec *codec, int nullformat)
 {
@@ -1259,6 +1635,13 @@ static void cs_8409_disable_amp_max(struct hda_codec *codec, int amp_address);
 
 static void cs_8409_disable_amp_ssm3(struct hda_codec *codec, int amp_address);
 
+static void cs_8409_disable_amp_tas576(struct hda_codec *codec, int amp_address);
+
+static void cs_8409_disable_amp_tas576_amp0(struct hda_codec *codec);
+static void cs_8409_disable_amp_tas576_amp1(struct hda_codec *codec);
+static void cs_8409_disable_amp_tas576_amp2(struct hda_codec *codec);
+static void cs_8409_disable_amp_tas576_amp3(struct hda_codec *codec);
+
 static void cs_8409_disable_amps12(struct hda_codec *codec)
 {
         if (codec->core.subsystem_id == 0x106b3900) {
@@ -1269,6 +1652,12 @@ static void cs_8409_disable_amps12(struct hda_codec *codec)
                 //setup_node_alpha_ssm3(codec);
                 cs_8409_disable_amp_ssm3(codec, 0x28);
                 cs_8409_disable_amp_ssm3(codec, 0x2a);
+        }
+        else if (codec->core.subsystem_id == 0x106b1000) {
+                //cs_8409_disable_amp_tas576(codec, 0xd8);
+                //cs_8409_disable_amp_tas576(codec, 0xda);
+                cs_8409_disable_amp_tas576_amp0(codec);
+                cs_8409_disable_amp_tas576_amp1(codec);
         }
         else {
                 dev_info(hda_codec_dev(codec), "UNKNOWN subsystem id 0x%08x",codec->core.subsystem_id);
@@ -1358,6 +1747,12 @@ static void cs_8409_disable_amps34(struct hda_codec *codec)
                 //setup_node_alpha_ssm3(codec);
                 cs_8409_disable_amp_ssm3(codec, 0x2c);
                 cs_8409_disable_amp_ssm3(codec, 0x2e);
+        }
+        else if (codec->core.subsystem_id == 0x106b1000) {
+                //cs_8409_disable_amp_tas576(codec, 0xdc);
+                //cs_8409_disable_amp_tas576(codec, 0xde);
+                cs_8409_disable_amp_tas576_amp2(codec);
+                cs_8409_disable_amp_tas576_amp3(codec);
         }
         else {
                 dev_info(hda_codec_dev(codec), "UNKNOWN subsystem id 0x%08x",codec->core.subsystem_id);
@@ -1481,10 +1876,76 @@ static void cs_8409_disable_amp_ssm3(struct hda_codec *codec, int amp_address)
 
 }
 
+static void cs_8409_disable_amp_tas576(struct hda_codec *codec, int amp_address)
+{
+        //int retval;
+
+//      snd_hda: # i2cWrite: 
+//      snd_hda i2cRead       i2c address 0xd8 i2c            reg 0x0100 i2c data 0x01fc   reg anal: Power Control
+//      snd_hda i2cWrite      i2c address 0xd8 i2c            reg 0x01fc i2c data 0x00fc   reg anal: Power Control           : Not sleep, Spkr Amp Shutdown
+
+        cs_8409_vendor_i2cRead(codec, amp_address, 0x0001, 0); // snd_hda
+        cs_8409_vendor_i2cWrite(codec, amp_address, 0x0001, 0x00fc, 0); // snd_hda
+
+}
+
+static void cs_8409_disable_amp_tas576_amp0(struct hda_codec *codec)
+{
+        //int retval;
+
+//      snd_hda: # i2cWrite: 
+//      snd_hda i2cRead       i2c address 0xd8 i2c            reg 0x0100 i2c data 0x01fc   reg anal: Power Control
+//      snd_hda i2cWrite      i2c address 0xd8 i2c            reg 0x01fc i2c data 0x00fc   reg anal: Power Control           : Not sleep, Spkr Amp Shutdown
+
+        cs_8409_vendor_i2cRead(codec, 0xd8, 0x0001, 0); // snd_hda
+        cs_8409_vendor_i2cWrite(codec, 0xd8, 0x0001, 0x00fc, 0); // snd_hda
+
+}
+
+static void cs_8409_disable_amp_tas576_amp1(struct hda_codec *codec)
+{
+        //int retval;
+
+//      snd_hda: # i2cWrite: 
+//      snd_hda i2cRead       i2c address 0xda i2c            reg 0x0100 i2c data 0x01fc   reg anal: Power Control
+//      snd_hda i2cWrite      i2c address 0xda i2c            reg 0x01fc i2c data 0x00fc   reg anal: Power Control           : Not sleep, Spkr Amp Shutdown
+
+        cs_8409_vendor_i2cRead(codec, 0xda, 0x0001, 0); // snd_hda
+        cs_8409_vendor_i2cWrite(codec, 0xda, 0x0001, 0x00fc, 0); // snd_hda
+
+}
+
+static void cs_8409_disable_amp_tas576_amp2(struct hda_codec *codec)
+{
+        //int retval;
+
+//      snd_hda: # i2cWrite: 
+//      snd_hda i2cRead       i2c address 0xdc i2c            reg 0x0100 i2c data 0x01fc   reg anal: Power Control
+//      snd_hda i2cWrite      i2c address 0xdc i2c            reg 0x01fc i2c data 0x00fc   reg anal: Power Control           : Not sleep, Spkr Amp Shutdown
+
+        cs_8409_vendor_i2cRead(codec, 0xdc, 0x0001, 0); // snd_hda
+        cs_8409_vendor_i2cWrite(codec, 0xdc, 0x0001, 0x00fc, 0); // snd_hda
+
+}
+
+static void cs_8409_disable_amp_tas576_amp3(struct hda_codec *codec)
+{
+        //int retval;
+
+//      snd_hda: # i2cWrite: 
+//      snd_hda i2cRead       i2c address 0xde i2c            reg 0x0100 i2c data 0x01fc   reg anal: Power Control
+//      snd_hda i2cWrite      i2c address 0xde i2c            reg 0x01fc i2c data 0x00fc   reg anal: Power Control           : Not sleep, Spkr Amp Shutdown
+
+        cs_8409_vendor_i2cRead(codec, 0xde, 0x0001, 0); // snd_hda
+        cs_8409_vendor_i2cWrite(codec, 0xde, 0x0001, 0x00fc, 0); // snd_hda
+
+}
+
+
 
 static void playstop_disable_amp_max(struct hda_codec *codec, int amp_address)
 {
-	cs_8409_disable_amp_max(codec, amp_address);
+        cs_8409_disable_amp_max(codec, amp_address);
 }
 
 
@@ -1492,11 +1953,13 @@ static void cs_8409_inputs_power_nids_on(struct hda_codec *codec)
 {
         int retval;
 
+        struct cs_spec *spec = codec->spec;
+
         //retval = snd_hda_codec_read_check(codec, 0x22, 0, AC_VERB_GET_POWER_STATE, 0x00000000, 0x00000033, 2785); // 0x022f0500
         //retval = snd_hda_codec_read_check(codec, 0x23, 0, AC_VERB_GET_POWER_STATE, 0x00000000, 0x00000033, 2786); // 0x023f0500
 
-        hda_set_node_power_state(codec, 0x22, AC_PWRST_D0);
-        hda_set_node_power_state(codec, 0x23, AC_PWRST_D0);
+        hda_set_node_power_state(codec, spec->intmike_adc_nid, AC_PWRST_D0);
+        hda_set_node_power_state(codec, spec->linein_amp_nid, AC_PWRST_D0);
 
 }
 
@@ -1504,11 +1967,13 @@ static void cs_8409_inputs_power_nids_off(struct hda_codec *codec)
 {
         int retval;
 
+        struct cs_spec *spec = codec->spec;
+
         //retval = snd_hda_codec_read_check(codec, 0x22, 0, AC_VERB_GET_POWER_STATE, 0x00000000, 0x00000033, 10741); // 0x022f0500
         //retval = snd_hda_codec_read_check(codec, 0x23, 0, AC_VERB_GET_POWER_STATE, 0x00000000, 0x00000033, 10742); // 0x023f0500
 
-        hda_set_node_power_state(codec, 0x22, AC_PWRST_D3);
-        hda_set_node_power_state(codec, 0x23, AC_PWRST_D3);
+        hda_set_node_power_state(codec, spec->intmike_adc_nid, AC_PWRST_D3);
+        hda_set_node_power_state(codec, spec->linein_amp_nid, AC_PWRST_D3);
 
 }
 
@@ -1517,7 +1982,8 @@ static int cs_8409_boot_setup_real(struct hda_codec *codec)
 {
         int retval;
 
-        //struct cs_spec *spec = codec->spec;
+        struct cs_spec *spec = codec->spec;
+
         //hda_nid_t beep_nid = spec->beep_nid;
 
         mycodec_info(codec, "command cs_8409_boot_setup_real start\n");
@@ -1567,6 +2033,9 @@ static int cs_8409_boot_setup_real(struct hda_codec *codec)
         else if (codec->core.subsystem_id == 0x106b3300 || codec->core.subsystem_id == 0x106b3600) {
                 enable_GPIforUR(codec, 0xd);
         }
+        else if (codec->core.subsystem_id == 0x106b1000) {
+                enable_GPIforUR(codec, 0xd);
+        }
         else {
                 dev_info(hda_codec_dev(codec), "UNKNOWN subsystem id 0x%08x",codec->core.subsystem_id);
         }
@@ -1580,6 +2049,9 @@ static int cs_8409_boot_setup_real(struct hda_codec *codec)
                 cs42l83_external_control_GPIO(codec, 0x7);
         }
         else if (codec->core.subsystem_id == 0x106b3300 || codec->core.subsystem_id == 0x106b3600) {
+                cs42l83_external_control_GPIO(codec, 0xf);
+        }
+        else if (codec->core.subsystem_id == 0x106b1000) {
                 cs42l83_external_control_GPIO(codec, 0xf);
         }
         else {
@@ -1599,6 +2071,9 @@ static int cs_8409_boot_setup_real(struct hda_codec *codec)
         else if (codec->core.subsystem_id == 0x106b3300 || codec->core.subsystem_id == 0x106b3600) {
                 cs42l83_external_control_GPIO(codec, 0xf);
         }
+        else if (codec->core.subsystem_id == 0x106b1000) {
+                cs42l83_external_control_GPIO(codec, 0xf);
+        }
         else {
                 dev_info(hda_codec_dev(codec), "UNKNOWN subsystem id 0x%08x",codec->core.subsystem_id);
         }
@@ -1615,6 +2090,10 @@ static int cs_8409_boot_setup_real(struct hda_codec *codec)
         else if (codec->core.subsystem_id == 0x106b3300 || codec->core.subsystem_id == 0x106b3600) {
                 //setup_amps_reset_i2c_ssm3
                 setup_amps_reset_i2c_ssm3(codec);
+        }
+        else if (codec->core.subsystem_id == 0x106b1000) {
+                //setup_amps_reset(codec);
+                setup_amps_reset_i2c_tas576(codec);
         }
         else {
                 dev_info(hda_codec_dev(codec), "UNKNOWN subsystem id 0x%08x",codec->core.subsystem_id);
@@ -1653,7 +2132,8 @@ static int cs_8409_boot_setup_real(struct hda_codec *codec)
 
         //setup_intmike_format_resetup(codec);
         //cs_8409_intmike_format_setup_format_nouse(codec);
-        cs_8409_really_update_stream_format(codec, 0x22, 1, 0, 0);
+        //cs_8409_really_update_stream_format(codec, 0x22, 1, 0, 0);
+        cs_8409_really_update_stream_format(codec, spec->intmike_adc_nid, 1, 0, 0);
 
         //setup_linein_nid(codec);
         cs_8409_linein_volume_setup(codec, 0x27);
@@ -1692,13 +2172,13 @@ static int cs_8409_boot_setup_real(struct hda_codec *codec)
         cs_8409_setup_TDM_amps12(codec, 1, 1);
 
         //setup_amps_6462(codec);
-        cs_8409_setup_amps12(codec);
+        cs_8409_setup_amps12(codec, 0);
 
         //setup_TDM_7472(codec);
         cs_8409_setup_TDM_amps34(codec,  1);
 
         //setup_amps_7472(codec);
-        cs_8409_setup_amps34(codec);
+        cs_8409_setup_amps34(codec, 0);
 
         //sync_converters(codec);
         cs_8409_sync_converters_on(codec, 1);
@@ -1757,14 +2237,14 @@ static int cs_8409_boot_setup_real(struct hda_codec *codec)
                 cs_8409_setup_TDM_amps12(codec, 1, 1);
 
                 //amps_enable2_6462(codec);
-                cs_8409_setup_amps12(codec);
+                cs_8409_setup_amps12(codec, 0);
 
                 // see above
                 //enable2_TDM2_7472(codec);
                 cs_8409_setup_TDM_amps34(codec, 1);
 
                 //amps_enable2_7472(codec);
-                cs_8409_setup_amps34(codec);
+                cs_8409_setup_amps34(codec, 0);
 
                 //sync_converters3(codec);
                 cs_8409_sync_converters_on(codec, 1);
@@ -1864,7 +2344,8 @@ static int cs_8409_boot_setup_real(struct hda_codec *codec)
 
         //setup_intmike_nid1(codec);
         //cs_8409_intmike_format_setup_format_nouse(codec);
-        cs_8409_really_update_stream_format(codec, 0x22, 1, 0, 0);
+        //cs_8409_really_update_stream_format(codec, 0x22, 1, 0, 0);
+        cs_8409_really_update_stream_format(codec, spec->intmike_adc_nid, 1, 0, 0);
 
         //setup_linein_vol7(codec);
         cs_8409_linein_volume_setup(codec, 0x27);
@@ -1886,10 +2367,12 @@ static int cs_8409_boot_setup_real(struct hda_codec *codec)
 
 
         //setup_intmike_vol10(codec);
-        cs_8409_volume_set(codec, 0x22, 0x33);
+        //cs_8409_volume_set(codec, 0x22, 0x33);
+        cs_8409_volume_set(codec, spec->intmike_adc_nid, 0x33);
 
         //setup_linein_vol10(codec);
-        cs_8409_volume_set(codec, 0x23, 0x33);
+        //cs_8409_volume_set(codec, 0x23, 0x33);
+        cs_8409_volume_set(codec, spec->linein_amp_nid, 0x33);
 
 
         mycodec_info(codec, "command cs_8409_boot_setup_real end\n");
@@ -2030,6 +2513,8 @@ static void cs_8409_intmike_stream_reset_nid_on(struct hda_codec *codec)
 {
         int retval;
 
+        struct cs_spec *spec = codec->spec;
+
 	// OK dont get this  - we turn the stream back on for the internal mike
 	// - but assume pin is OK??
 	// now think these 2 functions are resetting to original state - which happens
@@ -2037,9 +2522,10 @@ static void cs_8409_intmike_stream_reset_nid_on(struct hda_codec *codec)
 	// NOT PROPERLY FUNCTIONAL YET!!!!!
 
 //      retval = snd_hda_codec_read_check(codec, 0x22, 0, AC_VERB_GET_POWER_STATE, 0x00000000, 0x00000000, 23); // 0x022f0500
-        hda_set_node_power_state(codec, 0x22, AC_PWRST_D0);
+        hda_set_node_power_state(codec, spec->intmike_adc_nid, AC_PWRST_D0);
 
-        snd_hda_codec_write(codec, 0x22, 0, AC_VERB_SET_CHANNEL_STREAMID, 0x00000010); // 0x02270610
+        snd_hda_codec_write(codec, spec->intmike_adc_nid, 0, AC_VERB_SET_CHANNEL_STREAMID, 0x00000010); // 0x02270610
+        //snd_hda_codec_write(codec, 0x22, 0, AC_VERB_SET_CHANNEL_STREAMID, 0x00000010); // 0x02270610
 //      snd_hda:     conv stream channel map 34 [('CHAN', 0), ('STREAMID', 1)]
 
 }
@@ -2048,13 +2534,16 @@ static void cs_8409_linein_stream_reset_nid_off(struct hda_codec *codec)
 {
         int retval;
 
+        struct cs_spec *spec = codec->spec;
+
 	// OK dont get this  - we turn the stream off for the linein
 	// - but assume pin is OK??
 
 //      retval = snd_hda_codec_read_check(codec, 0x23, 0, AC_VERB_GET_POWER_STATE, 0x00000000, 0x00000000, 25); // 0x023f0500
-        hda_set_node_power_state(codec, 0x23, AC_PWRST_D0);
+        hda_set_node_power_state(codec, spec->linein_amp_nid, AC_PWRST_D0);
 
-        snd_hda_codec_write(codec, 0x23, 0, AC_VERB_SET_CHANNEL_STREAMID, 0x00000000); // 0x02370600
+        snd_hda_codec_write(codec, spec->linein_amp_nid, 0, AC_VERB_SET_CHANNEL_STREAMID, 0x00000000); // 0x02370600
+        //snd_hda_codec_write(codec, 0x23, 0, AC_VERB_SET_CHANNEL_STREAMID, 0x00000000); // 0x02370600
 //      snd_hda:     conv stream channel map 35 [('CHAN', 0), ('STREAMID', 0)]
 
 }
@@ -2063,7 +2552,7 @@ static void cs_8409_linein_stream_reset_nid_off(struct hda_codec *codec)
 static void cs_8409_capturestop_real(struct hda_codec *codec)
 {
         //int retval;
-        //struct cs_spec *spec = codec->spec;
+        struct cs_spec *spec = codec->spec;
 
         mycodec_info(codec, "command cs_8409_capturestop_real start");
 
@@ -2085,7 +2574,8 @@ static void cs_8409_capturestop_real(struct hda_codec *codec)
 	// we also reset the pin - however no change to volume or unmute 
 	// so cant say if should just set unmute or set volume to 0
 	// just choosing one
-	cs_8409_volume_set(codec, 0x44, 0x00);
+	//cs_8409_volume_set(codec, 0x44, 0x00);
+	cs_8409_volume_set(codec, spec->intmike_nid, 0x00);
 
 
 	cs_8409_intmike_format_setup_disable(codec);
@@ -2097,7 +2587,8 @@ static void cs_8409_capturestop_real(struct hda_codec *codec)
 	// we also reset the pin - however no change to volume or unmute 
 	// so cant say if should just set unmute or set volume to 0
 	// just choosing one
-	cs_8409_volume_set(codec, 0x45, 0x00);
+	//cs_8409_volume_set(codec, 0x45, 0x00);
+	cs_8409_volume_set(codec, spec->linein_nid, 0x00);
 
 
 	cs_8409_linein_format_setup_disable(codec);
@@ -2986,6 +3477,8 @@ static void cs_8409_linein_format_setup_enable(struct hda_codec *codec)
         int ret_coef9 = 0;
         int new_coef9 = 0;
 
+        struct cs_spec *spec = codec->spec;
+
         // theres some weird issue here
         // index 0x0009 has bit 0x0080 set only after an unplug event with headset with mike
         // but then never seems to be turned off!!!
@@ -3006,7 +3499,7 @@ static void cs_8409_linein_format_setup_enable(struct hda_codec *codec)
         //retval = snd_hda_codec_read_check(codec, 0x23, 0, AC_VERB_GET_POWER_STATE, 0x00000000, 0x00000033, 10555); // 0x023f0500
         //snd_hda_codec_write(codec, 0x23, 0, AC_VERB_SET_POWER_STATE, 0x00000000); // 0x02370500
         //retval = snd_hda_codec_read_check(codec, 0x23, 0, AC_VERB_GET_POWER_STATE, 0x00000000, 0x00000030, 10558); // 0x023f0500
-        hda_set_node_power_state(codec, 0x23, AC_PWRST_D0);
+        hda_set_node_power_state(codec, spec->linein_amp_nid, AC_PWRST_D0);
 
         //snd_hda_codec_write(codec, 0x23, 0, AC_VERB_SET_CHANNEL_STREAMID, 0x00000012); // 0x02370612
 //      snd_hda:     conv stream channel map 35 [('CHAN', 2), ('STREAMID', 1)]
@@ -3014,12 +3507,13 @@ static void cs_8409_linein_format_setup_enable(struct hda_codec *codec)
 
         // using the stored stream parameters update nid 0x23 stream parameters
         // we have limited the allowed formats so should only have working formats here
-        cs_8409_really_update_stream_format(codec, 0x23, 1, 1, 0);
+        //cs_8409_really_update_stream_format(codec, 0x23, 1, 1, 0);
+        cs_8409_really_update_stream_format(codec, spec->linein_amp_nid, 1, 1, 0);
 
 
         //snd_hda_codec_write(codec, 0x23, 0, AC_VERB_SET_POWER_STATE, 0x00000003); // 0x02370503
         //retval = snd_hda_codec_read_check(codec, 0x23, 0, AC_VERB_GET_POWER_STATE, 0x00000000, 0x00000033, 10561); // 0x023f0500
-        hda_set_node_power_state(codec, 0x23, AC_PWRST_D3);
+        hda_set_node_power_state(codec, spec->linein_amp_nid, AC_PWRST_D3);
 
 
 //      snd_hda: # AppleHDAWidgetCS8409::setConnectionSelect: 
@@ -3028,7 +3522,8 @@ static void cs_8409_linein_format_setup_enable(struct hda_codec *codec)
         myprintk_dbg("snd_hda_intel: masked cs_8409_linein_format_setup_enable coef 0x09 update 0x%04x 0x%04x \n", ret_coef9, new_coef9);
         //snd_hda_coef_item(codec, 1, CS8409_VENDOR_NID, 0x0009, 0x00b3, 0x00000000, 10567 ); // AppleHDAWidgetCS8409::setConnectionSelect  coef write 10567
         snd_hda_coef_item(codec, 1, CS8409_VENDOR_NID, 0x0009, new_coef9, 0x00000000, 0 ); // AppleHDAWidgetCS8409::setConnectionSelect  coef write 10567
-        snd_hda_codec_write(codec, 0x23, 0, AC_VERB_SET_CONNECT_SEL, 0x00000000); // 0x02370100
+        //snd_hda_codec_write(codec, 0x23, 0, AC_VERB_SET_CONNECT_SEL, 0x00000000); // 0x02370100
+        snd_hda_codec_write(codec, spec->linein_amp_nid, 0, AC_VERB_SET_CONNECT_SEL, 0x00000000); // 0x02370100
 
 }
 
@@ -3057,28 +3552,32 @@ static void cs_8409_intmike_stream_conn_off_disable(struct hda_codec *codec)
 {
         int retval;
 
+        struct cs_spec *spec = codec->spec;
+
         // more weird issue here
         // index 0x0009 has bit 0x0100 set only after an unplug event with headset with mike
         // it is reset
 
-        // 0x44 -> 0x22 is internal (I think) mike input
+        // 0x44 -> 0x22 is internal (I think) mike input (macbook pro)
 
         snd_hda_codec_write(codec, CS8409_VENDOR_NID, 0, AC_VERB_SET_PROC_STATE, 0x00000001); // 0x04770301
 
-        retval = snd_hda_codec_read_check(codec, 0x22, 0, AC_VERB_GET_CONV, 0x00000000, 0x00000000, 0); // 0x022f0600
+        retval = snd_hda_codec_read_check(codec, spec->intmike_adc_nid, 0, AC_VERB_GET_CONV, 0x00000000, 0x00000000, 0); // 0x022f0600
+        //retval = snd_hda_codec_read_check(codec, 0x22, 0, AC_VERB_GET_CONV, 0x00000000, 0x00000000, 0); // 0x022f0600
 //      snd_hda:     conv stream channel map 34 [('CHAN', 0), ('STREAMID', 0)]
 
         //retval = snd_hda_codec_read_check(codec, 0x22, 0, AC_VERB_GET_POWER_STATE, 0x00000000, 0x00000033, 10596); // 0x022f0500
         //snd_hda_codec_write(codec, 0x22, 0, AC_VERB_SET_POWER_STATE, 0x00000000); // 0x02270500
         //retval = snd_hda_codec_read_check(codec, 0x22, 0, AC_VERB_GET_POWER_STATE, 0x00000000, 0x00000030, 10599); // 0x022f0500
-        hda_set_node_power_state(codec, 0x22, AC_PWRST_D0);
+        hda_set_node_power_state(codec, spec->intmike_adc_nid, AC_PWRST_D0);
 
-        snd_hda_codec_write(codec, 0x22, 0, AC_VERB_SET_CHANNEL_STREAMID, 0x00000000); // 0x02270600
+        snd_hda_codec_write(codec, spec->intmike_adc_nid, 0, AC_VERB_SET_CHANNEL_STREAMID, 0x00000000); // 0x02270600
+        //snd_hda_codec_write(codec, 0x22, 0, AC_VERB_SET_CHANNEL_STREAMID, 0x00000000); // 0x02270600
 //      snd_hda:     conv stream channel map 34 [('CHAN', 0), ('STREAMID', 0)]
 
         //snd_hda_codec_write(codec, 0x22, 0, AC_VERB_SET_POWER_STATE, 0x00000003); // 0x02270503
         //retval = snd_hda_codec_read_check(codec, 0x22, 0, AC_VERB_GET_POWER_STATE, 0x00000000, 0x00000033, 10602); // 0x022f0500
-        hda_set_node_power_state(codec, 0x22, AC_PWRST_D3);
+        hda_set_node_power_state(codec, spec->intmike_adc_nid, AC_PWRST_D3);
 
         // this is NOT from setConnectionSelect - unkown where from
         // very not clear what this does - it appears as part of the multiple disable/enables
@@ -3092,22 +3591,26 @@ static void cs_8409_intmike_stream_conn_off_enable(struct hda_codec *codec)
 {
         int retval;
 
+        struct cs_spec *spec = codec->spec;
+
         snd_hda_codec_write(codec, CS8409_VENDOR_NID, 0, AC_VERB_SET_PROC_STATE, 0x00000001); // 0x04770301
 
-        retval = snd_hda_codec_read_check(codec, 0x22, 0, AC_VERB_GET_CONV, 0x00000000, 0x00000000, 0); // 0x022f0600
+        retval = snd_hda_codec_read_check(codec, spec->intmike_adc_nid, 0, AC_VERB_GET_CONV, 0x00000000, 0x00000000, 0); // 0x022f0600
+        //retval = snd_hda_codec_read_check(codec, 0x22, 0, AC_VERB_GET_CONV, 0x00000000, 0x00000000, 0); // 0x022f0600
 //      snd_hda:     conv stream channel map 34 [('CHAN', 0), ('STREAMID', 0)]
 
         //retval = snd_hda_codec_read_check(codec, 0x22, 0, AC_VERB_GET_POWER_STATE, 0x00000000, 0x00000033, 10676); // 0x022f0500
         //snd_hda_codec_write(codec, 0x22, 0, AC_VERB_SET_POWER_STATE, 0x00000000); // 0x02270500
         //retval = snd_hda_codec_read_check(codec, 0x22, 0, AC_VERB_GET_POWER_STATE, 0x00000000, 0x00000030, 10679); // 0x022f0500
-        hda_set_node_power_state(codec, 0x22, AC_PWRST_D0);
+        hda_set_node_power_state(codec, spec->intmike_adc_nid, AC_PWRST_D0);
 
-        snd_hda_codec_write(codec, 0x22, 0, AC_VERB_SET_CHANNEL_STREAMID, 0x00000000); // 0x02270600
+        snd_hda_codec_write(codec, spec->intmike_adc_nid, 0, AC_VERB_SET_CHANNEL_STREAMID, 0x00000000); // 0x02270600
+        //snd_hda_codec_write(codec, 0x22, 0, AC_VERB_SET_CHANNEL_STREAMID, 0x00000000); // 0x02270600
 //      snd_hda:     conv stream channel map 34 [('CHAN', 0), ('STREAMID', 0)]
 
         //snd_hda_codec_write(codec, 0x22, 0, AC_VERB_SET_POWER_STATE, 0x00000003); // 0x02270503
         //retval = snd_hda_codec_read_check(codec, 0x22, 0, AC_VERB_GET_POWER_STATE, 0x00000000, 0x00000033, 10682); // 0x022f0500
-        hda_set_node_power_state(codec, 0x22, AC_PWRST_D3);
+        hda_set_node_power_state(codec, spec->intmike_adc_nid, AC_PWRST_D3);
 
         // this is NOT from setConnectionSelect - unknown where from
         // very not clear what this does - it appears as part of the multiple disable/enables
@@ -3119,6 +3622,8 @@ static void cs_8409_intmike_stream_conn_off_enable(struct hda_codec *codec)
 
 static void cs_8409_intmike_linein_resetup(struct hda_codec *codec)
 {
+        struct cs_spec *spec = codec->spec;
+
         // for some very strange reason we setup a 4 channel format after unplug of headset with mike
 
         //cs_8409_intmike_format_setup_format33(codec);
@@ -3146,7 +3651,8 @@ static void cs_8409_intmike_linein_resetup(struct hda_codec *codec)
 
 
         //cs_8409_intmike_format_setup_format_nouse(codec);
-        cs_8409_really_update_stream_format(codec, 0x22, 1, 0, 0);
+        //cs_8409_really_update_stream_format(codec, 0x22, 1, 0, 0);
+        cs_8409_really_update_stream_format(codec, spec->intmike_adc_nid, 1, 0, 0);
 
         cs_8409_linein_volume_setup(codec, 0x27);
 

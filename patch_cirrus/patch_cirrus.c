@@ -100,6 +100,13 @@ struct cs_spec {
 	struct unsol_item unsol_items_prealloc[10];
 	int unsol_items_prealloc_used[10];
 
+	// add in specific nids for the intmike and linein as they seem to swap
+	// between macbook pros (14,3) and imacs (18,3)
+	int intmike_nid;
+	int linein_nid;
+	int intmike_adc_nid;
+	int linein_amp_nid;
+
 	// new item to deal with jack presence as Apple seems to have barfed
 	// the HDA spec by using a separate headphone chip
 	int jack_present;
@@ -1437,7 +1444,7 @@ static int cs_8409_capture_pcm_prepare(struct hda_pcm_stream *hinfo,
                                unsigned int format,
                                struct snd_pcm_substream *substream)
 {
-        struct hda_gen_spec *spec = codec->spec;
+        struct cs_spec *spec = codec->spec;
 
         codec_dbg(codec, "cs_8409_capture_pcm_prepare\n");
 
@@ -1457,7 +1464,7 @@ static int cs_8409_capture_pcm_prepare(struct hda_pcm_stream *hinfo,
 	//        - so as the format here is same (or at least should be!!) as that setup there is no format difference to that
 	//        cached and snd_hda_coded_setup_stream does nothing
 
-	if (hinfo->nid == 0x22)
+	if (hinfo->nid == spec->intmike_adc_nid)
 	{
 
 	// so this is getting stranger and stranger
@@ -1492,8 +1499,8 @@ static int cs_8409_capture_pcm_prepare(struct hda_pcm_stream *hinfo,
         //                      HDA_GEN_PCM_ACT_PREPARE);
 	// but its a trivial function - at least for the moment!!
 	// note this hook if defined also needs to switch between the 2 versions of input!!
-        if (spec->pcm_capture_hook)
-                spec->pcm_capture_hook(hinfo, codec, substream, HDA_GEN_PCM_ACT_PREPARE);
+        if (spec->gen.pcm_capture_hook)
+                spec->gen.pcm_capture_hook(hinfo, codec, substream, HDA_GEN_PCM_ACT_PREPARE);
 
         return 0;
 }
@@ -1646,9 +1653,9 @@ static int cs_8409_init(struct hda_codec *codec)
 	// (I still dont really understand the linux generic coding here)
 	// with capture devices we seem to get 2 pcm streams (0 and 1)
 	// each pcm stream has an output stream (0) and an input stream (1)
-	// the 1st pcm stream (0) is assigned nid 0x02 for output and nid 0x22 for input (internal mike)
+	// the 1st pcm stream (0) is assigned nid 0x02 for output and nid 0x22 (macbook pro) for input (internal mike)
 	// the 2nd pcm stream (1) has a dummy output stream and nid 0x1a for input (headset mike via cs42l83)
-	// (NOTE this means the line input stream (0x45->0x32) is not assigned currently ie not useable)
+	// (NOTE this means the line input stream (0x45->0x23) (macbook pro) is not assigned currently ie not useable)
 
         list_for_each_entry(info, &codec->pcm_list_head, list) {
                 int stream;
@@ -1676,10 +1683,11 @@ static int cs_8409_init(struct hda_codec *codec)
 				}
 				else if (stream == SNDRV_PCM_STREAM_CAPTURE)
 				{
-					if (hinfo->nid == 0x22)
+					//if (hinfo->nid == 0x22)
+					if (hinfo->nid == spec->intmike_adc_nid)
 					{
 						// this is the internal mike
-						// this is a bit weird - the output nodes are id'ed by output input pin nid
+						// this is a bit weird - the output nodes are id'ed by input pin nid
 						// but the input nodes are done by the input (adc) nid - not the input pin nid
 						codec_dbg(codec, "cs_8409_init info capture stream %d pointer %p\n",stream,hinfo);
 						// so now we could force the rates and formats to the single one Apple defines ie 44.1 kHz and S24_LE
@@ -1697,7 +1705,7 @@ static int cs_8409_init(struct hda_codec *codec)
 					else if (hinfo->nid == 0x1a)
 					{
 						// this is the external mike ie headset mike
-						// this is a bit weird - the output nodes are id'ed by output input pin nid
+						// this is a bit weird - the output nodes are id'ed by input pin nid
 						// but the input nodes are done by the input (adc) nid - not the input pin nid
 						codec_dbg(codec, "cs_8409_init info capture stream %d pointer %p\n",stream,hinfo);
 						// so now we force the rates and formats to the single one Apple defines ie 44.1 kHz and S24_LE
@@ -1911,7 +1919,7 @@ static int cs_8409_parse_auto_config(struct hda_codec *codec)
 	// because it appears the auto config assumes the inputs are connected to an ADC (or audio input converter widget)
 	// (NOTE - although these are labelled ADC nodes in the code they may not have an actual analog to digital
 	//  converter - may just be a digital sample formatter eg S/PDIF input - for the 8409 the internal mike
-	//  seems to be a standard ADC node (0x22) but the headphone input node (0x1a) is a digital input as digitization
+	//  seems to be a standard ADC node (eg 0x22 for macbook pro) but the headphone input node (0x1a) is a digital input as digitization
 	//  has already occurred in the cs42l83)
 	// now recoding the input setup in separate function
 	//spec->gen.num_adc_nids = 0;
@@ -2435,6 +2443,23 @@ static int patch_cs8409(struct hda_codec *codec)
         spec->headset_phase = 0;
 
         spec->headset_enable = 0;
+
+
+        // setup the intmike and linein nids
+        if (codec->core.subsystem_id == 0x106b1000)
+        {
+                spec->intmike_nid = 0x45;
+                spec->intmike_adc_nid = 0x23;
+                spec->linein_nid = 0x44;
+                spec->linein_amp_nid = 0x22;
+        }
+        else
+        {
+                spec->intmike_nid = 0x44;
+                spec->intmike_adc_nid = 0x22;
+                spec->linein_nid = 0x45;
+                spec->linein_amp_nid = 0x23;
+        }
 
 
         // so it appears we dont get interrupts in the auto config stage

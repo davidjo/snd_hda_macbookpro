@@ -928,6 +928,11 @@ static void cs_8409_play_data_ssm3(struct hda_codec *codec)
 // 14,2 0x106b3600
 // 14,3 0x106b3900
 
+// imac subsystem ids
+// 18,3 0x106b1000
+// 19,1 0x106b1000
+
+
 static int cs_8409_data_config(struct hda_codec *codec);
 static int cs_8409_real_config(struct hda_codec *codec);
 
