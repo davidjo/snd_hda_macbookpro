@@ -21,9 +21,16 @@ hda_dir="$build_dir/hda-$kernel_version"
 [[ ! -d $build_dir ]] && mkdir $build_dir
 [[ -d $hda_dir ]] && rm -rf $hda_dir
 
-if [ ! -d /usr/src/linux-headers-$(uname -r) ]; then
-
-	echo "linux kernel headers not found in /usr/src: /usr/src/linux-headers-$(uname -r)"
+if [ -d /usr/src/linux-headers-$(uname -r) ]; then
+	# Debian Based Distro
+	:
+elif [ -d /usr/src/kernels/$(uname -r) ]; then
+	# Fedora Based Distro
+	:
+else
+	echo "linux kernel headers not found in /usr/src:"
+	echo "Debian: /usr/src/linux-headers-$(uname -r)"
+	echo "Fedora: /usr/src/kernels/$(uname -r)"
 	echo "assuming the linux kernel headers package is not installed"
 	echo "please install the appropriate linux kernel headers package:"
 	echo "sudo apt install linux-headers-$revpart3"
