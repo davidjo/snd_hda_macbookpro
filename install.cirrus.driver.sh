@@ -29,7 +29,7 @@ elif [ -d /usr/src/kernels/$(uname -r) ]; then
 	:
 else
 	echo "linux kernel headers not found in /usr/src:"
-	echo "Debian: /usr/src/linux-headers-$(uname -r)"
+	echo "Debian (eg Ubuntu): /usr/src/linux-headers-$(uname -r)"
 	echo "Fedora: /usr/src/kernels/$(uname -r)"
 	echo "assuming the linux kernel headers package is not installed"
 	echo "please install the appropriate linux kernel headers package:"
