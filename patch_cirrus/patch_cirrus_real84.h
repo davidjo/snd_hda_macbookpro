@@ -1512,10 +1512,40 @@ static void cs_8409_inputs_power_nids_off(struct hda_codec *codec)
 
 }
 
+static void cs_8409_plugin_handle_detect(struct hda_codec *codec);
+
+static int cs_8409_boot_setup_headphone(struct hda_codec *codec)
+{
+        // this code is currently a copy paste from
+        // cs_8409_headset_plugin_event and its calls minus some of the sensing
+        // stuff because cs_8409_boot_setup_real handles the sensing for us
+
+        struct cs_spec *spec = codec->spec;
+
+        mycodec_info(codec, "cs_8409_boot_setup_headphone start\n");
+
+        // necessary ?
+        cs_8409_plugin_handle_detect(codec);
+
+        spec->jack_present = 1;
+        spec->headset_enable = 1;
+        cs42l83_complete_jack_detect(codec);
+        cs42l83_power_hs_bias_on(codec);
+
+        cs42l83_enable_hs_auto_int_on(codec);
+        cs42l83_unplug_interrupt_setup(codec);
+        cs42l83_headset_detect_on(codec);
+
+        spec->headset_phase = 2;
+
+        mycodec_info(codec, "cs_8409_boot_setup_headphone end\n");
+
+        return 0;
+}
 
 static int cs_8409_boot_setup_real(struct hda_codec *codec)
 {
-        int retval;
+        int headset_on_boot = 0, retval;
 
         //struct cs_spec *spec = codec->spec;
         //hda_nid_t beep_nid = spec->beep_nid;
@@ -1641,7 +1671,9 @@ static int cs_8409_boot_setup_real(struct hda_codec *codec)
 
         if ((retval & 0x80))
         {
-                dev_info(hda_codec_dev(codec), "cs_8409_boot_setup_real headphone ALREADY PLUGGED IN UNIMPLEMENTED!!\n");
+                dev_info(hda_codec_dev(codec), "cs_8409_boot_setup_real headphone already plugged in!!\n");
+                // store for after init
+                headset_on_boot = 1;
         }
 
 
@@ -1815,7 +1847,11 @@ static int cs_8409_boot_setup_real(struct hda_codec *codec)
         //setup_input_power_nids_off(codec);
         cs_8409_inputs_power_nids_off(codec);
 
-
+        // disabling headphone sense if already plugged *seems* to give a lesser
+        // chance of causing a max count error in cs_8409_read_status_and_clear_interrupt
+        // - this really needs to be properly tested
+        if (!headset_on_boot)
+        {
         //read_gpio_status1(codec);
 
         //read_gpio_status2(codec);
@@ -1860,7 +1896,7 @@ static int cs_8409_boot_setup_real(struct hda_codec *codec)
         //cs42l83_headphone_sense3(codec);
         retval = cs42l83_headphone_sense(codec);
         mycodec_dbg(codec, "cs_8409_boot_setup_real headphone sense 3 0x%x\n", retval);
-
+        }
 
         //setup_intmike_nid1(codec);
         //cs_8409_intmike_format_setup_format_nouse(codec);
@@ -1891,6 +1927,12 @@ static int cs_8409_boot_setup_real(struct hda_codec *codec)
         //setup_linein_vol10(codec);
         cs_8409_volume_set(codec, 0x23, 0x33);
 
+        // a bit hacky, but initialising the headphones as if they were plugged will work
+        // also not sure if all of the init code above is necessary if this is called
+        // NOTE: this does something bad to the interrupts and *sometimes* causes an error in
+        // cs_8409_read_status_and_clear_interrupt so it isn't stable
+        if (headset_on_boot)
+                cs_8409_boot_setup_headphone(codec);
 
         mycodec_info(codec, "command cs_8409_boot_setup_real end\n");
 
@@ -3413,7 +3455,6 @@ static void cs_8409_plugin_event_continued(struct hda_codec *codec)
         mycodec_info(codec, "cs_8409_plugin_event_continued end\n");
 }
 
-static void cs_8409_plugin_handle_detect(struct hda_codec *codec);
 static void cs_8409_plugin_complete_detect(struct hda_codec *codec);
 
 
