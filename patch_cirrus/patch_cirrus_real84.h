@@ -1512,10 +1512,40 @@ static void cs_8409_inputs_power_nids_off(struct hda_codec *codec)
 
 }
 
+static void cs_8409_plugin_handle_detect(struct hda_codec *codec);
+
+static int cs_8409_boot_setup_headphone(struct hda_codec *codec)
+{
+        // this code is currently a copy paste from
+        // cs_8409_headset_plugin_event and its calls minus some of the sensing
+        // stuff because cs_8409_boot_setup_real handles the sensing for us
+
+        struct cs_spec *spec = codec->spec;
+
+        mycodec_info(codec, "cs_8409_boot_setup_headphone start\n");
+
+        // necessary ?
+        cs_8409_plugin_handle_detect(codec);
+
+        spec->jack_present = 1;
+        spec->headset_enable = 1;
+        cs42l83_complete_jack_detect(codec);
+        cs42l83_power_hs_bias_on(codec);
+
+        cs42l83_enable_hs_auto_int_on(codec);
+        cs42l83_unplug_interrupt_setup(codec);
+        cs42l83_headset_detect_on(codec);
+
+        spec->headset_phase = 2;
+
+        mycodec_info(codec, "cs_8409_boot_setup_headphone end\n");
+
+        return 0;
+}
 
 static int cs_8409_boot_setup_real(struct hda_codec *codec)
 {
-        int retval;
+        int headset_on_boot = 0, retval;
 
         //struct cs_spec *spec = codec->spec;
         //hda_nid_t beep_nid = spec->beep_nid;
@@ -1641,7 +1671,9 @@ static int cs_8409_boot_setup_real(struct hda_codec *codec)
 
         if ((retval & 0x80))
         {
-                dev_info(hda_codec_dev(codec), "cs_8409_boot_setup_real headphone ALREADY PLUGGED IN UNIMPLEMENTED!!\n");
+                dev_info(hda_codec_dev(codec), "cs_8409_boot_setup_real headphone already plugged in!!\n");
+                // store for after init
+                headset_on_boot = 1;
         }
 
 
@@ -1815,7 +1847,11 @@ static int cs_8409_boot_setup_real(struct hda_codec *codec)
         //setup_input_power_nids_off(codec);
         cs_8409_inputs_power_nids_off(codec);
 
-
+        // disabling headphone sense if already plugged *seems* to give a lesser
+        // chance of causing a max count error in cs_8409_read_status_and_clear_interrupt
+        // - this really needs to be properly tested
+        if (!headset_on_boot)
+        {
         //read_gpio_status1(codec);
 
         //read_gpio_status2(codec);
@@ -1860,7 +1896,7 @@ static int cs_8409_boot_setup_real(struct hda_codec *codec)
         //cs42l83_headphone_sense3(codec);
         retval = cs42l83_headphone_sense(codec);
         mycodec_dbg(codec, "cs_8409_boot_setup_real headphone sense 3 0x%x\n", retval);
-
+        }
 
         //setup_intmike_nid1(codec);
         //cs_8409_intmike_format_setup_format_nouse(codec);
@@ -1891,6 +1927,12 @@ static int cs_8409_boot_setup_real(struct hda_codec *codec)
         //setup_linein_vol10(codec);
         cs_8409_volume_set(codec, 0x23, 0x33);
 
+        // a bit hacky, but initialising the headphones as if they were plugged will work
+        // also not sure if all of the init code above is necessary if this is called
+        // NOTE: this does something bad to the interrupts and *sometimes* causes an error in
+        // cs_8409_read_status_and_clear_interrupt so it isn't stable
+        if (headset_on_boot)
+                cs_8409_boot_setup_headphone(codec);
 
         mycodec_info(codec, "command cs_8409_boot_setup_real end\n");
 
@@ -3189,10 +3231,13 @@ static void cs_8409_intmike_linein_resetup(struct hda_codec *codec)
 #define BUTTON_DOWN_PRESS 0x10000
 #define BUTTON_UP_PRESS 0x20000
 #define BUTTON_RELEASE 0x100000
+// pressing the play/pause button on earbuds yields 0x100 on down and 0x200 on up
+#define BUTTON_TOGGLE_DOWN_PRESS 0x100
+#define BUTTON_TOGGLE_UP_PRESS 0x200
 #define BUTTON_DETECT_MAIN 0x1800  // we only see 0x800 but the mask allows for these 2 bits
 #define BUTTON_DETECT 0x40
 #define MIKE_CONNECT 0x02
-#define BUTTONS (BUTTON_UP_PRESS | BUTTON_DOWN_PRESS)
+#define BUTTONS (BUTTON_UP_PRESS | BUTTON_DOWN_PRESS | BUTTON_TOGGLE_UP_PRESS | BUTTON_TOGGLE_DOWN_PRESS)
 #define HSDET_AUTO_DONE 0x02
 #define PDN_DONE 0x01
 
@@ -3229,24 +3274,27 @@ static void cs_8409_interrupt_action(struct hda_codec *codec, int int_response)
                 cs_8409_headset_type_detect_event(codec);
 
                 // and this is where life gets really complicated
-		// if we have a mike we do a button detect - but that leads to an unsolicited response
-		// so we only continue here I think if we dont have a mike
-		if (!(spec->have_mike))
+                // if we have a mike we do a button detect - but that leads to an unsolicited response
+                // so we only continue here I think if we dont have a mike
+                if (!(spec->have_mike))
                 {
                         cs_8409_plugin_event_continued(codec);
                 }
         }
         // not clear what test is here - but this should check what we see - one button interrupt seems to be activated
-	// when doing the button detect
+        // when doing the button detect
         // not sure what the exact button interrupt is - we get 0x140800
         // so the button detect interrupt is 0x0800 - the 0x140000 are actual button interrupts (undocumented for cs42l42)
         else if (int_response & BUTTON_DETECT_MAIN)
         {
-		dev_info(hda_codec_dev(codec), "cs_8409_interrupt_action - buttons detected\n");
-		cs_8409_headset_button_detect_event(codec);
+                dev_info(hda_codec_dev(codec), "cs_8409_interrupt_action - buttons detected\n");
+                cs_8409_headset_button_detect_event(codec);
 
         }
-        else if (((int_response & BUTTON_UP_PRESS) == BUTTON_UP_PRESS) || ((int_response & BUTTON_DOWN_PRESS) == BUTTON_DOWN_PRESS))
+        else if (((int_response & BUTTON_UP_PRESS) == BUTTON_UP_PRESS) ||
+                 ((int_response & BUTTON_DOWN_PRESS) == BUTTON_DOWN_PRESS) ||
+                 ((int_response & BUTTON_TOGGLE_UP_PRESS) == BUTTON_TOGGLE_UP_PRESS) ||
+                 ((int_response & BUTTON_TOGGLE_DOWN_PRESS) == BUTTON_TOGGLE_DOWN_PRESS))
         {
                 dev_info(hda_codec_dev(codec), "cs_8409_interrupt_action - button event on \n");
                 cs_8409_headset_button_event(codec, int_response);
@@ -3255,7 +3303,7 @@ static void cs_8409_interrupt_action(struct hda_codec *codec, int int_response)
         else if (((int_response & BUTTON_RELEASE) == BUTTON_RELEASE))
         {
                 dev_info(hda_codec_dev(codec), "cs_8409_interrupt_action - button event off \n");
-		cs_8409_headset_button_event(codec, int_response);
+                cs_8409_headset_button_event(codec, int_response);
 
         }
         else if ((int_response & PDN_DONE) == PDN_DONE)
@@ -3407,7 +3455,6 @@ static void cs_8409_plugin_event_continued(struct hda_codec *codec)
         mycodec_info(codec, "cs_8409_plugin_event_continued end\n");
 }
 
-static void cs_8409_plugin_handle_detect(struct hda_codec *codec);
 static void cs_8409_plugin_complete_detect(struct hda_codec *codec);
 
 
