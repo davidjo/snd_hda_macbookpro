@@ -27,10 +27,14 @@ if [ -d /usr/src/linux-headers-$(uname -r) ]; then
 elif [ -d /usr/src/kernels/$(uname -r) ]; then
 	# Fedora Based Distro
 	:
+elif [ -d /lib/modules/$(uname -r) ]; then
+	# Manjaro
+	:
 else
 	echo "linux kernel headers not found in /usr/src:"
 	echo "Debian (eg Ubuntu): /usr/src/linux-headers-$(uname -r)"
 	echo "Fedora: /usr/src/kernels/$(uname -r)"
+	echo "Manjaro: /lib/modules/$(uname -r)"
 	echo "assuming the linux kernel headers package is not installed"
 	echo "please install the appropriate linux kernel headers package:"
 	echo "sudo apt install linux-headers-$revpart3"
