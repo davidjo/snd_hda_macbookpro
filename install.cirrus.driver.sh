@@ -27,13 +27,19 @@ if [ -d /usr/src/linux-headers-$(uname -r) ]; then
 elif [ -d /usr/src/kernels/$(uname -r) ]; then
 	# Fedora Based Distro
 	:
+elif [ -d /usr/lib/modules/$(uname -r) ]; then
+	# Arch Linux Based Distro
+	:
 else
-	echo "linux kernel headers not found in /usr/src:"
+	echo "Linux kernel headers not found."
 	echo "Debian (eg Ubuntu): /usr/src/linux-headers-$(uname -r)"
 	echo "Fedora: /usr/src/kernels/$(uname -r)"
+	echo "Arch Linux: /usr/lib/modules/$(uname -r)"
 	echo "assuming the linux kernel headers package is not installed"
 	echo "please install the appropriate linux kernel headers package:"
-	echo "sudo apt install linux-headers-$revpart3"
+	echo "Debian: sudo apt install linux-headers-$revpart3"
+	echo "Fedora: sudo dnf install kernel-headers"
+	echo "Arch Linux: sudo pacman -S linux-headers"
 
 	exit 1
 
