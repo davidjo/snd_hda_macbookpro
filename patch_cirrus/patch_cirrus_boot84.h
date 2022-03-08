@@ -1753,7 +1753,7 @@ static void determine_speaker_id(struct hda_codec *codec)
 
         // this is call AppleHDAFunctionGroup::setGPIOEnable in determineSpeakerID
 
-        if (codec->core.subsystem_id == 0x106b3900)
+        if (codec->core.subsystem_id == 0x106b1000)
         {
                 //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_GPIO_MASK, 0x00000008); // 0x00171608
 //              snd_hda:     gpio enable 1 0x08
@@ -1771,13 +1771,13 @@ static void determine_speaker_id(struct hda_codec *codec)
 
                 retval = snd_hda_codec_read(codec, codec->core.afg, 0, AC_VERB_GET_GPIO_DATA, 0x00000000); // 0x001f1500
 
-                mycodec_info(codec, "command determine_speaker_id gpio data 0x%08x\n", retval);
+                mycodec_info(codec, "command determine_speaker_id gpio mask 0x8 data 0x%08x\n", retval);
 
                 snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_GPIO_MASK, 0x0000000c); // 0x0017160c
 
                 retval = snd_hda_codec_read(codec, codec->core.afg, 0, AC_VERB_GET_GPIO_DATA, 0x00000000); // 0x001f1500
 
-                mycodec_info(codec, "command determine_speaker_id gpio data 0x%08x\n", retval);
+                mycodec_info(codec, "command determine_speaker_id gpio mask 0xc data 0x%08x\n", retval);
 
 	}
 	else
@@ -1792,7 +1792,7 @@ static void determine_speaker_id(struct hda_codec *codec)
 
                 retval = snd_hda_codec_read(codec, codec->core.afg, 0, AC_VERB_GET_GPIO_DATA, 0x00000000); // 0x001f1500
 
-                mycodec_info(codec, "command determine_speaker_id gpio data 0x%08x\n", retval);
+                mycodec_info(codec, "command determine_speaker_id gpio mask 0x4 data 0x%08x\n", retval);
 
 	}
 
