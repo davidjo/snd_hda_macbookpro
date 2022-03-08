@@ -3533,6 +3533,8 @@ static void cs_8409_linein_stream_on_nid(struct hda_codec *codec)
         int reg_coef82 = 0;
         int new_coef82 = 0;
 
+        struct cs_spec *spec = codec->spec;
+
         reg_coef82 = snd_hda_coef_item_check(codec, 0, CS8409_VENDOR_NID, 0x0082, 0x0000, 0x00005401, 0 ); //   coef read 10584
 
         new_coef82 = (reg_coef82 | 0x2);
@@ -3541,9 +3543,12 @@ static void cs_8409_linein_stream_on_nid(struct hda_codec *codec)
         //snd_hda_coef_item(codec, 1, CS8409_VENDOR_NID, 0x0082, 0x5403, 0x00000000, 10588 ); //   coef write 10588
         snd_hda_coef_item(codec, 1, CS8409_VENDOR_NID, 0x0082, new_coef82, 0x00000000, 10588 ); //   coef write 10588
 
-        retval = snd_hda_codec_read_check(codec, 0x45, 0, AC_VERB_GET_PIN_WIDGET_CONTROL, 0x00000000, 0x00000000, 0); // 0x045f0700
+        //retval = snd_hda_codec_read_check(codec, 0x45, 0, AC_VERB_GET_PIN_WIDGET_CONTROL, 0x00000000, 0x00000000, 0); // 0x045f0700
+        retval = snd_hda_codec_read_check(codec, spec->linein_nid, 0, AC_VERB_GET_PIN_WIDGET_CONTROL, 0x00000000, 0x00000000, 0); // 0x045f0700
 
-        snd_hda_codec_write(codec, 0x45, 0, AC_VERB_SET_PIN_WIDGET_CONTROL, 0x00000020); // 0x04570720
+        snd_hda_codec_write(codec, spec->linein_nid, 0, AC_VERB_SET_PIN_WIDGET_CONTROL, 0x00000020); // 0x04570720
+
+        //snd_hda_codec_write(codec, 0x45, 0, AC_VERB_SET_PIN_WIDGET_CONTROL, 0x00000020); // 0x04570720
 //      snd_hda:     69 ['AC_PINCTL_IN_EN']
 
 }
