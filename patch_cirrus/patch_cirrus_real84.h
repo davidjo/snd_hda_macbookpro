@@ -2107,7 +2107,11 @@ static int cs_8409_boot_setup_real(struct hda_codec *codec)
 
         cs42l83_mic_detect(codec);
 
-        cs42l83_tip_sense(codec);
+        // apparently the imacs use an inverted circuit for physical sensing of jack being plugged in
+        if (codec->core.subsystem_id == 0x106b1000)
+                cs42l83_tip_sense(codec, 1);
+        else
+                cs42l83_tip_sense(codec, 0);
 
         cs42l83_plugin_interrupt_setup(codec);
 
@@ -3092,7 +3096,7 @@ static void cs43l83_headset_amp_format_setup(struct hda_codec *codec, int full)
         //snd_hda_codec_write(codec, 0x0a, 0, AC_VERB_SET_CHANNEL_STREAMID, 0x00000010); // 0x00a70610
 //      snd_hda:     conv stream channel map 10 [('CHAN', 0), ('STREAMID', 1)]
 
-        // using the stored stream parameters update nid 0x1a stream parameters
+        // using the stored stream parameters update nid 0x0a stream parameters
         // we have limited the allowed formats so should only have working formats here
         cs_8409_really_update_stream_format(codec, 0x0a, 1, 2, 0);
 
@@ -3584,7 +3588,7 @@ static void cs_8409_intmike_stream_conn_off_disable(struct hda_codec *codec)
         //retval = snd_hda_codec_read_check(codec, 0x22, 0, AC_VERB_GET_POWER_STATE, 0x00000000, 0x00000033, 10602); // 0x022f0500
         hda_set_node_power_state(codec, spec->intmike_adc_nid, AC_PWRST_D3);
 
-        // this is NOT from setConnectionSelect - unkown where from
+        // this is NOT from setConnectionSelect - unknown where from
         // very not clear what this does - it appears as part of the multiple disable/enables
 //      snd_hda_coef_item_masked(codec, 2, CS8409_VENDOR_NID, 0x0009, 0x01b3, 0xffff, 0x000000b3, 0, 10604 ); // coef write mask 10604
         snd_hda_coef_item_masked(codec, 2, CS8409_VENDOR_NID, 0x0009, 0x0100, 0x0000, 0x000000b3, 0x01b3, 0 ); // coef write mask 10604

@@ -2412,13 +2412,13 @@ static void cs42l83_mic_detect(struct hda_codec *codec)
         mycodec_info(codec, "command cs42l83_mic_detect end\n");
 }
 
-static void cs42l83_tip_sense(struct hda_codec *codec)
+static void cs42l83_tip_sense(struct hda_codec *codec, int invert)
 {
         int retval;
         int newval1;
         int newval2;
         int newval;
-        int flag = 0;
+        //int invert = 0;
 
         // likely in AppleHDAMikeyInternalCS8409::setupJackDetection
 	// - only 0x73 readMikey/writeMikey calls seen
@@ -2431,15 +2431,20 @@ static void cs42l83_tip_sense(struct hda_codec *codec)
 
         retval = cs_8409_vendor_i2cRead(codec, 0x90, 0x1b73, 1); // snd_hda
 
-        newval1 = (retval & 0x1c);
+        // invert indicates inverted signal path for physical jack presence detect circuit
 
-        if (flag)
+        // following code translated from assembler
+        newval1 = (retval & 0x1c);
+        if (invert)
                 newval = (newval1 | 0xe0);
-	else
+        else
                 newval = (newval1 | 0xc0);
 
 
-        cs_8409_vendor_i2cWrite(codec, 0x90, 0x1b73, 0x00c0, 1); // snd_hda
+        if (invert)
+                cs_8409_vendor_i2cWrite(codec, 0x90, 0x1b73, 0x00e0, 1); // snd_hda
+        else
+                cs_8409_vendor_i2cWrite(codec, 0x90, 0x1b73, 0x00c0, 1); // snd_hda
 
         mycodec_info(codec, "command cs42l83_tip_sense end\n");
 }
