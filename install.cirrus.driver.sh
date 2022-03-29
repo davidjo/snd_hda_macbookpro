@@ -24,6 +24,9 @@ hda_dir="$build_dir/hda-$kernel_version"
 if [ -d /usr/src/linux-headers-$(uname -r) ]; then
 	# Debian Based Distro
 	:
+elif [ -d /usr/src/linux/include/linux ]; then
+	# Arch
+	:
 elif [ -d /usr/src/kernels/$(uname -r) ]; then
 	# Fedora Based Distro
 	:
