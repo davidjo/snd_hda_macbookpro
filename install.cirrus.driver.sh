@@ -27,13 +27,18 @@ if [ -d /usr/src/linux-headers-$(uname -r) ]; then
 elif [ -d /usr/src/kernels/$(uname -r) ]; then
 	# Fedora Based Distro
 	:
+elif [ -d /usr/src/kernel-headers-$(uname -r) ]; then
+        # Void Linux
+	:
 else
 	echo "linux kernel headers not found in /usr/src:"
 	echo "Debian (eg Ubuntu): /usr/src/linux-headers-$(uname -r)"
 	echo "Fedora: /usr/src/kernels/$(uname -r)"
+	echo "Void Linux: /usr/src/kernel-headers-$(uname -r)"
 	echo "assuming the linux kernel headers package is not installed"
 	echo "please install the appropriate linux kernel headers package:"
 	echo "sudo apt install linux-headers-$revpart3"
+	echo "Void Linux: xbps-install -S linux-headers"
 
 	exit 1
 
