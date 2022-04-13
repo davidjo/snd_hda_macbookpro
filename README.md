@@ -60,6 +60,10 @@ apt install wget make gcc linux-headers-generic
 ```
 pacman -S wget make gcc linux-headers
 ```
+**void linux package install
+```
+xbps-install -S wget make gcc linux-headers
+```
 
 **build driver**  
 ```
