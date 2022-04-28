@@ -151,7 +151,7 @@ struct cs_spec {
 
 	// this is new item for dealing with headset plugins
 	// so can distinguish which phase we are in if have multiple interrupts
-	// not really used now have analyzed interrupts properly
+	// now primarily used to indicate if booted with headset plugged in
 	int headset_phase;
 
 	// another dirty hack item to manage the different headset enable codes
@@ -2747,7 +2747,7 @@ static int patch_cs8409(struct hda_codec *codec)
                goto error;
 
        // update the headset phase
-       spec->headset_phase = 1;
+       spec->headset_phase = 2;
 
        spec->play_init = 0;
        spec->capture_init = 0;

@@ -109,15 +109,15 @@ static void cs_8409_intmike_format_setup_enable(struct hda_codec *codec, int hda
 
         // 0x44 -> 0x22 is internal (I think) mike input (macbook pro)
 
-	// now updated to not write the Apple format but use my format setting routines
-	// (remember we have limited the allowed formats to acceptable ones)
-	// note that apparently we can set the format with the nid powered down but for setting the
-	// stream id the nid has to be powered up
-	// this seems to be used a lot in plugin/unplug headset in a powered down state
-	// - but when capturing no power changes done
+        // now updated to not write the Apple format but use my format setting routines
+        // (remember we have limited the allowed formats to acceptable ones)
+        // note that apparently we can set the format with the nid powered down but for setting the
+        // stream id the nid has to be powered up
+        // this seems to be used a lot in plugin/unplug headset in a powered down state
+        // - but when capturing no power changes done
 
         // for some very strange reason we setup a 4 channel format after unplug of headset with mike
-	// - otherwise its 2 channel - pass the format to allow for this
+        // - otherwise its 2 channel - pass the format to allow for this
         //snd_hda_codec_write(codec, 0x22, 0, AC_VERB_SET_STREAM_FORMAT, 0x00004033); // 0x02224033
 //      snd_hda:     stream format 34 [('CHAN', 4), ('RATE', 44100), ('BITS', 24), ('RATE_MUL', 1), ('RATE_DIV', 1)]
 
@@ -495,7 +495,7 @@ static void cs_8409_intmike_stream_on_nid(struct hda_codec *codec)
 static void cs_8409_intmike_format_setup_disable(struct hda_codec *codec)
 {
         int retval;
-	int reg_coef82 = 0;
+        int reg_coef82 = 0;
         int new_coef82 = 0;
 
         struct cs_spec *spec = codec->spec;
@@ -1982,10 +1982,26 @@ static void cs_8409_inputs_power_nids_off(struct hda_codec *codec)
 
 }
 
+static void cs_8409_plugin_handle_detect(struct hda_codec *codec);
+
+static void cs_8409_headset_amp_format_setup_disable(struct hda_codec *codec, int full);
+
+static void cs43l83_headset_amp_format_setup(struct hda_codec *codec, int set_stream_id, int full);
+
+static void cs_8409_perform_external_device_unsolicited_responses(struct hda_codec *codec);
+
+static void cs_8409_plugin_complete_detect(struct hda_codec *codec);
+
+static void cs42l83_headset_play_setup_on(struct hda_codec *codec);
+
+static void cs42l83_headset_mike_format_setup_enable(struct hda_codec *codec, int nullformat, int full);
+
+static void cs_8409_headset_mike_buttons_enable(struct hda_codec *codec);
+
 
 static int cs_8409_boot_setup_real(struct hda_codec *codec)
 {
-        int retval;
+        int headset_on_boot = 0, retval;
 
         struct cs_spec *spec = codec->spec;
 
@@ -2129,7 +2145,9 @@ static int cs_8409_boot_setup_real(struct hda_codec *codec)
 
         if ((retval & 0x80))
         {
-                dev_info(hda_codec_dev(codec), "cs_8409_boot_setup_real headphone ALREADY PLUGGED IN UNIMPLEMENTED!!\n");
+                dev_info(hda_codec_dev(codec), "cs_8409_boot_setup_real headphone already plugged in!!\n");
+                // store for after init
+                headset_on_boot = 1;
         }
 
 
@@ -2168,221 +2186,715 @@ static int cs_8409_boot_setup_real(struct hda_codec *codec)
 
         //setup_intmike_vol2(codec);
         cs_8409_intmike_volume_unmute_nouse(codec);
-        cs_8409_intmike_volume_unmute_nouse(codec);
 
         //setup_linein_vol2(codec);
         cs_8409_linein_volume_unmute_nouse(codec);
 
-
-        // NOTE - OSX sets a stream format here but a null (ie 0) stream id
-        //        on linux we set the OSX format - it will be updated with actual stream format later
-
-        //setup_TDM_6462(codec);
-        cs_8409_setup_TDM_amps12(codec, 1, 1);
-
-        //setup_amps_6462(codec);
-        cs_8409_setup_amps12(codec, 0);
-
-        //setup_TDM_7472(codec);
-        cs_8409_setup_TDM_amps34(codec,  1);
-
-        //setup_amps_7472(codec);
-        cs_8409_setup_amps34(codec, 0);
-
-        //sync_converters(codec);
-        cs_8409_sync_converters_on(codec, 1);
-
-
-        //sync_converters1(codec);
-        cs_8409_sync_converters_off(codec, 1);
-
-        //amps_disable_6462(codec);
-        cs_8409_disable_amps12(codec);
-
-        //putative_tdm_disable_6462(codec);
-        cs_8409_disable_TDM_amps12(codec);
-
-        //amps_disable_7472(codec);
-        cs_8409_disable_amps34(codec);
-
-        //putative_tdm_disable_7472(codec);
-        cs_8409_disable_TDM_amps34(codec);
-
-
-        // I think Im going to disable the following as we appear to have a stream id here
-        // but under linux we do not have a stream at all at this boot stage
-
-        if (0)
+        if (headset_on_boot)
         {
+                // so the big question is what to do about unsolicited responses
+                // should we disable them in this boot section
+                // and if so when should we re-enable them
+                // I suspect at some point the code for headset already plugged in
+                // switches to unsolicited response code
 
-                // this is not quite correct - cs_8409_setup_TDM_amps12 will write a null stream id etc
-                // but the actual logged version does not - although does update format
-                // this may be because Apple is caching the stream format/id similar to linux and
-                // at this point we have already set a null stream id - but because the above disable also
-                // cleared the format we get a re-setup of the the format
-                //putative_enable1_TDM_6462(codec);
-                cs_8409_setup_TDM_amps12(codec, 1, 1);
+                // so I think we need to enable unsol response at this stage and block it till end of this function
+                // - because we seem to get an UNSOL response in the middle of this code
+                spec->block_unsol = 1;
 
-                //amps_disable2_6462(codec);
-                cs_8409_disable_amps12(codec);
+                // Im guessing the following code should be done explicitly
+                // because we have not seen a cs42l83_read_status_and_clear_interrupt/cs42l83_disambiguate_ur_from_int
 
-                // see above notes for putative_enable1_TDM_6462
-                //putative_enable1_TDM_7472(codec);
-                cs_8409_setup_TDM_amps34(codec, 1);
+                // for some reason the stream id is set to 0 here
+                cs43l83_headset_amp_format_setup(codec, 0, 0);
 
-                //amps_disable2_7472(codec);
-                cs_8409_disable_amps34(codec);
+                //#2880: cs42l83_configure_int_mclk
+                //#3152: cs42l83_power_onoff
+                //#3216: cs42l83_configure_serial_port
+                //#3376: cs42l83_output_set_input_sample_rate
+                //#3504: cs42l83_setup_audio_output
+                //#3680: cs42l83_buffers_onoff
 
-                // so this does not set the channel id for node 0x03 to 0x2 but cs_8409_sync_converters_on does
-                // is this significant??
-                // does suggest this function reads the initial stream id then rewrites at the end
-                //sync_converters2(codec);
-                cs_8409_sync_converters_on(codec, 1);
+                // this is essentially from cs42l83_headset_play_setup_on
 
+                cs42l83_configure_int_mclk(codec);
 
-                // so this also not quite same - we actually have a stream id here on OSX
-                // but at the boot stage dont think we have this in linux
-                //enable2_TDM2_6462(codec);
-                cs_8409_setup_TDM_amps12(codec, 1, 1);
+                //cs42l83_headset_power_on_on_nouse(codec);
+                cs42l83_power_onoff(codec, 1);
 
-                //amps_enable2_6462(codec);
-                cs_8409_setup_amps12(codec, 0);
-
-                // see above
-                //enable2_TDM2_7472(codec);
-                cs_8409_setup_TDM_amps34(codec, 1);
-
-                //amps_enable2_7472(codec);
-                cs_8409_setup_amps34(codec, 0);
-
-                //sync_converters3(codec);
-                cs_8409_sync_converters_on(codec, 1);
+                cs42l83_configure_serial_port(codec);
 
 
-                // I dont get this - sync_converters3 sets the stream id/channel id to non-zero
-                // but here when we read the stream id/channel id its 0??
-                //sync_converters4(codec);
-                cs_8409_sync_converters_off(codec, 1);
+                cs42l83_output_set_input_sample_rate(codec);
 
-                //amps_disable3_6462(codec);
-                cs_8409_disable_amps12(codec);
+                cs42l83_setup_audio_output(codec);
 
-                //putative_disable3_TDM_6462(codec);
-                cs_8409_disable_TDM_amps12(codec);
+                               // headset_setup_SPDIf_output(codec); - presumably if is SPDIF setup
 
-                //amps_disable3_7472(codec);
-                cs_8409_disable_amps34(codec);
+                //cs42l83_headset_rcv_enable_on(codec);
+                cs42l83_buffers_onoff(codec, 1);
 
-                //putative_disable3_TDM_7472(codec);
-                cs_8409_disable_TDM_amps34(codec);
+
+                // so we seem to get an UNSOL response at this point
+                // - Im thinking we need to store this response
+
+
+                // and now turn off
+
+                //#3698: cs42l83_buffers_onoff
+                //#3714: cs42l83_headset_power_off
+
+                cs42l83_buffers_onoff(codec, 0);
+
+                cs42l83_power_onoff(codec, 0);
+
+                cs_8409_headset_amp_format_setup_disable(codec, 1);
+
+
+                // and back on again
+                // we dont set stream id, do full TDM setup and not enable the pin
+                // then set stream id, turn on pin but partial TDM setup
+                cs43l83_headset_amp_format_setup(codec, 0, 1);
+                cs43l83_headset_amp_format_setup(codec, 1, 0);
+
+                //#3920: cs42l83_configure_int_mclk
+                //#4192: cs42l83_power_onoff
+                //#4256: cs42l83_configure_serial_port
+                //#4416: cs42l83_output_set_input_sample_rate
+                //#4544: cs42l83_setup_audio_output
+                //#4720: cs42l83_buffers_onoff
+
+                // this is essentially from cs42l83_headset_play_setup_on
+
+                cs42l83_configure_int_mclk(codec);
+
+                //cs42l83_headset_power_on_on_nouse(codec);
+                cs42l83_power_onoff(codec, 1);
+
+                cs42l83_configure_serial_port(codec);
+
+
+                cs42l83_output_set_input_sample_rate(codec);
+
+                cs42l83_setup_audio_output(codec);
+
+                               // headset_setup_SPDIf_output(codec); - presumably if is SPDIF setup
+
+                //cs42l83_headset_rcv_enable_on(codec);
+                cs42l83_buffers_onoff(codec, 1);
+
+
+                //#4738: cs42l83_headphone_sense
+
+                // this may be the same as one of the multiple headphone sense calls seen if no headset plugged in
+
+                retval = cs42l83_headphone_sense(codec);
+                mycodec_info(codec, "cs_8409_boot_setup_real headphone sense 0x%x\n", retval);
+
+                if ((retval & 0x80))
+                {
+                        dev_info(hda_codec_dev(codec), "cs_8409_boot_setup_real headphone still plugged in!!\n");
+
+                        cs42l83_buffers_onoff(codec, 0);
+
+                        cs42l83_power_onoff(codec, 0);
+
+                        cs_8409_headset_amp_format_setup_disable(codec, 1);
+
+                        cs_8409_intmike_volume_unmute_nouse(codec);
+
+                        cs_8409_linein_volume_unmute_nouse(codec);
+
+                        cs_8409_intmike_volume_unmute_nouse(codec);
+
+                        cs_8409_linein_volume_unmute_nouse(codec);
+
+                        cs_8409_inputs_power_nids_off(codec);
+
+
+                        // so I think we need to try performing the unsol responses here
+                        // - because we get a call to cs42l83_read_status_and_clear_interrupt/cs42l83_disambiguate_ur_from_int here
+                        // well all the evidence is altho these routines are called they dont actually do anything
+                        // - the cs_8409_read_status_and_clear_interrupt call does not see a TIP SENSE interrupt
+                        // (cf actually plugging in headphones post-boot)
+                        // - calling these routines does clear the interrupt - which may be its only function
+
+                        // we need to update headset_phase so we dont ignore headset unsol responses in the following call
+                        spec->headset_phase = 1;
+
+                        // I think we need to block here - because clearing the interrupts causes interrupts!!
+                        // this is similar to cs_8409_cs42l83_unsolicited_response where we block
+                        // before calling the perform function
+                        spec->block_unsol = 1;
+
+                        cs_8409_perform_external_device_unsolicited_responses(codec);
+
+                        spec->block_unsol = 0;
+
+                }
+                else
+                {
+                        dev_info(hda_codec_dev(codec), "cs_8409_boot_setup_real boot headphone REMOVED - UNIMPLEMENTED!!\n");
+                }
+
+
+                // so now just going to continue with the logged boot code
+                // we get a lot of checks the headset is still plugged in
+                // Im assuming if these detect the headset has been removed other things may happen
+                // - this would likely be setting up the amps
+
+                retval = cs42l83_headphone_sense(codec);
+                mycodec_info(codec, "cs_8409_boot_setup_real headphone sense 0x%x\n", retval);
+
+                if ((retval & 0x80))
+                {
+                }
+                else
+                {
+                        dev_info(hda_codec_dev(codec), "cs_8409_boot_setup_real boot headphone REMOVED 2 - UNIMPLEMENTED!!\n");
+                }
+
+                retval = cs42l83_headphone_sense(codec);
+                mycodec_info(codec, "cs_8409_boot_setup_real headphone sense 0x%x\n", retval);
+
+                if ((retval & 0x80))
+                {
+                        cs_8409_intmike_volume_unmute(codec);
+
+                        cs_8409_linein_volume_unmute(codec);
+                }
+                else
+                {
+                        dev_info(hda_codec_dev(codec), "cs_8409_boot_setup_real boot headphone REMOVED 3 - UNIMPLEMENTED!!\n");
+                }
+
+                retval = cs42l83_headphone_sense(codec);
+                mycodec_info(codec, "cs_8409_boot_setup_real headphone sense 0x%x\n", retval);
+
+                if ((retval & 0x80))
+                {
+                        //#5328: cs42l83_headset_button_detect_interrupts_off
+                        //#5392: cs42l83_headset_set_hpout_clamp_disable
+
+                        // these 2 functions seem to be this function
+                        // - additional code is setting jack_present and an msleep
+                        cs_8409_plugin_handle_detect(codec);
+                }
+                else
+                {
+                        dev_info(hda_codec_dev(codec), "cs_8409_boot_setup_real boot headphone REMOVED 4 - UNIMPLEMENTED!!\n");
+                }
+
+                retval = cs42l83_headphone_sense(codec);
+                mycodec_info(codec, "cs_8409_boot_setup_real headphone sense 0x%x\n", retval);
+
+                if ((retval & 0x80))
+                {
+                        // so there are 4 gpio status reads here
+                        // why 4??
+                        retval = read_gpio_status_check(codec);
+
+                        retval = read_gpio_status_check(codec);
+
+                        retval = read_gpio_status_check(codec);
+
+                        retval = read_gpio_status_check(codec);
+
+                        // why - this just sets nid 0x22 format???
+                        cs_8409_intmike_format_setup_format_nouse(codec);
+                        //cs_8409_really_update_stream_format(codec, 0x22, 1, 0, 0);
+
+                        //cs_8409_linein_volume_setup_new(codec, 0x27)
+                        cs_8409_linein_volume_setup(codec, 0x27);
+
+
+                        cs_8409_linein_format_setup_disable(codec);
+
+                        cs_8409_intmike_stream_conn_off(codec);
+
+                        cs_8409_linein_stream_conn_off(codec);
+
+                        cs_8409_intmike_stream_off_nid(codec);
+                        cs_8409_linein_stream_off_nid(codec);
+
+                        cs_8409_intmike_volume_mute(codec);
+                        cs_8409_linein_volume_mute(codec);
+                }
+                else
+                {
+                        dev_info(hda_codec_dev(codec), "cs_8409_boot_setup_real boot headphone REMOVED 5 - UNIMPLEMENTED!!\n");
+                }
+
+		// we see a delay here - this is I think the equivalent of the 1800 msleep
+		// in cs_8409_headset_plugin_event
+		// should we just make it 1800??
+		msleep(1500); // what we actually see is 1470
+
+                // the cs_8409_plugin_complete_detect function seems to encapsulate what happens next
+                // - this functions ends with initiating headset detection
+                //#5551: cs42l83_headphone_sense
+                //#5567: cs42l83_complete_jack_detect
+                //#5631: cs42l83_power_hs_bias_on
+                //#5727: cs42l83_enable_hs_auto_int_on
+                //#5759: cs42l83_unplug_interrupt_setup
+                //#5807: cs42l83_set_hpout_pulldown_off
+                //#5839: cs42l83_headset_detect_on
+
+                cs_8409_plugin_complete_detect(codec);
+
+                spec->block_unsol = 1;
+
+                // testing status checks to see if we get an interrupt
+                // so at this point the status is still 0x27 - no interrupt
+                // can we just use the msleep??
+                retval = read_gpio_status_check(codec);
+
+                msleep(1);
+
+                // but here the status is 0x26 ie interrupt
+                //retval = read_gpio_status_check(codec);
+
+                // I think we need to block here - because clearing the interrupts causes interrupts!!
+                // this is similar to cs_8409_cs42l83_unsolicited_response where we block
+                // before calling the perform function
+
+                // so next we should get some unsol responses
+                //#5923: cs42l83_read_status_and_clear_interrupt
+                //#6117: cs42l83_disambiguate_ur_from_int
+                //#6165:  cs_8409_headset_type_detect_event
+                //#6165: cs42l83_enable_hs_auto_int_off
+                //#6197: cs42l83_headset_type
+                //#6213: cs42l83_unplug_headset_detect_off
+                //#6277: cs42l83_set_hpout_pulldown_onoff
+                //#6309: cs42l83_set_hpout_clamp_enable
+                //#6341: cs42l83_enable_hsbias_auto_clamp_on
+                //#6373: cs42l83_enable_hsbias_auto_clamp_off
+                //#6421: cs42l83_power_hs_bias_off
+                //#6517: cs42l83_setup_button_detect
+                //#6709: cs42l83_power_hs_bias_button_on
+                //#6805: cs42l83_enable_hsbias_auto_clamp_off1
+
+                cs_8409_perform_external_device_unsolicited_responses(codec);
+
+
+                retval = read_gpio_status_check(codec);
+
+                // so the delay here seems to be around 130 ms
+                // with delay of 1 ms dont see any interrupts
+                msleep(130);
+
+                retval = read_gpio_status_check(codec);
+
+
+                //#6857: cs42l83_read_status_and_clear_interrupt
+                //#7051: cs42l83_disambiguate_ur_from_int
+                // cs_8409_headset_button_detect_event
+                //#7099: cs42l83_handle_button_detect
+                //#7243: cs42l83_mike_connected
+
+                // cs_8409_perform_external_device_unsolicited_responses then calls cs_8409_plugin_event_continued
+                // - but here we have a divergence from plugin post-boot
+                // fixed up cs_8409_plugin_event_continued to only do things for plugin post-boot
+                // - at boot we drop back to here
+                // NOTA BENE - MUST set up the button interrupts here now - otherwise buttons wont work
+
+                cs_8409_perform_external_device_unsolicited_responses(codec);
+
+
+                //#7553:  cs_8409_enable_headset_streaming
+                //#7553: cs43l83_headset_amp_format_setup
+                //#7417:  cs42l83_headset_play_setup_on
+                //#7417: cs42l83_configure_int_mclk
+                //#7689: cs42l83_power_onoff
+                //#7753: cs42l83_configure_serial_port
+                //#7913: cs42l83_output_set_input_sample_rate
+                //#8041: cs42l83_setup_audio_output
+                //#8217: cs42l83_buffers_onoff
+
+                cs43l83_headset_amp_format_setup(codec, 1, 1);
+                cs42l83_headset_play_setup_on(codec);
+
+                // and yet again turn off
+                //#8233: cs42l83_buffers_onoff
+                //#8249: cs42l83_power_onoff
+                //#8279: cs_8409_headset_amp_format_setup_disable
+
+                cs42l83_buffers_onoff(codec, 0);
+                cs42l83_power_onoff(codec, 0);
+                cs_8409_headset_amp_format_setup_disable(codec, 1);
+
+
+                // and back on again
+                // we dont set stream id, do full TDM setup and not enable the pin
+                // then set stream id, turn on pin but partial TDM setup
+                cs43l83_headset_amp_format_setup(codec, 0, 1);
+                cs43l83_headset_amp_format_setup(codec, 1, 0);
+
+
+                //#8455:  cs42l83_headset_play_setup_on
+                //#8455: cs42l83_configure_int_mclk
+                //#8727: cs42l83_power_onoff
+                //#8791: cs42l83_configure_serial_port
+                //#8951: cs42l83_output_set_input_sample_rate
+                //#9079: cs42l83_setup_audio_output
+                //#9255: cs42l83_buffers_onoff
+
+                cs42l83_headset_play_setup_on(codec);
+
+
+                //#9273: cs42l83_headphone_sense
+
+                retval = cs42l83_headphone_sense(codec);
+                mycodec_info(codec, "cs_8409_boot_setup_real headphone sense 0x%x\n", retval);
+
+                if ((retval & 0x80))
+                {
+                        //#9287: cs_8409_intmike_stream_conn_off_disable
+                        //#9299: cs_8409_linein_stream_conn_off
+
+                        cs_8409_intmike_stream_conn_off(codec);
+                        cs_8409_linein_stream_conn_off(codec);
+
+                        //       snd_hda_codec_write(codec, 0x22, 0, AC_VERB_SET_CHANNEL_STREAMID, 0x00000000); // 0x02270600
+                        //       snd_hda:     conv stream channel map 34 [('CHAN', 0), ('STREAMID', 0)]
+
+                        //       snd_hda_codec_write(codec, 0x23, 0, AC_VERB_SET_CHANNEL_STREAMID, 0x00000000); // 0x02370600
+                        //       snd_hda:     conv stream channel map 35 [('CHAN', 0), ('STREAMID', 0)]
+
+                        snd_hda_codec_write(codec, 0x22, 0, AC_VERB_SET_CHANNEL_STREAMID, 0x00000000); // 0x02270600
+                        snd_hda_codec_write(codec, 0x23, 0, AC_VERB_SET_CHANNEL_STREAMID, 0x00000000); // 0x02370600
+
+
+                        //#9324:  cs_8409_intmike_volume_setup
+                        //#9357: cs_8409_intmike_format_setup_disable
+                        //#9324:  cs_8409_linein_volume_setup
+                        //#9401: cs_8409_linein_format_setup_disable
+                        //#9412:  cs42l83_headset_mike_format_setup_enable
+                        //#9451: cs42l83_input_set_output_sample_rate
+                        //#9579: cs42l83_mike_setup_audio_input
+                        //#9643: cs42l83_mike_enable
+
+                        cs_8409_intmike_volume_setup(codec, 0x27);
+
+                        cs_8409_intmike_format_setup_disable(codec);
+
+                        cs_8409_linein_volume_setup(codec, 0x27);
+
+                        cs_8409_linein_format_setup_disable(codec);
+
+
+                        // as the following relates to the headset mike
+                        // Im guessing we should only do it if we have a mike
+                        // spec->have_mike should have been set above
+                        // by the unsol response function cs_8409_headset_type_detect_event
+
+                        if (spec->have_mike)
+                        {
+
+                                // this is part of cs_8409_enable_headset_mike_streaming
+
+                                // whats missing is no actual cs42l83 power on calls
+                                // or unmuting input
+
+                                cs42l83_headset_mike_format_setup_enable(codec, 0, 1);
+
+                                cs42l83_input_set_output_sample_rate(codec);
+
+                                cs42l83_mike_setup_audio_input(codec);
+
+                                cs42l83_mike_enable(codec);
+
+
+                                // and disable it all!!
+                                // this is part of cs_8409_disable_headset_mike_streaming
+                                // as usual disabling this duplicate setup
+
+                                //#9675: cs42l83_mike_disable
+                                //#9705: cs42l83_headset_mike_format_setup_disable
+
+                                //cs42l83_mike_disable(codec);
+
+                                //cs42l83_headset_mike_format_setup_disable(codec);
+
+
+                                //#9738:  cs42l83_headset_mike_format_setup_enable
+                                //#9738:  cs42l83_headset_mike_format_setup_enable
+                                //#9810: cs42l83_input_set_output_sample_rate
+                                //#9938: cs42l83_mike_setup_audio_input
+                                //#10002: cs42l83_mike_enable
+
+                                // why duplicate setup - 1st dont set stream id/pin
+                                // 2nd set stream id and pin
+                                //cs42l83_headset_mike_format_setup_enable(codec, 0, 0);
+                                //cs42l83_headset_mike_format_setup_enable(codec, 0, 1);
+
+                                //cs42l83_input_set_output_sample_rate(codec);
+
+                                //cs42l83_mike_setup_audio_input(codec);
+
+                                //cs42l83_mike_enable(codec);
+
+                                //// this doesnt make sense double read of nid 0x3c then double set??
+                                //retval = snd_hda_codec_read_check(codec, 0x3c, 0, AC_VERB_GET_PIN_WIDGET_CONTROL, 0x00000000, 0x00000020, 25649); // 0x03cf0700
+                                //retval = snd_hda_codec_read_check(codec, 0x3c, 0, AC_VERB_GET_PIN_WIDGET_CONTROL, 0x00000000, 0x00000020, 25650); // 0x03cf0700
+                                //snd_hda_codec_write(codec, 0x3c, 0, AC_VERB_SET_PIN_WIDGET_CONTROL, 0x00000020); // 0x03c70720
+                                ////       snd_hda:     60 ['AC_PINCTL_IN_EN']
+                                //snd_hda_codec_write(codec, 0x3c, 0, AC_VERB_SET_PIN_WIDGET_CONTROL, 0x00000020); // 0x03c70720
+                                ////       snd_hda:     60 ['AC_PINCTL_IN_EN']
+
+
+                                // is this a good position to switch the inputs??
+                                // just before enable buttons is where we switch inputs on plugin
+                                // note that this is just telling Alsa the input source has changed
+                                // - no changes to audio setup at all
+                                switch_input_src(codec);
+
+
+                                //#10040:  cs_8409_headset_mike_buttons_enable
+                                //#10040: cs42l83_configure_headset_button_interrupts
+                                //#10088: cs42l83_enable_hsbias_auto_clamp_off2
+                                //#10136: cs42l83_enable_hsbias_auto_clamp_on3
+
+                                cs_8409_headset_mike_buttons_enable(codec);
+
+
+				// we get some calls to cs42l83_read_status_and_clear_interrupt/cs42l83_disambiguate_ur_from_int here
+				// clear out any stored unsol responses
+
+                                // I think we need to block here - because clearing the interrupts causes interrupts!!
+                                // this is similar to cs_8409_cs42l83_unsolicited_response where we block
+                                // before calling the perform function
+                                spec->block_unsol = 1;
+
+                                cs_8409_perform_external_device_unsolicited_responses(codec);
+
+                                spec->block_unsol = 0;
+
+                        }
+
+		}
+                else
+                {
+                        dev_info(hda_codec_dev(codec), "cs_8409_boot_setup_real boot headphone REMOVED 6 - UNIMPLEMENTED!!\n");
+                }
+
+
+                spec->block_unsol = 0;
+
+                dev_info(hda_codec_dev(codec), "cs_8409_boot_setup_real boot CURRENT IMPLEMENTATION END!!\n");
 
         }
+        else
+        {
 
-        // this is best guess what these volume functions are doing
-        // as from the log there is no change in output volume or muting
-        // - but if already unmuted thats what you would expect
+                // NOTE - OSX sets a stream format here but a null (ie 0) stream id
+                //        on linux we set the OSX format - it will be updated with actual stream format later
 
-        //setup_mic_vol2(codec);
+                //setup_TDM_6462(codec);
+                cs_8409_setup_TDM_amps12(codec, 1, 1);
 
-        //setup_intmike_vol3(codec);
-        cs_8409_intmike_volume_unmute_nouse(codec);
+                //setup_amps_6462(codec);
+                cs_8409_setup_amps12(codec, 0);
 
-        //setup_linein_vol3(codec);
-        cs_8409_linein_volume_unmute_nouse(codec);
+                //setup_TDM_7472(codec);
+                cs_8409_setup_TDM_amps34(codec,  1);
 
+                //setup_amps_7472(codec);
+                cs_8409_setup_amps34(codec, 0);
 
-        //setup_mic_vol3(codec);
-
-        //setup_intmike_vol4(codec);
-        cs_8409_intmike_volume_unmute_nouse(codec);
-
-        //setup_linein_vol4(codec);
-        cs_8409_linein_volume_unmute_nouse(codec);
-
-
-        //setup_mic_vol3(codec);
-        //setup_input_power_nids_off(codec);
-        cs_8409_inputs_power_nids_off(codec);
+                //sync_converters(codec);
+                cs_8409_sync_converters_on(codec, 1);
 
 
-        //read_gpio_status1(codec);
+                //sync_converters1(codec);
+                cs_8409_sync_converters_off(codec, 1);
 
-        //read_gpio_status2(codec);
+                //amps_disable_6462(codec);
+                cs_8409_disable_amps12(codec);
 
-        //read_gpio_status3(codec);
+                //putative_tdm_disable_6462(codec);
+                cs_8409_disable_TDM_amps12(codec);
 
-        // why 3 reads here - they seem to return the exact same data each time
-        retval = read_gpio_status_check(codec);
+                //amps_disable_7472(codec);
+                cs_8409_disable_amps34(codec);
 
-        retval = read_gpio_status_check(codec);
-
-        retval = read_gpio_status_check(codec);
-
-
-        //cs42l83_headphone_sense1(codec);
-        retval = cs42l83_headphone_sense(codec);
-        mycodec_dbg(codec, "cs_8409_boot_setup_real headphone sense 1 0x%x\n", retval);
+                //putative_tdm_disable_7472(codec);
+                cs_8409_disable_TDM_amps34(codec);
 
 
-        //setup_mic_vol4(codec);
+                // I think Im going to disable the following as we appear to have a stream id here
+                // but under linux we do not have a stream at all at this boot stage
 
-        //setup_intmike_vol5(codec);
-        cs_8409_intmike_volume_unmute_nouse(codec);
+                if (0)
+                {
 
-        //setup_linein_vol5(codec);
-        cs_8409_linein_volume_unmute_nouse(codec);
+                        // this is not quite correct - cs_8409_setup_TDM_amps12 will write a null stream id etc
+                        // but the actual logged version does not - although does update format
+                        // this may be because Apple is caching the stream format/id similar to linux and
+                        // at this point we have already set a null stream id - but because the above disable also
+                        // cleared the format we get a re-setup of the the format
+                        //putative_enable1_TDM_6462(codec);
+                        cs_8409_setup_TDM_amps12(codec, 1, 1);
 
-        //setup_mic_vol5(codec);
+                        //amps_disable2_6462(codec);
+                        cs_8409_disable_amps12(codec);
 
-        //setup_intmike_vol6(codec);
-        cs_8409_intmike_volume_unmute_nouse(codec);
+                        // see above notes for putative_enable1_TDM_6462
+                        //putative_enable1_TDM_7472(codec);
+                        cs_8409_setup_TDM_amps34(codec, 1);
 
-        //setup_linein_vol6(codec);
-        cs_8409_linein_volume_unmute_nouse(codec);
+                        //amps_disable2_7472(codec);
+                        cs_8409_disable_amps34(codec);
 
-
-        //cs42l83_headphone_sense2(codec);
-        retval = cs42l83_headphone_sense(codec);
-        mycodec_dbg(codec, "cs_8409_boot_setup_real headphone sense 2 0x%x\n", retval);
-
-
-        //cs42l83_headphone_sense3(codec);
-        retval = cs42l83_headphone_sense(codec);
-        mycodec_dbg(codec, "cs_8409_boot_setup_real headphone sense 3 0x%x\n", retval);
-
-
-        //setup_intmike_nid1(codec);
-        //cs_8409_intmike_format_setup_format_nouse(codec);
-        //cs_8409_really_update_stream_format(codec, 0x22, 1, 0, 0);
-        cs_8409_really_update_stream_format(codec, spec->intmike_adc_nid, 1, 0, 0);
-
-        //setup_linein_vol7(codec);
-        cs_8409_linein_volume_setup(codec, 0x27);
-
-        //setup_linein_nid1(codec);
-        cs_8409_linein_format_setup_disable(codec);
-
-        //setup_intmike_stream_conn_off_nid1(codec);
-        cs_8409_intmike_stream_conn_off(codec);
-
-        //setup_linein_stream_conn_off_nid1(codec);
-        cs_8409_linein_stream_conn_off(codec);
-
-        //setup_intmike_stream_off_nid1(codec);
-        cs_8409_intmike_stream_off_nid(codec);
-
-        //setup_linein_stream_off_nid1(codec);
-        cs_8409_linein_stream_off_nid(codec);
+                        // so this does not set the channel id for node 0x03 to 0x2 but cs_8409_sync_converters_on does
+                        // is this significant??
+                        // does suggest this function reads the initial stream id then rewrites at the end
+                        //sync_converters2(codec);
+                        cs_8409_sync_converters_on(codec, 1);
 
 
-        //setup_intmike_vol10(codec);
-        //cs_8409_volume_set(codec, 0x22, 0x33);
-        cs_8409_volume_set(codec, spec->intmike_adc_nid, 0x33);
+                        // so this also not quite same - we actually have a stream id here on OSX
+                        // but at the boot stage dont think we have this in linux
+                        //enable2_TDM2_6462(codec);
+                        cs_8409_setup_TDM_amps12(codec, 1, 1);
 
-        //setup_linein_vol10(codec);
-        //cs_8409_volume_set(codec, 0x23, 0x33);
-        cs_8409_volume_set(codec, spec->linein_amp_nid, 0x33);
 
+                        //amps_enable2_6462(codec);
+                        cs_8409_setup_amps12(codec, 0);
+
+                        // see above
+                        //enable2_TDM2_7472(codec);
+                        cs_8409_setup_TDM_amps34(codec, 1);
+
+                        //amps_enable2_7472(codec);
+                        cs_8409_setup_amps34(codec, 0);
+
+                        //sync_converters3(codec);
+                        cs_8409_sync_converters_on(codec, 1);
+
+
+                        // I dont get this - sync_converters3 sets the stream id/channel id to non-zero
+                        // but here when we read the stream id/channel id its 0??
+                        //sync_converters4(codec);
+                        cs_8409_sync_converters_off(codec, 1);
+
+                        //amps_disable3_6462(codec);
+                        cs_8409_disable_amps12(codec);
+
+                        //putative_disable3_TDM_6462(codec);
+                        cs_8409_disable_TDM_amps12(codec);
+
+                        //amps_disable3_7472(codec);
+                        cs_8409_disable_amps34(codec);
+
+                        //putative_disable3_TDM_7472(codec);
+                        cs_8409_disable_TDM_amps34(codec);
+                }
+
+
+                // this is best guess what these volume functions are doing
+                // as from the log there is no change in output volume or muting
+                // - but if already unmuted thats what you would expect
+
+                //setup_mic_vol2(codec);
+
+                //setup_intmike_vol3(codec);
+                cs_8409_intmike_volume_unmute_nouse(codec);
+
+                //setup_linein_vol3(codec);
+                cs_8409_linein_volume_unmute_nouse(codec);
+
+
+                //setup_mic_vol3(codec);
+
+                //setup_intmike_vol4(codec);
+                cs_8409_intmike_volume_unmute_nouse(codec);
+
+                //setup_linein_vol4(codec);
+                cs_8409_linein_volume_unmute_nouse(codec);
+
+
+                //setup_mic_vol3(codec);
+                //setup_input_power_nids_off(codec);
+                cs_8409_inputs_power_nids_off(codec);
+
+
+                //read_gpio_status1(codec);
+
+                //read_gpio_status2(codec);
+
+                //read_gpio_status3(codec);
+
+                // why 3 reads here - they seem to return the exact same data each time
+                retval = read_gpio_status_check(codec);
+
+                retval = read_gpio_status_check(codec);
+
+                retval = read_gpio_status_check(codec);
+
+
+                //cs42l83_headphone_sense1(codec);
+                retval = cs42l83_headphone_sense(codec);
+                mycodec_dbg(codec, "cs_8409_boot_setup_real headphone sense 1 0x%x\n", retval);
+
+
+                //setup_mic_vol4(codec);
+
+                //setup_intmike_vol5(codec);
+                cs_8409_intmike_volume_unmute_nouse(codec);
+
+                //setup_linein_vol5(codec);
+                cs_8409_linein_volume_unmute_nouse(codec);
+
+                //setup_mic_vol5(codec);
+
+                //setup_intmike_vol6(codec);
+                cs_8409_intmike_volume_unmute_nouse(codec);
+
+                //setup_linein_vol6(codec);
+                cs_8409_linein_volume_unmute_nouse(codec);
+
+                //cs42l83_headphone_sense2(codec);
+                retval = cs42l83_headphone_sense(codec);
+                mycodec_dbg(codec, "cs_8409_boot_setup_real headphone sense 2 0x%x\n", retval);
+
+
+                //cs42l83_headphone_sense3(codec);
+                retval = cs42l83_headphone_sense(codec);
+                mycodec_dbg(codec, "cs_8409_boot_setup_real headphone sense 3 0x%x\n", retval);
+
+                //setup_intmike_nid1(codec);
+                //cs_8409_intmike_format_setup_format_nouse(codec);
+                //cs_8409_really_update_stream_format(codec, 0x22, 1, 0, 0);
+                cs_8409_really_update_stream_format(codec, spec->intmike_adc_nid, 1, 0, 0);
+
+                //setup_linein_vol7(codec);
+                cs_8409_linein_volume_setup(codec, 0x27);
+
+                //setup_linein_nid1(codec);
+                cs_8409_linein_format_setup_disable(codec);
+
+                //setup_intmike_stream_conn_off_nid1(codec);
+                cs_8409_intmike_stream_conn_off(codec);
+
+                //setup_linein_stream_conn_off_nid1(codec);
+                cs_8409_linein_stream_conn_off(codec);
+
+                //setup_intmike_stream_off_nid1(codec);
+                cs_8409_intmike_stream_off_nid(codec);
+
+                //setup_linein_stream_off_nid1(codec);
+                cs_8409_linein_stream_off_nid(codec);
+
+
+                //setup_intmike_vol10(codec);
+                //cs_8409_volume_set(codec, 0x22, 0x33);
+                cs_8409_volume_set(codec, spec->intmike_adc_nid, 0x33);
+
+                //setup_linein_vol10(codec);
+                //cs_8409_volume_set(codec, 0x23, 0x33);
+                cs_8409_volume_set(codec, spec->linein_amp_nid, 0x33);
+        }
 
         mycodec_info(codec, "command cs_8409_boot_setup_real end\n");
 
@@ -2489,14 +3001,14 @@ static void cs_8409_capture_real(struct hda_codec *codec)
         hda_set_node_power_state(codec, codec->core.afg, AC_PWRST_D0);
 
 
-	// NOTE - there are big ordering issues here
-	//        - here we setup the speaker output before the internal mike
-	//        - this maybe because Quicktime defaults to enabling play when recording
-	//        unfortunately looks as tho linux tends to open the capture stream before the playback stream
-	//        - so going to ignore this here
+        // NOTE - there are big ordering issues here
+        //        - here we setup the speaker output before the internal mike
+        //        - this maybe because Quicktime defaults to enabling play when recording
+        //        unfortunately looks as tho linux tends to open the capture stream before the playback stream
+        //        - so going to ignore this here
 
 
-	cs_8409_inputs_power_nids_on(codec);
+        cs_8409_inputs_power_nids_on(codec);
 
         //cs_8409_intmike_format_setup_format(codec);
         cs_8409_intmike_format_setup_enable(codec, 0x4031, 0);
@@ -2504,14 +3016,14 @@ static void cs_8409_capture_real(struct hda_codec *codec)
         cs_8409_intmike_volume_setup(codec, 0x27);
         cs_8409_intmike_stream_on_nid(codec);
 
-	cs_8409_intmike_volume_unmute(codec);
-	cs_8409_linein_volume_unmute(codec);
+        cs_8409_intmike_volume_unmute(codec);
+        cs_8409_linein_volume_unmute(codec);
 
-	// so here we get AMP_GAIN_MUTE setups but nothing changes
-	// - so either this is a volume update with no change or unmute with no change
-	// - which to do with??
-	//cs_8409_intmike_volume_setup - (no change)
-	//cs_8409_linein_volume_setup - (no change)
+        // so here we get AMP_GAIN_MUTE setups but nothing changes
+        // - so either this is a volume update with no change or unmute with no change
+        // - which to do with??
+        //cs_8409_intmike_volume_setup - (no change)
+        //cs_8409_linein_volume_setup - (no change)
 
 
         mycodec_info(codec, "command cs_8409_capture_real end");
@@ -2571,14 +3083,14 @@ static void cs_8409_capturestop_real(struct hda_codec *codec)
         cs_8409_intmike_stream_conn_off(codec);
         cs_8409_linein_stream_conn_off(codec);
 
-	// this I think is re-setting to pre-capture state
-	// THIS NEEDS FIXING!!!
-	cs_8409_intmike_stream_reset_nid_on(codec);
-	cs_8409_linein_stream_reset_nid_off(codec);
+        // this I think is re-setting to pre-capture state
+        // THIS NEEDS FIXING!!!
+        cs_8409_intmike_stream_reset_nid_on(codec);
+        cs_8409_linein_stream_reset_nid_off(codec);
 
 
-	cs_8409_intmike_volume_set(codec, 0x27);
-	cs_8409_intmike_volume_mute(codec);
+        cs_8409_intmike_volume_set(codec, 0x27);
+        cs_8409_intmike_volume_mute(codec);
 
 	// we also reset the pin - however no change to volume or unmute 
 	// so cant say if should just set unmute or set volume to 0
@@ -2587,11 +3099,11 @@ static void cs_8409_capturestop_real(struct hda_codec *codec)
 	cs_8409_volume_set(codec, spec->intmike_nid, 0x00);
 
 
-	cs_8409_intmike_format_setup_disable(codec);
+        cs_8409_intmike_format_setup_disable(codec);
 
 
         cs_8409_linein_volume_set(codec, 0x27);
-	cs_8409_linein_volume_mute(codec);
+        cs_8409_linein_volume_mute(codec);
 
 	// we also reset the pin - however no change to volume or unmute 
 	// so cant say if should just set unmute or set volume to 0
@@ -2600,20 +3112,20 @@ static void cs_8409_capturestop_real(struct hda_codec *codec)
 	cs_8409_volume_set(codec, spec->linein_nid, 0x00);
 
 
-	cs_8409_linein_format_setup_disable(codec);
+        cs_8409_linein_format_setup_disable(codec);
 
 
-	cs_8409_inputs_power_nids_off(codec);
+        cs_8409_inputs_power_nids_off(codec);
 
 
-	// using Quicktime we get a play disable when we stop recording
-	//cs_8409_sync_converters_off
-	//cs_8409_disable_amps12
-	//cs_8409_disable_TDM_amps12
-	//cs_8409_disable_amps34
-	//cs_8409_disable_TDM_amps34
-	//cs_8409_disable_amps12
-	//cs_8409_disable_amps34
+        // using Quicktime we get a play disable when we stop recording
+        //cs_8409_sync_converters_off
+        //cs_8409_disable_amps12
+        //cs_8409_disable_TDM_amps12
+        //cs_8409_disable_amps34
+        //cs_8409_disable_TDM_amps34
+        //cs_8409_disable_amps12
+        //cs_8409_disable_amps34
 
 
         mycodec_info(codec, "command cs_8409_capturestop_real end");
@@ -2694,6 +3206,7 @@ static int cs_8409_read_status_and_clear_interrupt(struct hda_codec *codec)
 {
         int retval = 0;
         int retint = 0;
+        int last_retint = 0;
         int loopmax = 11;
         int loopcnt = 0;
 
@@ -2717,6 +3230,8 @@ static int cs_8409_read_status_and_clear_interrupt(struct hda_codec *codec)
 
                 retint = cs42l83_read_status_and_clear_interrupt(codec);
 
+                mycodec_info(codec, "cs_8409_read_status_and_clear_interrupt - UNSOL status 0x%08x\n",retint);
+
                 retval = read_gpio_status_check(codec);
 
                 if (loopcnt >= loopmax)
@@ -2733,13 +3248,15 @@ static int cs_8409_read_status_and_clear_interrupt(struct hda_codec *codec)
                         break;
                 }
 
+                last_retint = retint;
+
                 // IOSleep(10);
                 //usleeprange(8000,12000);
                 msleep(10);
 
         }
 
-        mycodec_info(codec, "cs_8409_read_status_and_clear_interrupt end\n");
+        mycodec_info(codec, "cs_8409_read_status_and_clear_interrupt 0x%08x end\n",retint);
 
         return retint;
 }
@@ -2984,7 +3501,7 @@ static void cs42l83_set_power_state_on(struct hda_codec *codec, int instate)
 
         }
 
-	mycodec_info(codec, "cs42l83_set_power_state_on end\n");
+        mycodec_info(codec, "cs42l83_set_power_state_on end\n");
 }
 
 static void cs42l83_headset_amp_setup_TDM_sample_rate(struct hda_codec *codec)
@@ -3016,19 +3533,19 @@ static void cs42l83_headset_amp_setup_TDM_proper(struct hda_codec *codec, int fu
         int new_coef71 = 0;
 
 
-	if (full)
-	{
-		ret_coef1 = snd_hda_coef_item_check(codec, 0, CS8409_VENDOR_NID, 0x0001, 0x0000, 0x00000200, 0 ); //   coef read 3810
-		new_coef1 = (ret_coef1 & 0xffff); // not clear what this is setting - no difference between read and write so far
+        if (full)
+        {
+                ret_coef1 = snd_hda_coef_item_check(codec, 0, CS8409_VENDOR_NID, 0x0001, 0x0000, 0x00000200, 0 ); //   coef read 3810
+                new_coef1 = (ret_coef1 & 0xffff); // not clear what this is setting - no difference between read and write so far
                                         // however if used in different places the actual value may be different
-		myprintk_dbg("snd_hda_intel: masked cs42l83_headset_amp_setup_TDM_proper coef 0x01 update 0x%04x 0x%04x \n", ret_coef1, new_coef1);
+                myprintk_dbg("snd_hda_intel: masked cs42l83_headset_amp_setup_TDM_proper coef 0x01 update 0x%04x 0x%04x \n", ret_coef1, new_coef1);
 
-		//snd_hda_coef_item(codec, 1, CS8409_VENDOR_NID, 0x0001, 0x0200, 0x00000000, 3814 ); //   coef write 3814
-		snd_hda_coef_item(codec, 1, CS8409_VENDOR_NID, 0x0001, new_coef1, 0x00000000, 3814 ); //   coef write 3814
-	}
+                //snd_hda_coef_item(codec, 1, CS8409_VENDOR_NID, 0x0001, 0x0200, 0x00000000, 3814 ); //   coef write 3814
+                snd_hda_coef_item(codec, 1, CS8409_VENDOR_NID, 0x0001, new_coef1, 0x00000000, 3814 ); //   coef write 3814
+        }
 
-	snd_hda_coef_item_masked(codec, 2, CS8409_VENDOR_NID, 0x0015, 0xaaaa, 0xffff, 0x0000aaaa, 0, 0 ); // coef write mask 3819
-	snd_hda_coef_item_masked(codec, 2, CS8409_VENDOR_NID, 0x0014, 0x0100, 0xffff, 0x00000000, 0, 0 ); // coef write mask 3825
+        snd_hda_coef_item_masked(codec, 2, CS8409_VENDOR_NID, 0x0015, 0xaaaa, 0xffff, 0x0000aaaa, 0, 0 ); // coef write mask 3819
+        snd_hda_coef_item_masked(codec, 2, CS8409_VENDOR_NID, 0x0014, 0x0100, 0xffff, 0x00000000, 0, 0 ); // coef write mask 3825
 
 //      snd_hda: # AppleHDATDMBusManagerCS8409::setupTDMPath: 
         snd_hda_coef_item(codec, 0, CS8409_VENDOR_NID, 0x0029, 0x0000, 0x00008000, 0 ); //   coef read 3832
@@ -3036,37 +3553,37 @@ static void cs42l83_headset_amp_setup_TDM_proper(struct hda_codec *codec, int fu
         snd_hda_coef_item(codec, 0, CS8409_VENDOR_NID, 0x002a, 0x0000, 0x00008000, 0 ); //   coef read 3840
         snd_hda_coef_item(codec, 1, CS8409_VENDOR_NID, 0x002a, 0x0820, 0x00000000, 0 ); //   coef write 3844
 
-	if (full)
-	{
-		ret_coef0 = snd_hda_coef_item_check(codec, 0, CS8409_VENDOR_NID, 0x0000, 0x0000, 0x00009000, 0 ); // AppleHDATDMBusManagerCS8409::setupTDMPath  coef read 3848
-		snd_hda_coef_item(codec, 1, CS8409_VENDOR_NID, 0x0000, 0xb000, 0x00000000, 0 ); // AppleHDATDMBusManagerCS8409::setupTDMPath  coef write 3852
-		snd_hda_coef_item(codec, 0, CS8409_VENDOR_NID, 0x0007, 0x0000, 0x000028ff, 0 ); // AppleHDATDMBusManagerCS8409::setupTDMPath  coef read 3856
-		snd_hda_coef_item(codec, 1, CS8409_VENDOR_NID, 0x0007, 0x10ff, 0x00000000, 0 ); // AppleHDATDMBusManagerCS8409::setupTDMPath  coef write 3860
-		snd_hda_coef_item(codec, 1, CS8409_VENDOR_NID, 0x0000, 0xb000, 0x00000000, 0 ); // AppleHDATDMBusManagerCS8409::setupTDMPath  coef write 3864
-		// NOTA BENE - here we update from 0x9000 to 0xb000 - which is then never removed - even after unplugging headphones!!
-		new_coef0 = ret_coef0 | 0x2000;
-		snd_hda_coef_item(codec, 1, CS8409_VENDOR_NID, 0x0000, new_coef0, 0x00000000, 0 ); // AppleHDATDMBusManagerCS8409::setupTDMPath  coef write 76
+        if (full)
+        {
+                ret_coef0 = snd_hda_coef_item_check(codec, 0, CS8409_VENDOR_NID, 0x0000, 0x0000, 0x00009000, 0 ); // AppleHDATDMBusManagerCS8409::setupTDMPath  coef read 3848
+                snd_hda_coef_item(codec, 1, CS8409_VENDOR_NID, 0x0000, 0xb000, 0x00000000, 0 ); // AppleHDATDMBusManagerCS8409::setupTDMPath  coef write 3852
+                snd_hda_coef_item(codec, 0, CS8409_VENDOR_NID, 0x0007, 0x0000, 0x000028ff, 0 ); // AppleHDATDMBusManagerCS8409::setupTDMPath  coef read 3856
+                snd_hda_coef_item(codec, 1, CS8409_VENDOR_NID, 0x0007, 0x10ff, 0x00000000, 0 ); // AppleHDATDMBusManagerCS8409::setupTDMPath  coef write 3860
+                snd_hda_coef_item(codec, 1, CS8409_VENDOR_NID, 0x0000, 0xb000, 0x00000000, 0 ); // AppleHDATDMBusManagerCS8409::setupTDMPath  coef write 3864
+                // NOTA BENE - here we update from 0x9000 to 0xb000 - which is then never removed - even after unplugging headphones!!
+                new_coef0 = ret_coef0 | 0x2000;
+                snd_hda_coef_item(codec, 1, CS8409_VENDOR_NID, 0x0000, new_coef0, 0x00000000, 0 ); // AppleHDATDMBusManagerCS8409::setupTDMPath  coef write 76
 
-	//      snd_hda: # AppleHDATDMBusManagerCS8409::setupTDMPath: 
-		snd_hda_coef_item_masked(codec, 2, CS8409_VENDOR_NID, 0x0006, 0x8000, 0xffff, 0x00008000, 0, 0 ); // coef write mask 3868
-		snd_hda_coef_item_masked(codec, 2, CS8409_VENDOR_NID, 0x0008, 0x0040, 0xffff, 0x00000000, 0, 0 ); // coef write mask 3874
+        //      snd_hda: # AppleHDATDMBusManagerCS8409::setupTDMPath: 
+                snd_hda_coef_item_masked(codec, 2, CS8409_VENDOR_NID, 0x0006, 0x8000, 0xffff, 0x00008000, 0, 0 ); // coef write mask 3868
+                snd_hda_coef_item_masked(codec, 2, CS8409_VENDOR_NID, 0x0008, 0x0040, 0xffff, 0x00000000, 0, 0 ); // coef write mask 3874
 
-	//      snd_hda: # AppleHDATDMBusManagerCS8409::setupTDMPath: 
-	//      snd_hda_coef_item_masked(codec, 2, CS8409_VENDOR_NID, 0x0082, 0xa801, 0xffff, 0x00000001, 0, 3880 ); // coef write mask 3880
-		snd_hda_coef_item_masked(codec, 2, CS8409_VENDOR_NID, 0x0082, 0xa800, 0x0000, 0x00000001, 0xa801, 0 ); // coef write mask 3880
+        //      snd_hda: # AppleHDATDMBusManagerCS8409::setupTDMPath: 
+        //      snd_hda_coef_item_masked(codec, 2, CS8409_VENDOR_NID, 0x0082, 0xa801, 0xffff, 0x00000001, 0, 3880 ); // coef write mask 3880
+                snd_hda_coef_item_masked(codec, 2, CS8409_VENDOR_NID, 0x0082, 0xa800, 0x0000, 0x00000001, 0xa801, 0 ); // coef write mask 3880
 
-		snd_hda_coef_item_masked(codec, 2, CS8409_VENDOR_NID, 0x0002, 0x0280, 0xffff, 0x00000280, 0, 0 ); // coef write mask 3886
+                snd_hda_coef_item_masked(codec, 2, CS8409_VENDOR_NID, 0x0002, 0x0280, 0xffff, 0x00000280, 0, 0 ); // coef write mask 3886
 
-		cs42l83_headset_amp_setup_TDM_sample_rate(codec);
+                cs42l83_headset_amp_setup_TDM_sample_rate(codec);
 
-		ret_coef1 = snd_hda_coef_item_check(codec, 0, CS8409_VENDOR_NID, 0x0001, 0x0000, 0x00000200, 0 ); //   coef read 3910
+                ret_coef1 = snd_hda_coef_item_check(codec, 0, CS8409_VENDOR_NID, 0x0001, 0x0000, 0x00000200, 0 ); //   coef read 3910
 
-		new_coef1 = (ret_coef1 & 0xffff) | 0x40;
-		myprintk_dbg("snd_hda_intel: masked cs42l83_headset_amp_setup_TDM_proper coef 0x01 update 0x%04x 0x%04x \n", ret_coef1, new_coef1);
+                new_coef1 = (ret_coef1 & 0xffff) | 0x40;
+                myprintk_dbg("snd_hda_intel: masked cs42l83_headset_amp_setup_TDM_proper coef 0x01 update 0x%04x 0x%04x \n", ret_coef1, new_coef1);
 
-		//snd_hda_coef_item(codec, 1, CS8409_VENDOR_NID, 0x0001, 0x0240, 0x00000000, 3914 ); //   coef write 3914
-		snd_hda_coef_item(codec, 1, CS8409_VENDOR_NID, 0x0001, new_coef1, 0x00000000, 0 ); //   coef write 3914
-	}
+                //snd_hda_coef_item(codec, 1, CS8409_VENDOR_NID, 0x0001, 0x0240, 0x00000000, 3914 ); //   coef write 3914
+                snd_hda_coef_item(codec, 1, CS8409_VENDOR_NID, 0x0001, new_coef1, 0x00000000, 0 ); //   coef write 3914
+        }
 
 
 //      snd_hda: # AppleHDATDMBusManagerCS8409::configureTDMUR: AppleHDATDMBusManagerCS8409::tdmInUse:
@@ -3091,19 +3608,24 @@ static void cs42l83_headset_amp_setup_TDM_proper(struct hda_codec *codec, int fu
 
 }
 
-static void cs43l83_headset_amp_format_setup(struct hda_codec *codec, int full)
+static void cs43l83_headset_amp_format_setup(struct hda_codec *codec, int set_stream_id, int full)
 {
         int retval;
 
         //snd_hda_codec_write(codec, 0x0a, 0, AC_VERB_SET_STREAM_FORMAT, 0x00004031); // 0x00a24031
 //      snd_hda:     stream format 10 [('CHAN', 2), ('RATE', 44100), ('BITS', 24), ('RATE_MUL', 1), ('RATE_DIV', 1)]
 
-        //snd_hda_codec_write(codec, 0x0a, 0, AC_VERB_SET_CHANNEL_STREAMID, 0x00000010); // 0x00a70610
-//      snd_hda:     conv stream channel map 10 [('CHAN', 0), ('STREAMID', 1)]
+        if (set_stream_id)
+        {
+                //snd_hda_codec_write(codec, 0x0a, 0, AC_VERB_SET_CHANNEL_STREAMID, 0x00000010); // 0x00a70610
+        //      snd_hda:     conv stream channel map 10 [('CHAN', 0), ('STREAMID', 1)]
 
-        // using the stored stream parameters update nid 0x0a stream parameters
-        // we have limited the allowed formats so should only have working formats here
-        cs_8409_really_update_stream_format(codec, 0x0a, 1, 2, 0);
+                // using the stored stream parameters update nid 0x1a stream parameters
+                // we have limited the allowed formats so should only have working formats here
+                cs_8409_really_update_stream_format(codec, 0x0a, 1, 2, 0);
+        } else {
+               snd_hda_codec_write(codec, 0x0a, 0, AC_VERB_SET_CHANNEL_STREAMID, 0x00000000); // 0x00a70600
+        }
 
         //cs42l83_headset_amp_setup_TDM_proper_full(codec);
         cs42l83_headset_amp_setup_TDM_proper(codec, full);
@@ -3200,7 +3722,7 @@ static void cs_8409_headset_amp_format_setup_disable(struct hda_codec *codec, in
 }
 
 
-static void cs42l83_headset_mike_format_setup_enable(struct hda_codec *codec, int nullformat)
+static void cs42l83_headset_mike_format_setup_enable(struct hda_codec *codec, int nullformat, int full)
 {
         int retval = 0;
         int ret_coef71 = 0;
@@ -3212,15 +3734,21 @@ static void cs42l83_headset_mike_format_setup_enable(struct hda_codec *codec, in
         //snd_hda_codec_write(codec, 0x1a, 0, AC_VERB_SET_CHANNEL_STREAMID, 0x00000010); // 0x01a70610
 //      snd_hda:     conv stream channel map 26 [('CHAN', 0), ('STREAMID', 1)]
 
-	if (nullformat)
-	{
+        if (nullformat)
+        {
                 // note that 0x4031 is Apples fixed format - but this is for plugin stage when we have
                 // not defined any format yet so just use it - we overwrite below when actually play
-		snd_hda_codec_write(codec, 0x1a, 0, AC_VERB_SET_STREAM_FORMAT, 0x00004031); // 0x01a24031
-		snd_hda_codec_write(codec, 0x1a, 0, AC_VERB_SET_CHANNEL_STREAMID, 0x00000010); // 0x01a70610
-	}
-	else
-		cs_8409_really_update_stream_format(codec, 0x1a, 1, 2, 0);
+                snd_hda_codec_write(codec, 0x1a, 0, AC_VERB_SET_STREAM_FORMAT, 0x00004031); // 0x01a24031
+                if (full)
+                        snd_hda_codec_write(codec, 0x1a, 0, AC_VERB_SET_CHANNEL_STREAMID, 0x00000010); // 0x01a70610
+        }
+        else
+        {
+                if (full)
+                        cs_8409_really_update_stream_format(codec, 0x1a, 1, 2, 0);
+                else
+                        cs_8409_really_update_stream_format(codec, 0x1a, 1, 0, 0);
+        }
 
         snd_hda_coef_item_masked(codec, 2, CS8409_VENDOR_NID, 0x0012, 0xaccc, 0xffff, 0x0000cccc, 0, 0 ); // coef write mask 12272
         snd_hda_coef_item_masked(codec, 2, CS8409_VENDOR_NID, 0x0011, 0x0001, 0xffff, 0x00000000, 0, 0 ); // coef write mask 12278
@@ -3248,10 +3776,14 @@ static void cs42l83_headset_mike_format_setup_enable(struct hda_codec *codec, in
 
         snd_hda_codec_write(codec, CS8409_VENDOR_NID, 0, 0x7f0, 0x00b6 ); // AppleHDATDMBusManagerCS8409::configureTDMUR  write verb 12381
 
-        retval = snd_hda_codec_read_check(codec, 0x3c, 0, AC_VERB_GET_PIN_WIDGET_CONTROL, 0x00000000, 0x00000000, 0); // 0x03cf0700
+        if (full)
+        {
 
-        snd_hda_codec_write(codec, 0x3c, 0, AC_VERB_SET_PIN_WIDGET_CONTROL, 0x00000020); // 0x03c70720
-//      snd_hda:     60 ['AC_PINCTL_IN_EN']
+                retval = snd_hda_codec_read_check(codec, 0x3c, 0, AC_VERB_GET_PIN_WIDGET_CONTROL, 0x00000000, 0x00000000, 0); // 0x03cf0700
+
+                snd_hda_codec_write(codec, 0x3c, 0, AC_VERB_SET_PIN_WIDGET_CONTROL, 0x00000020); // 0x03c70720
+        //      snd_hda:     60 ['AC_PINCTL_IN_EN']
+        }
 
 }
 
@@ -3495,12 +4027,12 @@ static void cs_8409_linein_format_setup_enable(struct hda_codec *codec)
         // 0x45 -> 0x23 is line input
 
 
-	// now updated to not write the Apple format but use my format setting routines
-	// (remember we have limited the allowed formats to acceptable ones)
-	// note that apparently we can set the format with the nid powered down but for setting the
-	// stream id the nid has to be powered up
-	// we may wish to ignore the power down here - because we reactivate the nid only a few steps
-	// later
+        // now updated to not write the Apple format but use my format setting routines
+        // (remember we have limited the allowed formats to acceptable ones)
+        // note that apparently we can set the format with the nid powered down but for setting the
+        // stream id the nid has to be powered up
+        // we may wish to ignore the power down here - because we reactivate the nid only a few steps
+        // later
 
         //snd_hda_codec_write(codec, 0x23, 0, AC_VERB_SET_STREAM_FORMAT, 0x00004033); // 0x02324033
 //      snd_hda:     stream format 35 [('CHAN', 4), ('RATE', 44100), ('BITS', 24), ('RATE_MUL', 1), ('RATE_DIV', 1)]
@@ -3711,10 +4243,13 @@ static void cs_8409_intmike_linein_resetup(struct hda_codec *codec)
 #define BUTTON_DOWN_PRESS 0x10000
 #define BUTTON_UP_PRESS 0x20000
 #define BUTTON_RELEASE 0x100000
+// pressing the play/pause button on earbuds yields 0x100 on down and 0x200 on up
+#define BUTTON_TOGGLE_DOWN_PRESS 0x100
+#define BUTTON_TOGGLE_UP_PRESS 0x200
 #define BUTTON_DETECT_MAIN 0x1800  // we only see 0x800 but the mask allows for these 2 bits
 #define BUTTON_DETECT 0x40
 #define MIKE_CONNECT 0x02
-#define BUTTONS (BUTTON_UP_PRESS | BUTTON_DOWN_PRESS)
+#define BUTTONS (BUTTON_UP_PRESS | BUTTON_DOWN_PRESS | BUTTON_TOGGLE_UP_PRESS | BUTTON_TOGGLE_DOWN_PRESS)
 #define HSDET_AUTO_DONE 0x02
 #define PDN_DONE 0x01
 
@@ -3751,24 +4286,27 @@ static void cs_8409_interrupt_action(struct hda_codec *codec, int int_response)
                 cs_8409_headset_type_detect_event(codec);
 
                 // and this is where life gets really complicated
-		// if we have a mike we do a button detect - but that leads to an unsolicited response
-		// so we only continue here I think if we dont have a mike
-		if (!(spec->have_mike))
+                // if we have a mike we do a button detect - but that leads to an unsolicited response
+                // so we only continue here I think if we dont have a mike
+                if (!(spec->have_mike))
                 {
                         cs_8409_plugin_event_continued(codec);
                 }
         }
         // not clear what test is here - but this should check what we see - one button interrupt seems to be activated
-	// when doing the button detect
+        // when doing the button detect
         // not sure what the exact button interrupt is - we get 0x140800
         // so the button detect interrupt is 0x0800 - the 0x140000 are actual button interrupts (undocumented for cs42l42)
         else if (int_response & BUTTON_DETECT_MAIN)
         {
-		dev_info(hda_codec_dev(codec), "cs_8409_interrupt_action - buttons detected\n");
-		cs_8409_headset_button_detect_event(codec);
+                dev_info(hda_codec_dev(codec), "cs_8409_interrupt_action - buttons detected\n");
+                cs_8409_headset_button_detect_event(codec);
 
         }
-        else if (((int_response & BUTTON_UP_PRESS) == BUTTON_UP_PRESS) || ((int_response & BUTTON_DOWN_PRESS) == BUTTON_DOWN_PRESS))
+        else if (((int_response & BUTTON_UP_PRESS) == BUTTON_UP_PRESS) ||
+                 ((int_response & BUTTON_DOWN_PRESS) == BUTTON_DOWN_PRESS) ||
+                 ((int_response & BUTTON_TOGGLE_UP_PRESS) == BUTTON_TOGGLE_UP_PRESS) ||
+                 ((int_response & BUTTON_TOGGLE_DOWN_PRESS) == BUTTON_TOGGLE_DOWN_PRESS))
         {
                 dev_info(hda_codec_dev(codec), "cs_8409_interrupt_action - button event on \n");
                 cs_8409_headset_button_event(codec, int_response);
@@ -3777,7 +4315,7 @@ static void cs_8409_interrupt_action(struct hda_codec *codec, int int_response)
         else if (((int_response & BUTTON_RELEASE) == BUTTON_RELEASE))
         {
                 dev_info(hda_codec_dev(codec), "cs_8409_interrupt_action - button event off \n");
-		cs_8409_headset_button_event(codec, int_response);
+                cs_8409_headset_button_event(codec, int_response);
 
         }
         else if ((int_response & PDN_DONE) == PDN_DONE)
@@ -3803,13 +4341,15 @@ static void cs_8409_plugin_event_continued(struct hda_codec *codec)
 {
         struct cs_spec *spec = codec->spec;
         int headset_plugged_in = 0;
-	int retval = 0;
+        int retval = 0;
 
         mycodec_info(codec, "cs_8409_plugin_event_continued start\n");
 
         // 0 is power state - 0 is powered on +ve powered/powering down
         // headset_plugged_in indicates if headset still plugged in or not
         headset_plugged_in = cs_8409_set_power_state(codec, 0);
+
+        mycodec_info(codec, "cs_8409_plugin_event_continued headset_plugged_in %d\n", headset_plugged_in);
 
         if (headset_plugged_in)
         {
@@ -3846,80 +4386,90 @@ static void cs_8409_plugin_event_continued(struct hda_codec *codec)
                         // of the stream format
 
                         // using explicit nid here!!
-			//cs_8409_reset_stream_format(codec, 0xa, 1, 1);
+                        //cs_8409_reset_stream_format(codec, 0xa, 1, 1);
 
                 }
                 else
                 {
 
-			// try removing this - we still do a partial setup when actually play on OSX
-			// and if we stop play then do another play we do a full setup
-			// - why not just enable when we play??
-			// in any case we initially made this a full setup and it worked
-			//cs_8409_headset_streaming_preplay(codec);
+                        // try removing this - we still do a partial setup when actually play on OSX
+                        // and if we stop play then do another play we do a full setup
+                        // - why not just enable when we play??
+                        // in any case we initially made this a full setup and it worked
+                        //cs_8409_headset_streaming_preplay(codec);
 
-			// so now think on OSX we pre-setup the headphone and mike here
-			// when we dont know if we will be playing or capturing
-			// in particular realised that cs42l83_configure_serial_port is only called
-			// for the headphone setup - but it sets both primary ASP (Audio Serial Port)
-			// transmit and receive frequencies - which would seem to be important for
-			// capturing!!
+                        // so now think on OSX we pre-setup the headphone and mike here
+                        // when we dont know if we will be playing or capturing
+                        // in particular realised that cs42l83_configure_serial_port is only called
+                        // for the headphone setup - but it sets both primary ASP (Audio Serial Port)
+                        // transmit and receive frequencies - which would seem to be important for
+                        // capturing!!
 
-			//spec->headset_presetup_done = 1;
+                        //spec->headset_presetup_done = 1;
 
                 }
 
-		// NOTA BENE - no concept/implementation of plugging in while capturing!!
+                // NOTA BENE - no concept/implementation of plugging in while capturing!!
 
-                // ensure the intmike/linein nids are powered off
-                cs_8409_inputs_power_nids_off(codec);
+                mycodec_info(codec, "cs_8409_plugin_event_continued headset_phase %d\n", spec->headset_phase);
 
-
-                retval = cs42l83_headphone_sense(codec);
-
-                mycodec_info(codec, "cs_8409_plugin_event_continued headphone sense 0x%x\n", retval);
-
-		if (!(retval & 0x80))
-		{
-			dev_info(hda_codec_dev(codec), "cs_8409_plugin_event_continued JACK DISCONNECT NOT IMPLEMENTED!!\n");
-		}
-
-                if (spec->have_mike)
+                // this event now gets called if boot with headset plugged in
+                // but from this point the boot phase setup is different
+		// -  now a headset_phase of 1 indicates booted with headset plugged in
+                // - headset phase of 2 or more means post boot headset plugin
+		if (spec->headset_phase >= 2)
                 {
-			if (spec->capturing)
-			{
-				dev_info(hda_codec_dev(codec), "cs_8409_plugin_event_continued PLUGIN WHILE CAPTURING NOT IMPLEMENTED!!\n");
-			}
 
-			// this is just calling this routine
-			//cs_8409_headset_mike_setup_nouse
-
-                        cs_8409_intmike_linein_disable(codec);
-
-			// is this a good position to switch the inputs??
-			switch_input_src(codec);
-
-			// confirmed that if do a second recording we get a full setup as for playing above
-			// - so why not just enable when we capture??
-			// (only plausible reason so far is to reduce setup time because of the long time
-			//  to send the i2c commands??)
-			// NOTE - this is complicated because on OSX it appears the headphone setup is always
-			//        done - even if just capturing
-			//        going with OSX way and doing the headphone setup as well
-
-			// so this is a problem - at this point we dont have a stream
-			// so our format is null
-			// what to do??
-			// now moving all this setup into the actual capture setup
-			// - as did with the play setup
-
-                        //cs_8409_headset_mike_streaming_preplay(codec, 1);
-
-			//spec->headset_presetup_done = 1;
+                        // ensure the intmike/linein nids are powered off
+                        cs_8409_inputs_power_nids_off(codec);
 
 
-                        cs_8409_headset_mike_buttons_enable(codec);
+                        retval = cs42l83_headphone_sense(codec);
 
+                        mycodec_info(codec, "cs_8409_plugin_event_continued headphone sense 0x%x\n", retval);
+
+                        if (!(retval & 0x80))
+                        {
+                                dev_info(hda_codec_dev(codec), "cs_8409_plugin_event_continued JACK DISCONNECT NOT IMPLEMENTED!!\n");
+                        }
+
+                        if (spec->have_mike)
+                        {
+                                if (spec->capturing)
+                                {
+                                        dev_info(hda_codec_dev(codec), "cs_8409_plugin_event_continued PLUGIN WHILE CAPTURING NOT IMPLEMENTED!!\n");
+                                }
+
+                                // this is just calling this routine
+                                //cs_8409_headset_mike_setup_nouse
+
+                                cs_8409_intmike_linein_disable(codec);
+
+                                // is this a good position to switch the inputs??
+                                switch_input_src(codec);
+
+                                // confirmed that if do a second recording we get a full setup as for playing above
+                                // - so why not just enable when we capture??
+                                // (only plausible reason so far is to reduce setup time because of the long time
+                                //  to send the i2c commands??)
+                                // NOTE - this is complicated because on OSX it appears the headphone setup is always
+                                //        done - even if just capturing
+                                //        going with OSX way and doing the headphone setup as well
+
+                                // so this is a problem - at this point we dont have a stream
+                                // so our format is null
+                                // what to do??
+                                // now moving all this setup into the actual capture setup
+                                // - as did with the play setup
+
+                                //cs_8409_headset_mike_streaming_preplay(codec, 1);
+
+                                //spec->headset_presetup_done = 1;
+
+
+                                cs_8409_headset_mike_buttons_enable(codec);
+
+                        }
                 }
 
         }
@@ -3929,7 +4479,6 @@ static void cs_8409_plugin_event_continued(struct hda_codec *codec)
         mycodec_info(codec, "cs_8409_plugin_event_continued end\n");
 }
 
-static void cs_8409_plugin_handle_detect(struct hda_codec *codec);
 static void cs_8409_plugin_complete_detect(struct hda_codec *codec);
 
 
@@ -3965,7 +4514,7 @@ static void cs_8409_headset_plugin_event(struct hda_codec *codec)
 
         mycodec_info(codec, "cs_8409_headset_plugin_event post plugin complete_detect\n");
 
-        spec->headset_phase = 2;
+        spec->headset_phase = 3;
 
 }
 
@@ -4050,7 +4599,6 @@ static void cs_8409_plugin_complete_detect(struct hda_codec *codec)
                 // AppleHDAMikeyInternalCS8409::handleJackDisconnectUR
 
                 dev_info(hda_codec_dev(codec), "cs_8409_plugin_complete_detect no headphone UNIMPLEMENTED!!\n");
-
         }
 
         mycodec_info(codec, "cs_8409_plugin_complete_detect end\n");
@@ -4138,7 +4686,7 @@ static void cs_8409_headset_type_detect_event(struct hda_codec *codec)
                 spec->have_mike = 1;
                 dev_info(hda_codec_dev(codec), "cs_8409_headset_type_detect_event headset has mike!!\n");
         }
-	else if (headset_type == 0x01)
+        else if (headset_type == 0x01)
         {
                 // 0x74e98
                 // insert Mikey event 0xfe
@@ -4299,7 +4847,7 @@ static void cs_8409_headset_button_detect_event(struct hda_codec *codec)
         mycodec_info(codec, "cs_8409_headset_button_detect_event start\n");
 
         // this returns significant state - headphone sense (shift 16), and 2 reads from register 0x1b78 (second one shifted 8)
-	ret_button = cs42l83_handle_button_detect(codec);
+        ret_button = cs42l83_handle_button_detect(codec);
 
         mycodec_info(codec, "cs_8409_headset_button_detect_event button data 0x%08x\n", ret_button);
 
@@ -4359,15 +4907,15 @@ static void cs_8409_intmike_linein_disable(struct hda_codec *codec)
 static void cs_8409_headset_mike_streaming_preplay(struct hda_codec *codec, int nullformat)
 {
 
-	// confirmed that if do a second recording we get a full setup as for playing
-	// - so why not just enable when we capture??
-	// (only plausible reason so far is to reduce setup time because of the long time
-	//  to send the i2c commands??)
-	// NOTE - this is complicated because on OSX it appears the headphone setup is always
-	//        done - even if just capturing
-	//        going with OSX way and doing the headphone setup as well
+        // confirmed that if do a second recording we get a full setup as for playing
+        // - so why not just enable when we capture??
+        // (only plausible reason so far is to reduce setup time because of the long time
+        //  to send the i2c commands??)
+        // NOTE - this is complicated because on OSX it appears the headphone setup is always
+        //        done - even if just capturing
+        //        going with OSX way and doing the headphone setup as well
 
-        //cs42l83_headset_mike_format_setup_enable(codec, nullformat);
+        //cs42l83_headset_mike_format_setup_enable(codec, nullformat, 1);
 
         //cs42l83_input_set_output_sample_rate(codec);
 
@@ -4627,8 +5175,8 @@ static void cs_8409_unplug_handle_disconnect(struct hda_codec *codec)
 
                                 cs42l83_headset_amp_disable_and_mike_format_setup_disable(codec);
 
-				// is this a good position to switch the inputs??
-				switch_input_src(codec);
+                                // is this a good position to switch the inputs??
+                                switch_input_src(codec);
 
                                 //unplug23_intmike_linein_resetup(codec);
 
@@ -4722,7 +5270,7 @@ static void cs42l83_headset_disable(struct hda_codec *codec, int full)
 
         myprintk("snd_hda_intel: cs42l83_power_off_codec_output start\n");
 
-	cs42l83_power_off_codec_output(codec);
+        cs42l83_power_off_codec_output(codec);
 
         myprintk("snd_hda_intel: cs42l83_power_off_codec_output end\n");
 
@@ -4752,7 +5300,7 @@ static void cs_8409_headset_streaming_preplay(struct hda_codec *codec)
         // the usual enable/disable multiple times
 
         //plugin3_headphone_format_setup_enable(codec);
-        cs43l83_headset_amp_format_setup(codec, 1);
+        cs43l83_headset_amp_format_setup(codec, 1, 1);
 
         //plugin3_configure_int_mclk(codec);
         cs42l83_configure_int_mclk(codec);
@@ -4773,7 +5321,7 @@ static void cs_8409_headset_streaming_preplay(struct hda_codec *codec)
         cs42l83_buffers_onoff(codec, 1);
 
 
-	// ignoring the disable
+        // ignoring the disable
 
         //plugin3_buffers_off(codec);
         //cs42l83_buffers_onoff(codec, 0);
@@ -4817,7 +5365,7 @@ static void cs_8409_enable_headset_streaming(struct hda_codec *codec)
         // Im guessing from messaging
 
         //play_format_setup_headphone(codec);
-        cs43l83_headset_amp_format_setup(codec, 1);
+        cs43l83_headset_amp_format_setup(codec, 1, 1);
 
         cs42l83_headset_play_setup_on(codec);
 
@@ -4903,16 +5451,16 @@ static void cs_8409_enable_headset_mike_streaming(struct hda_codec *codec)
         // Im guessing from messaging
 
 
-	// NOTE - there are big ordering issues here
-	//        - here we setup the headphone output before the mike
-	//        - this maybe because Quicktime defaults to enabling play when recording
-	//        unfortunately looks as tho linux tends to open the capture stream before the playback stream
-	//        - so going to ignore this here
+        // NOTE - there are big ordering issues here
+        //        - here we setup the headphone output before the mike
+        //        - this maybe because Quicktime defaults to enabling play when recording
+        //        unfortunately looks as tho linux tends to open the capture stream before the playback stream
+        //        - so going to ignore this here
 
-	// this sets up the headphones
-	// note this only does a partial headset amp setup compared to a base headset play
+        // this sets up the headphones
+        // note this only does a partial headset amp setup compared to a base headset play
         // power on audio output
-	//cs42l83_set_power_state_on(codec, 0);
+        //cs42l83_set_power_state_on(codec, 0);
         //cs42l83_headset_enable_on(codec);
 
         //retval = cs42l83_headphone_sense(codec);
@@ -4928,11 +5476,11 @@ static void cs_8409_enable_headset_mike_streaming(struct hda_codec *codec)
         //        dev_info(hda_codec_dev(codec), "cs_8409_enable_headset_mike_streaming headphone NOT PLUGGED IN UNIMPLEMENTED!!\n");
         //}
 
-	////cs43l83_headset_amp_format_setup_partial
-	//cs43l83_headset_amp_format_setup(codec, 0);
+        ////cs43l83_headset_amp_format_setup_partial
+        //cs43l83_headset_amp_format_setup(codec, 0);
 
 
-        cs42l83_headset_mike_format_setup_enable(codec, 0);
+        cs42l83_headset_mike_format_setup_enable(codec, 0, 1);
 
         cs42l83_input_set_output_sample_rate(codec);
 
@@ -4941,31 +5489,31 @@ static void cs_8409_enable_headset_mike_streaming(struct hda_codec *codec)
         cs42l83_mike_enable(codec);
 
 
-	// power on the codec/audio input
-	cs42l83_set_power_state_on(codec, 1);
+        // power on the codec/audio input
+        cs42l83_set_power_state_on(codec, 1);
 
-	// unmute audio input
-	cs42l83_headset_mike_adc_unmutevol(codec, 1);
-
-
-	// for partial setup only
-	//cs42l83_headset_mike_pin_enable(codec);
-	//cs42l83_headset_mike_format_setup_enable(codec, 0);
+        // unmute audio input
+        cs42l83_headset_mike_adc_unmutevol(codec, 1);
 
 
-	// this is all done in the capture hook after this call
-	//read_gpio_status
-	//read_gpio_status
-	//cs42l83_read_status_and_clear_interrupt
-	//read_gpio_status
-	//cs42l83_disambiguate_ur_from_int
-	//read_gpio_status
-	//read_gpio_status
-	//read_gpio_status
-	//cs42l83_read_status_and_clear_interrupt
-	//read_gpio_status
-	//cs42l83_disambiguate_ur_from_int
-	//read_gpio_status
+        // for partial setup only
+        //cs42l83_headset_mike_pin_enable(codec);
+        //cs42l83_headset_mike_format_setup_enable(codec, 0, 1);
+
+
+        // this is all done in the capture hook after this call
+        //read_gpio_status
+        //read_gpio_status
+        //cs42l83_read_status_and_clear_interrupt
+        //read_gpio_status
+        //cs42l83_disambiguate_ur_from_int
+        //read_gpio_status
+        //read_gpio_status
+        //read_gpio_status
+        //cs42l83_read_status_and_clear_interrupt
+        //read_gpio_status
+        //cs42l83_disambiguate_ur_from_int
+        //read_gpio_status
 
         mycodec_info(codec, "cs_8409_enable_headset_mike_streaming end\n");
 }
@@ -4977,100 +5525,100 @@ static void cs_8409_disable_headset_mike_streaming(struct hda_codec *codec)
         mycodec_info(codec, "snd_hda_intel: cs_8409_disable_headset_mike_streaming start\n");
 
 
-	// NOTE - there are big ordering issues here
-	//        although here the mike is turned off before the headphone output
+        // NOTE - there are big ordering issues here
+        //        although here the mike is turned off before the headphone output
 
-	// mute ADC
-	cs42l83_headset_mike_adc_unmutevol(codec, 0);
+        // mute ADC
+        cs42l83_headset_mike_adc_unmutevol(codec, 0);
 
-	cs42l83_power_off_codec_input(codec);
+        cs42l83_power_off_codec_input(codec);
 
-	cs42l83_mike_disable(codec);
+        cs42l83_mike_disable(codec);
 
-	cs42l83_headset_mike_format_setup_disable(codec);
+        cs42l83_headset_mike_format_setup_disable(codec);
 
-	// and duplicate the above!!
-	cs42l83_headset_mike_adc_unmutevol(codec, 0);
-	cs42l83_power_off_codec_input(codec);
-
-
-	// the following is disabling the headphone component
-	// - assuming this is done by the playback hooks
-
-	//cs42l83_headset_enable_off
-	//cs42l83_power_off_codec_output
-	//cs42l83_buffers_onoff
-	//cs42l83_headset_power_off
-	//cs_8409_headset_amp_disable_TDM_proper (full)
-	//cs_8409_headset_amp_format_setup_disable
-	//cs42l83_headset_enable_off
-	//cs42l83_power_off_codec_output
-
-	//cs_8409_external_device_unsolicited_response
-	//cs_8409_read_status_and_clear_interrupt
-	//read_gpio_status
-	//read_gpio_status
-	//cs42l83_read_status_and_clear_interrupt
-	//read_gpio_status
-	//cs42l83_disambiguate_ur_from_int
-	//read_gpio_status
+        // and duplicate the above!!
+        cs42l83_headset_mike_adc_unmutevol(codec, 0);
+        cs42l83_power_off_codec_input(codec);
 
 
-	// and re-enabling the headphone component?????
-	// igoring all the following for the moment
+        // the following is disabling the headphone component
+        // - assuming this is done by the playback hooks
+
+        //cs42l83_headset_enable_off
+        //cs42l83_power_off_codec_output
+        //cs42l83_buffers_onoff
+        //cs42l83_headset_power_off
+        //cs_8409_headset_amp_disable_TDM_proper (full)
+        //cs_8409_headset_amp_format_setup_disable
+        //cs42l83_headset_enable_off
+        //cs42l83_power_off_codec_output
+
+        //cs_8409_external_device_unsolicited_response
+        //cs_8409_read_status_and_clear_interrupt
+        //read_gpio_status
+        //read_gpio_status
+        //cs42l83_read_status_and_clear_interrupt
+        //read_gpio_status
+        //cs42l83_disambiguate_ur_from_int
+        //read_gpio_status
+
+
+        // and re-enabling the headphone component?????
+        // igoring all the following for the moment
 
         // note there was a 7 second delay here - this is recextstop2/2c
 
-	//cs43l83_headset_amp_format_setup (full)
-	//cs42l83_configure_int_mclk
-	//cs42l83_power_onoff
-	//cs42l83_configure_serial_port
-	//cs42l83_output_set_input_sample_rate
-	//cs42l83_setup_audio_output
-	//cs42l83_buffers_onoff
-	//cs42l83_set_power_state_on
-	//cs42l83_headset_enable_on
+        //cs43l83_headset_amp_format_setup (full)
+        //cs42l83_configure_int_mclk
+        //cs42l83_power_onoff
+        //cs42l83_configure_serial_port
+        //cs42l83_output_set_input_sample_rate
+        //cs42l83_setup_audio_output
+        //cs42l83_buffers_onoff
+        //cs42l83_set_power_state_on
+        //cs42l83_headset_enable_on
 
-	//cs_8409_external_device_unsolicited_response
-	//cs_8409_read_status_and_clear_interrupt
-	//read_gpio_status
-	//read_gpio_status
-	//cs42l83_read_status_and_clear_interrupt
-	//read_gpio_status
-	//cs42l83_read_status_and_clear_interrupt
-	//read_gpio_status
-	//cs42l83_disambiguate_ur_from_int
-	//read_gpio_status
-	//cs_8409_external_device_unsolicited_response (continued)
-	//cs_8409_read_status_and_clear_interrupt
-	//read_gpio_status
-	//read_gpio_status
-	//cs42l83_read_status_and_clear_interrupt
-	//read_gpio_status
-	//cs42l83_disambiguate_ur_from_int
-	//read_gpio_status
+        //cs_8409_external_device_unsolicited_response
+        //cs_8409_read_status_and_clear_interrupt
+        //read_gpio_status
+        //read_gpio_status
+        //cs42l83_read_status_and_clear_interrupt
+        //read_gpio_status
+        //cs42l83_read_status_and_clear_interrupt
+        //read_gpio_status
+        //cs42l83_disambiguate_ur_from_int
+        //read_gpio_status
+        //cs_8409_external_device_unsolicited_response (continued)
+        //cs_8409_read_status_and_clear_interrupt
+        //read_gpio_status
+        //read_gpio_status
+        //cs42l83_read_status_and_clear_interrupt
+        //read_gpio_status
+        //cs42l83_disambiguate_ur_from_int
+        //read_gpio_status
 
 
-	// then re-disabling!!
+        // then re-disabling!!
 
         // note there was a 5 second delay here - this is recextstop3
 
-	//cs42l83_headset_enable_off
-	//cs42l83_power_off_codec_output
-	//cs42l83_headset_rcv_enable_off
-	//cs42l83_headset_power_off
-	//cs_8409_headset_amp_disable_TDM_proper - full
-	//cs42l83_headset_enable_off
-	//cs42l83_power_off_codec_output
+        //cs42l83_headset_enable_off
+        //cs42l83_power_off_codec_output
+        //cs42l83_headset_rcv_enable_off
+        //cs42l83_headset_power_off
+        //cs_8409_headset_amp_disable_TDM_proper - full
+        //cs42l83_headset_enable_off
+        //cs42l83_power_off_codec_output
 
-	//cs_8409_external_device_unsolicited_response
-	//cs_8409_read_status_and_clear_interrupt
-	//read_gpio_status
-	//read_gpio_status
-	//cs42l83_read_status_and_clear_interrupt
-	//read_gpio_status
-	//cs42l83_disambiguate_ur_from_int
-	//read_gpio_status
+        //cs_8409_external_device_unsolicited_response
+        //cs_8409_read_status_and_clear_interrupt
+        //read_gpio_status
+        //read_gpio_status
+        //cs42l83_read_status_and_clear_interrupt
+        //read_gpio_status
+        //cs42l83_disambiguate_ur_from_int
+        //read_gpio_status
 
         mycodec_info(codec, "snd_hda_intel: cs_8409_disable_headset_mike_streaming end\n");
 }
@@ -5091,11 +5639,11 @@ static void cs_8409_headcapture_real(struct hda_codec *codec)
         {
                 mycodec_info(codec, "cs_8409_headcapture_real enable 1\n");
                 //cs_8409_headcapture_real1(codec);
-		hda_check_power_state(codec, 0x1a, 11);
-		hda_check_power_state(codec, 0x3c, 11);
+                hda_check_power_state(codec, 0x1a, 11);
+                hda_check_power_state(codec, 0x3c, 11);
                 cs_8409_enable_headset_mike_streaming(codec);
-		hda_check_power_state(codec, 0x1a, 12);
-		hda_check_power_state(codec, 0x3c, 12);
+                hda_check_power_state(codec, 0x1a, 12);
+                hda_check_power_state(codec, 0x3c, 12);
                 //spec->headset_enable = 2;
         }
         else if (spec->headset_enable == 2)
@@ -5114,7 +5662,7 @@ static void cs_8409_headcapturestop_real(struct hda_codec *codec)
 
         mycodec_info(codec, "cs_8409_headcapturestop_real start\n");
 
-	cs_8409_disable_headset_mike_streaming(codec);
+        cs_8409_disable_headset_mike_streaming(codec);
 
         mycodec_info(codec, "cs_8409_headcapturestop_real end\n");
 }
