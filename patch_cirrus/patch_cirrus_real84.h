@@ -1013,16 +1013,26 @@ static void cs_8409_setup_amps12(struct hda_codec *codec, int amps_enable)
 {
         if (codec->core.subsystem_id == 0x106b3900) {
                 // use reduced volume - from 0x01 to 0x30 - now passing as argument
+                // change channel mapping - make a standard left/right pair
+                // so 1st 2 channels are tweeters, 2nd 2 channels are woofers
                 cs_8409_setup_amp_max(codec, 0x64, 0x30, 0x00);
-                cs_8409_setup_amp_max(codec, 0x62, 0x30, 0x01);
+                cs_8409_setup_amp_max(codec, 0x62, 0x30, 0x02);
+                // use reduced volume - from 0x01 to 0x30 - now passing as argument
+                //cs_8409_setup_amp_max(codec, 0x64, 0x30, 0x00);
+                //cs_8409_setup_amp_max(codec, 0x62, 0x30, 0x01);
                 //cs_8409_setup_amp_max(codec, 0x64, 0x01, 0x00);
                 //cs_8409_setup_amp_max(codec, 0x62, 0x01, 0x01);
         }
         else if (codec->core.subsystem_id == 0x106b3300 || codec->core.subsystem_id == 0x106b3600) {
                 //setup_node_alpha_ssm3(codec);
-                // use reduced volume - from 0x48 to 0x80 - same reduction as for MAXs -24dB
+                // use reduced volume - from 0x01 to 0x30 - now passing as argument
+                // change channel mapping - make a standard left/right pair
+                // so 1st 2 channels are tweeters, 2nd 2 channels are woofers
                 cs_8409_setup_amp_ssm3(codec, 0x28, 0x80, 0x00);
-                cs_8409_setup_amp_ssm3(codec, 0x2a, 0x80, 0x01);
+                cs_8409_setup_amp_ssm3(codec, 0x2a, 0x80, 0x02);
+                // use reduced volume - from 0x48 to 0x80 - same reduction as for MAXs -24dB
+                //cs_8409_setup_amp_ssm3(codec, 0x28, 0x80, 0x00);
+                //cs_8409_setup_amp_ssm3(codec, 0x2a, 0x80, 0x01);
                 //cs_8409_setup_amp_ssm3(codec, 0x28, 0x48, 0x00);
                 //cs_8409_setup_amp_ssm3(codec, 0x2a, 0x48, 0x01);
         }
@@ -1030,10 +1040,15 @@ static void cs_8409_setup_amps12(struct hda_codec *codec, int amps_enable)
                 // NOTE that the TAS57642 amps setup during boot seems to skip the actual speaker power on
                 //      hence the addition of the amps_enable parameter
                 // use reduced volume - from 0xcf to 0x9f - same reduction as for MAXs -24dB (0.5dB steps)
+                // change channel mapping - make a standard left/right pair
+                // so 1st 2 channels are tweeters, 2nd 2 channels are woofers
+                cs_8409_setup_amp_tas576(codec, 0xd8, 0x9f, 0x00, amps_enable);
+                cs_8409_setup_amp_tas576(codec, 0xda, 0x9f, 0x02, amps_enable);
+                // use reduced volume - from 0xcf to 0x9f - same reduction as for MAXs -24dB (0.5dB steps)
+                //cs_8409_setup_amp_tas576(codec, 0xd8, 0x9f, 0x00, amps_enable);
+                //cs_8409_setup_amp_tas576(codec, 0xda, 0x9f, 0x01, amps_enable);
                 //cs_8409_setup_amp_tas576_amp0(codec, 0x9f, amps_enable);
                 //cs_8409_setup_amp_tas576_amp1(codec, 0x9f, amps_enable);
-                cs_8409_setup_amp_tas576(codec, 0xd8, 0x9f, 0x00, amps_enable);
-                cs_8409_setup_amp_tas576(codec, 0xda, 0x9f, 0x01, amps_enable);
                 //cs_8409_setup_amp_tas576(codec, 0xd8, 0xcf, 0x00, amps_enable);
                 //cs_8409_setup_amp_tas576(codec, 0xda, 0xcf, 0x01, amps_enable);
         }
@@ -1134,27 +1149,42 @@ static void cs_8409_setup_amps34(struct hda_codec *codec, int amps_enable)
 {
         if (codec->core.subsystem_id == 0x106b3900) {
                 // use reduced volume - from 0x01 to 0x30 - now passing as argument
-                cs_8409_setup_amp_max(codec, 0x74, 0x30, 0x02);
+                // change channel mapping - make a standard left/right pair
+                // so 1st 2 channels are tweeters, 2nd 2 channels are woofers
+                cs_8409_setup_amp_max(codec, 0x74, 0x30, 0x01);
                 cs_8409_setup_amp_max(codec, 0x72, 0x30, 0x03);
+                // use reduced volume - from 0x01 to 0x30 - now passing as argument
+                //cs_8409_setup_amp_max(codec, 0x74, 0x30, 0x02);
+                //cs_8409_setup_amp_max(codec, 0x72, 0x30, 0x03);
                 //cs_8409_setup_amp_max(codec, 0x74, 0x01, 0x02);
                 //cs_8409_setup_amp_max(codec, 0x72, 0x01, 0x03);
         }
         else if (codec->core.subsystem_id == 0x106b3300 || codec->core.subsystem_id == 0x106b3600) {
                 //setup_node_alpha_ssm3(codec);
                 // use reduced volume - from 0x48 to 0x80 - same reduction as for MAXs -24dB
-                cs_8409_setup_amp_ssm3(codec, 0x2c, 0x80, 0x02);
+                // change channel mapping - make a standard left/right pair
+                // so 1st 2 channels are tweeters, 2nd 2 channels are woofers
+                cs_8409_setup_amp_ssm3(codec, 0x2c, 0x80, 0x01);
                 cs_8409_setup_amp_ssm3(codec, 0x2e, 0x80, 0x03);
+                // use reduced volume - from 0x48 to 0x80 - same reduction as for MAXs -24dB
+                //cs_8409_setup_amp_ssm3(codec, 0x2c, 0x80, 0x02);
+                //cs_8409_setup_amp_ssm3(codec, 0x2e, 0x80, 0x03);
                 //cs_8409_setup_amp_ssm3(codec, 0x2c, 0x48, 0x02);
                 //cs_8409_setup_amp_ssm3(codec, 0x2e, 0x48, 0x03);
         }
         else if (codec->core.subsystem_id == 0x106b1000) {
                 // NOTE that the TAS57642 amps setup during boot seems to skip the actual speaker power on
                 //      hence the addition of the amps_enable parameter
+                // use reduced volume - from 0x48 to 0x80 - same reduction as for MAXs -24dB
+                // change channel mapping - make a standard left/right pair
+                // so 1st 2 channels are tweeters, 2nd 2 channels are woofers
+                cs_8409_setup_amp_tas576(codec, 0xdc, 0x9f, 0x01, amps_enable);
+                cs_8409_setup_amp_tas576(codec, 0xde, 0x9f, 0x03, amps_enable);
                 // use reduced volume - from 0xcf to 0x9f - same reduction as for MAXs -24dB (0.5dB steps)
+                //cs_8409_setup_amp_tas576(codec, 0xdc, 0x9f, 0x02, amps_enable);
+                //cs_8409_setup_amp_tas576(codec, 0xde, 0x9f, 0x03, amps_enable);
                 //cs_8409_setup_amp_tas576_amp2(codec, 0x9f, amps_enable);
                 //cs_8409_setup_amp_tas576_amp3(codec, 0x9f, amps_enable);
-                cs_8409_setup_amp_tas576(codec, 0xdc, 0x9f, 0x02, amps_enable);
-                cs_8409_setup_amp_tas576(codec, 0xde, 0x9f, 0x03, amps_enable);
                 //cs_8409_setup_amp_tas576(codec, 0xdc, 0xcf, 0x02, amps_enable);
                 //cs_8409_setup_amp_tas576(codec, 0xde, 0xcf, 0x03, amps_enable);
         }
