@@ -1217,10 +1217,10 @@ static void cs_8409_sync_converters_on(struct hda_codec *codec, int nullformat)
 
         // and reset back to normal channel mapping
 
-        snd_hda_codec_write(codec, 0x02, 0, AC_VERB_SET_CHANNEL_STREAMID, 0x00000010); // 0x00270610
+        //snd_hda_codec_write(codec, 0x02, 0, AC_VERB_SET_CHANNEL_STREAMID, 0x00000010); // 0x00270610
 //      snd_hda:     conv stream channel map 2 [('CHAN', 0), ('STREAMID', 1)]
 
-        snd_hda_codec_write(codec, 0x03, 0, AC_VERB_SET_CHANNEL_STREAMID, 0x00000012); // 0x00370612
+        //snd_hda_codec_write(codec, 0x03, 0, AC_VERB_SET_CHANNEL_STREAMID, 0x00000012); // 0x00370612
 //      snd_hda:     conv stream channel map 3 [('CHAN', 2), ('STREAMID', 1)]
 
         if (nullformat)
