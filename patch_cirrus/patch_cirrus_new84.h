@@ -1041,7 +1041,7 @@ void cs_8409_play_cleanup(struct hda_codec *codec)
 		if (spec->use_data) {
                         printk("snd_hda_intel: cs_8409_play_cleanup data not implemented for subsystem id 0x%08x",codec->core.subsystem_id);
 		} else {
-		        cs_8409_play_real(codec);
+		        cs_8409_playstop_real(codec);
 		}
         }
 	else {
