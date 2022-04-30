@@ -146,8 +146,10 @@ static void cs_8409_intmike_format_setup_enable(struct hda_codec *codec, int hda
 
 //      snd_hda: # AppleHDAWidgetCS8409::setConnectionSelect: 
         ret_coef9 = snd_hda_coef_item_check(codec, 0, CS8409_VENDOR_NID, 0x0009, 0x0000, 0x000000b3, 0 ); // AppleHDAWidgetCS8409::setConnectionSelect  coef read 10523
-        new_coef9 = (ret_coef9 | 0x20); // note most of the time it just seems to copy the value because bit 0x20 already set on input
-                                        // only on boot does this get set
+        //new_coef9 = (ret_coef9 | 0x20); // note most of the time it just seems to copy the value because bit 0x20 already set on input
+        //                                // only on boot does this get set
+        new_coef9 = (ret_coef9 | spec->reg9_intmike_dmic_mo); // note most of the time it just seems to copy the value because bit 0x20 already set on input
+                                                              // only on boot does this get set
         myprintk_dbg("snd_hda_intel: masked cs_8409_intmike_format_setup_enable coef 0x09 update 0x%04x 0x%04x \n", ret_coef9, new_coef9);
         //snd_hda_coef_item(codec, 1, CS8409_VENDOR_NID, 0x0009, 0x00b3, 0x00000000, 10527 ); // AppleHDAWidgetCS8409::setConnectionSelect  coef write 10527
         snd_hda_coef_item(codec, 1, CS8409_VENDOR_NID, 0x0009, new_coef9, 0x00000000, 0 ); // AppleHDAWidgetCS8409::setConnectionSelect  coef write 10527
@@ -469,7 +471,8 @@ static void cs_8409_intmike_stream_on_nid(struct hda_codec *codec)
 
         reg_coef82 = snd_hda_coef_item_check(codec, 0, CS8409_VENDOR_NID, 0x0082, 0x0000, 0x00005400, 0 ); //   coef read 10544
 
-        new_coef82 = (reg_coef82 | 0x1);
+        //new_coef82 = (reg_coef82 | 0x1);
+        new_coef82 = (reg_coef82 | spec->reg82_intmike_dmic_scl);
         myprintk_dbg("snd_hda_intel: masked cs_8409_intmike_stream_on_nid coef 0x82 update 0x%04x 0x%04x \n", reg_coef82, new_coef82);
 
         //snd_hda_coef_item(codec, 1, CS8409_VENDOR_NID, 0x0082, 0x5401, 0x00000000, 10548 ); //   coef write 10548
@@ -529,7 +532,8 @@ static void cs_8409_intmike_format_setup_disable(struct hda_codec *codec)
         // AppleHDAWidgetCS8409::configurePinForIO(bool)??
         reg_coef82 = snd_hda_coef_item_check(codec, 0, CS8409_VENDOR_NID, 0x0082, 0x0000, 0x0000a801, 0 ); //   coef read 12226
 
-        new_coef82 = (reg_coef82 & 0xfffffffe);
+        //new_coef82 = (reg_coef82 & 0xfffffffe);
+        new_coef82 = (reg_coef82 & ~spec->reg82_intmike_dmic_scl);
         myprintk_dbg("snd_hda_intel: masked cs_8409_intmike_format_setup_disable coef 0x82 update 0x%04x 0x%04x \n", reg_coef82, new_coef82);
 
         //snd_hda_coef_item(codec, 1, CS8409_VENDOR_NID, 0x0082, 0xa800, 0x00000000, 12230 ); //   coef write 12230
@@ -587,7 +591,8 @@ static void cs_8409_linein_format_setup_disable(struct hda_codec *codec)
 
         reg_coef82 = snd_hda_coef_item_check(codec, 0, CS8409_VENDOR_NID, 0x0082, 0x0000, 0x0000a800, 0 ); //   coef read 12257
 
-        new_coef82 = (reg_coef82 & 0xfffffffd);
+        //new_coef82 = (reg_coef82 & 0xfffffffd);
+        new_coef82 = (reg_coef82 & ~spec->reg82_linein_dmic_scl);
         myprintk_dbg("snd_hda_intel: masked cs_8409_linein_format_setup_disable coef 0x82 update 0x%04x 0x%04x \n", reg_coef82, new_coef82);
 
         //snd_hda_coef_item(codec, 1, CS8409_VENDOR_NID, 0x0082, 0xa800, 0x00000000, 12261 ); //   coef write 12261
@@ -3522,7 +3527,8 @@ static void cs_8409_linein_format_setup_enable(struct hda_codec *codec)
 
 //      snd_hda: # AppleHDAWidgetCS8409::setConnectionSelect: 
         ret_coef9 = snd_hda_coef_item_check(codec, 0, CS8409_VENDOR_NID, 0x0009, 0x0000, 0x000000b3, 0 ); // AppleHDAWidgetCS8409::setConnectionSelect  coef read 10563
-        new_coef9 = ret_coef9 | 0x80; // I dont get this bit set - see above
+        //new_coef9 = ret_coef9 | 0x80; // I dont get this bit set - see above
+        new_coef9 = ret_coef9 | spec->reg9_linein_dmic_mo; // I dont get this bit set - see above
         myprintk_dbg("snd_hda_intel: masked cs_8409_linein_format_setup_enable coef 0x09 update 0x%04x 0x%04x \n", ret_coef9, new_coef9);
         //snd_hda_coef_item(codec, 1, CS8409_VENDOR_NID, 0x0009, 0x00b3, 0x00000000, 10567 ); // AppleHDAWidgetCS8409::setConnectionSelect  coef write 10567
         snd_hda_coef_item(codec, 1, CS8409_VENDOR_NID, 0x0009, new_coef9, 0x00000000, 0 ); // AppleHDAWidgetCS8409::setConnectionSelect  coef write 10567
@@ -3541,7 +3547,8 @@ static void cs_8409_linein_stream_on_nid(struct hda_codec *codec)
 
         reg_coef82 = snd_hda_coef_item_check(codec, 0, CS8409_VENDOR_NID, 0x0082, 0x0000, 0x00005401, 0 ); //   coef read 10584
 
-        new_coef82 = (reg_coef82 | 0x2);
+        //new_coef82 = (reg_coef82 | 0x2);
+        new_coef82 = (reg_coef82 | spec->reg82_linein_dmic_scl);
         myprintk_dbg("snd_hda_intel: masked cs_8409_linein_stream_on_nid coef 0x82 update 0x%04x 0x%04x \n", reg_coef82, new_coef82);
 
         //snd_hda_coef_item(codec, 1, CS8409_VENDOR_NID, 0x0082, 0x5403, 0x00000000, 10588 ); //   coef write 10588

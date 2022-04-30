@@ -107,6 +107,12 @@ struct cs_spec {
 	int intmike_adc_nid;
 	int linein_amp_nid;
 
+	// the following flag bits also need swapping
+	int reg9_intmike_dmic_mo;
+	int reg9_linein_dmic_mo;
+	int reg82_intmike_dmic_scl;
+	int reg82_linein_dmic_scl;
+
 	// new item to deal with jack presence as Apple seems to have barfed
 	// the HDA spec by using a separate headphone chip
 	int jack_present;
@@ -2446,6 +2452,7 @@ static int patch_cs8409(struct hda_codec *codec)
 
 
         // setup the intmike and linein nids
+        // these are swapped between macbook pros and imacs
         if (codec->core.subsystem_id == 0x106b1000)
         {
                 spec->intmike_nid = 0x45;
@@ -2459,6 +2466,74 @@ static int patch_cs8409(struct hda_codec *codec)
                 spec->intmike_adc_nid = 0x22;
                 spec->linein_nid = 0x45;
                 spec->linein_amp_nid = 0x23;
+        }
+
+        // ASP is Audio Serial Port
+        // DMIC is Digital Microphone Input
+        //
+        // so it appears that while the intmike/linein nid functions are swapped between macbook pro and imacs
+        // the digital mike paths associated with the nids are fixed - which means the digital mike path
+        // swaps between macbooks and imac
+        // ie nid 0x44 -> 0x22 path 0x82 : 0x0001 ie DMIC1
+        // ie nid 0x45 -> 0x23 path 0x82 : 0x0002 ie DMIC2
+
+        // current status 0x82 reg:
+        // macbook pro and imac use 0x5400 for speaker amps - ASP1 (nid indpendent??)
+        // macbook pro and imac use 0xa800 for headset  amp - ASP2 (nid indpendent??)
+        // macbook pro          use 0x0001 for internal mike? - DMIC1 (nid dependent)
+        // macbook imac         use 0x0002 for internal mike? - DMIC2 (nid dependent)
+        // macbook pro          use 0x0002 for linein? - DMIC2 (nid dependent)
+        // macbook imac         use 0x0001 for linein? - DMIC1 (nid dependent)
+
+        // headset mike path
+        // nid 0x3c -> 0x1a
+
+        // combining data from cs4208_...inf with new 8409 updates in patch_cirrus for DEL laptops
+        // it seems reg 0x0009 is associated with the digital mikes
+        // vendor reg 0x0009 - 0x0023 : DMIC1_MO=10b, DMIC1/2_SR=1
+        //                   - 0x0003 : DMIC1_MO=00b, DMIC1/2_SR=1
+        //                   - 0x0043 : DMIC2_MO=01b, DMIC1/2_SR=1
+        //                   - 0x0083 : DMIC2_MO=10b, DMIC1/2_SR=1 - this is my guess
+        // note that Apple also sets bit 0x0010 which so far is undocumented as is not consistent with above data
+        //                   - 0x0033 : DMIC1_MO=11b, DMIC1/2_SR=1
+        //                   - 0x0093 : DMIC2_MO=10b, DMIC1_MO=01b?, DMIC1/2_SR=1
+
+        // it appears we need to swap a number of vendor node register fields because of the above path swap
+        // vendor reg 0x0009 - associated with internal mike from macbook pros
+        //      OSX function setConnectionSelect
+        //      macbook pro init        0x0013 -> 0x0033 ie 0x0020 bit set
+        //             imac init        0x0013 -> 0x0093 ie 0x0080 bit set
+        if (codec->core.subsystem_id == 0x106b1000)
+        {
+                spec->reg9_intmike_dmic_mo = 0x0080;    // DMIC2_MO=10b
+        }
+        else
+        {
+                spec->reg9_intmike_dmic_mo = 0x0020;    // DMIC1_MO=10b
+        }
+
+        // vendor reg 0x0082 - this is a very complex reg
+        //                   - it appears to contain 2 sort of separate items - the ASP1 and ASP2 enables and the DMIC1/DMIC2 SCL enables
+        //                   - 0xfc03 : ASP1/2_xxx_EN=1, ASP1/2_MCLK_EN=0, DMIC1/2_SCL_EN=1 (was DMIC1_SCL_EN in comments but thinks thats wrong given below)
+        //                   - 0xfc01 : (ASP1/2_xxx_EN = 1, ASP1/2_MCLK_EN = 0, DMIC1_SCL_EN = 1)
+        //                   - 0xff03 : (ASP1/2_xxx_EN = 1, DMIC1/2_SCL_EN = 1)
+        //                   - 0xfd02 : (ASP1/2_xxx_EN = 1, ASP2_MCLK_EN = 0, DMIC2_SCL_EN = 1)
+        //                   - 0xfe03 : (ASP1/2_xxx_EN = 1, ASP1_MCLK_EN = 0, DMIC1/2_SCL_EN = 1)
+        //                   - so (ASP1_MCLK_EN is 0x0100 and ASP2_MCLK_EN is 0x0200)
+        //                   - from the OSX codes we seem to have
+        //                   - 0xa800 : ASP2_xxx_EN = 1, ASP1/2_MCLK_EN = 0
+        //                   - 0x5400 : ASP1_xxx_EN = 1, ASP1/2_MCLK_EN = 0
+
+        // vendor reg 0x0082 - we need to update the DMIC bit fields but not the ASP bit fields for macbook/imac switch
+        if (codec->core.subsystem_id == 0x106b1000)
+        {
+                spec->reg82_intmike_dmic_scl = 0x0002;   // DMIC2_SCL_EN
+                spec->reg82_linein_dmic_scl = 0x0001;    // DMIC1_SCL_EN
+        }
+        else
+        {
+                spec->reg82_intmike_dmic_scl = 0x0001;   // DMIC1_SCL_EN
+                spec->reg82_linein_dmic_scl = 0x0002;    // DMIC2_SCL_EN
         }
 
 
