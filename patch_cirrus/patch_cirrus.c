@@ -1578,6 +1578,55 @@ cs_8409_hda_jack_detect_enable_callback(struct hda_codec *codec, hda_nid_t nid, 
 static void cs_8409_set_extended_codec_verb(void);
 #endif
 
+// new attempt to solve the channel map issue
+static const struct snd_pcm_chmap_elem cs_8409_chmap[] = {
+        { .channels = 2,
+          .map = { SNDRV_CHMAP_FL, SNDRV_CHMAP_FR } },
+        { .channels = 4,
+          .map = { SNDRV_CHMAP_FL, SNDRV_CHMAP_RL,
+                   SNDRV_CHMAP_FR, SNDRV_CHMAP_RR } },
+        { }
+};
+
+// this adds controls which I have no idea what they do
+static void cs_8409_add_chmap_ctls(struct hda_codec *codec)
+{
+        int err = 0;
+        struct hda_pcm *pcm;
+
+        codec_dbg(codec, "cs_8409_add_chmap_ctls enter");
+
+        list_for_each_entry(pcm, &codec->pcm_list_head, list) {
+                struct hda_pcm_stream *hinfo =
+                        &pcm->stream[SNDRV_PCM_STREAM_PLAYBACK];
+                struct snd_pcm_chmap *chmap;
+                const struct snd_pcm_chmap_elem *elem;
+
+		if (pcm != NULL) {
+			codec_dbg(codec, "cs_8409_add_chmap_ctls pcm name %s", pcm->name);
+
+			if (hinfo != NULL) {
+				codec_dbg(codec, "cs_8409_add_chmap_ctls pcm hinfo OK");
+				elem = cs_8409_chmap;
+				if (hinfo->channels_max == 4) {
+					codec_dbg(codec, "cs_8409_add_chmap_ctls pcm hinfo chan == 4");
+					err = snd_pcm_add_chmap_ctls(pcm->pcm,
+							SNDRV_PCM_STREAM_PLAYBACK,
+							elem, hinfo->channels_max, 0, &chmap);
+					if (err < 0)
+						codec_dbg(codec, "cs_8409_add_chmap_ctls failed!");
+				}
+			} else {
+				codec_dbg(codec, "cs_8409_add_chmap_ctls pcm hinfo NULL");
+			}
+		} else {
+			codec_dbg(codec, "cs_8409_add_chmap_ctls pcm NULL");
+		}
+        }
+
+        codec_dbg(codec, "cs_8409_add_chmap_ctls exit");
+}
+
 static int cs_8409_init(struct hda_codec *codec)
 {
 	struct hda_pcm *info = NULL;
@@ -1780,6 +1829,10 @@ static int cs_8409_build_controls(struct hda_codec *codec)
 	if (err < 0)
 		return err;
 	snd_hda_apply_fixup(codec, HDA_FIXUP_ACT_BUILD);
+
+	// before or after the snd_hda_apply_fixup??
+	//cs_8409_add_chmap_ctls(codec);
+
 
         myprintk("snd_hda_intel: end cs_8409_build_controls\n");
 	return 0;
