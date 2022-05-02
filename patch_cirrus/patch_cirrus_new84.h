@@ -645,9 +645,9 @@ static void cs_8409_dump_stream_format(struct hda_codec *codec, hda_nid_t nid)
         }
 
         if (p != NULL)
-                codec_dbg(codec, "cs_8409_dump_stream_format: NID=0x%x, cached values: stream=0x%x, channel=%d, format=0x%x\n", nid, p->stream_tag, p->channel_id, p->format_id);
+                mycodec_dbg(codec, "cs_8409_dump_stream_format: NID=0x%x, cached values: stream=0x%x, channel=%d, format=0x%x\n", nid, p->stream_tag, p->channel_id, p->format_id);
         else
-                codec_dbg(codec, "cs_8409_dump_stream_format: NID=0x%x, cached values: NULL\n", nid);
+                mycodec_dbg(codec, "cs_8409_dump_stream_format: NID=0x%x, cached values: NULL\n", nid);
 }
 
 static void cs_8409_reset_stream_format(struct hda_codec *codec, hda_nid_t nid, int format, int doreset)
@@ -696,7 +696,7 @@ static void cs_8409_save_and_clear_stream_format(struct hda_codec *codec, hda_ni
         int channel_id_sv;
         int format_id_sv;
 
-        codec_dbg(codec, "cs_8409_save_and_clear_stream_format\n");
+        mycodec_dbg(codec, "cs_8409_save_and_clear_stream_format\n");
 
         // use this to save the stream format and clear the stream id and channel
 
@@ -713,7 +713,7 @@ static void cs_8409_update_from_save_stream_format(struct hda_codec *codec, hda_
 {
         struct hda_cvt_setup *p = NULL;
 
-        codec_dbg(codec, "cs_8409_update_from_save_stream_format\n");
+        mycodec_dbg(codec, "cs_8409_update_from_save_stream_format\n");
 
         // so this will ensure the format is re-updated
 
@@ -737,7 +737,7 @@ static void cs_8409_really_update_stream_format(struct hda_codec *codec, hda_nid
         int channel_id_sv;
         int format_id_sv;
 
-        codec_dbg(codec, "cs_8409_really_update_stream_format\n");
+        mycodec_dbg(codec, "cs_8409_really_update_stream_format\n");
 
         cs_8409_dump_stream_format(codec, nid);
 
@@ -769,7 +769,7 @@ static void cs_8409_setup_stream_format(struct hda_codec *codec, hda_nid_t nid, 
 {
         struct hda_cvt_setup *p = NULL;
 
-        codec_dbg(codec, "cs_8409_setup_stream_format nid 0x%02x\n",nid);
+        mycodec_dbg(codec, "cs_8409_setup_stream_format nid 0x%02x\n",nid);
 
         cs_8409_dump_stream_format(codec, nid);
 
@@ -800,40 +800,40 @@ static void switch_input_src(struct hda_codec *codec)
 	struct hda_input_mux *imux = &spec->input_mux;
 	struct nid_path *path;
 	int i, c, nums;
-	codec_dbg(codec, "switch_input_src enter\n");
+	mycodec_dbg(codec, "switch_input_src enter\n");
 
 	nums = spec->num_adc_nids;
 
-	codec_dbg(codec, "switch_input_src num adc nids %d %d\n",nums,spec->dyn_adc_switch);
+	mycodec_dbg(codec, "switch_input_src num adc nids %d %d\n",nums,spec->dyn_adc_switch);
 
 	for (c = 0; c < nums; c++) {
-		codec_dbg(codec, "switch_input_src num_items %d\n",imux->num_items);
+		mycodec_dbg(codec, "switch_input_src num_items %d\n",imux->num_items);
 		for (i = 0; i < imux->num_items; i++) {
 			//path = get_input_path(codec, c, i);
 	                path = snd_hda_get_path_from_idx(codec, spec->input_paths[i][c]);
 			if (path) {
 				int in;
 				bool active = path->active;
-				codec_dbg(codec, "switch_input_src path active %d\n",active);
+				mycodec_dbg(codec, "switch_input_src path active %d\n",active);
 				for (in = path->depth - 1; in >= 0; in--) {
 					hda_nid_t tnid = path->path[in];
-					codec_dbg(codec, "switch_input_src path nid %d: 0x%02x\n",in,tnid);
+					mycodec_dbg(codec, "switch_input_src path nid %d: 0x%02x\n",in,tnid);
 				}
 				if (path->active) {
-					codec_dbg(codec, "switch_input_src path nid 0x%02x deactivate\n",path->path[1]);
+					mycodec_dbg(codec, "switch_input_src path nid 0x%02x deactivate\n",path->path[1]);
 					snd_hda_activate_path(codec, path, false, false);
 				} else {
-					codec_dbg(codec, "switch_input_src path nid 0x%02x   activate\n",path->path[1]);
+					mycodec_dbg(codec, "switch_input_src path nid 0x%02x   activate\n",path->path[1]);
 					snd_hda_activate_path(codec, path, true, false);
 				}
 			}
 			else {
-				codec_dbg(codec, "switch_input_src path NULL\n");
+				mycodec_dbg(codec, "switch_input_src path NULL\n");
 			}
 		}
 	}
 
-	codec_dbg(codec, "switch_input_src exit\n");
+	mycodec_dbg(codec, "switch_input_src exit\n");
 }
 
 

@@ -2865,7 +2865,7 @@ static int cs_8409_boot_setup_real(struct hda_codec *codec)
 
                 //cs42l83_headphone_sense1(codec);
                 retval = cs42l83_headphone_sense(codec);
-                mycodec_dbg(codec, "cs_8409_boot_setup_real headphone sense 1 0x%x\n", retval);
+                mycodec_info(codec, "cs_8409_boot_setup_real headphone sense 1 0x%x\n", retval);
 
 
                 //setup_mic_vol4(codec);
@@ -2886,12 +2886,12 @@ static int cs_8409_boot_setup_real(struct hda_codec *codec)
 
                 //cs42l83_headphone_sense2(codec);
                 retval = cs42l83_headphone_sense(codec);
-                mycodec_dbg(codec, "cs_8409_boot_setup_real headphone sense 2 0x%x\n", retval);
+                mycodec_info(codec, "cs_8409_boot_setup_real headphone sense 2 0x%x\n", retval);
 
 
                 //cs42l83_headphone_sense3(codec);
                 retval = cs42l83_headphone_sense(codec);
-                mycodec_dbg(codec, "cs_8409_boot_setup_real headphone sense 3 0x%x\n", retval);
+                mycodec_info(codec, "cs_8409_boot_setup_real headphone sense 3 0x%x\n", retval);
 
                 //setup_intmike_nid1(codec);
                 //cs_8409_intmike_format_setup_format_nouse(codec);

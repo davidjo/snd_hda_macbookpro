@@ -473,9 +473,9 @@ static int cs_8409_playback_pcm_prepare(struct hda_pcm_stream *hinfo,
 {
         struct hda_gen_spec *spec = codec->spec;
         int err;
-        codec_dbg(codec, "cs_8409_playback_pcm_prepare\n");
+        mycodec_dbg(codec, "cs_8409_playback_pcm_prepare\n");
 
-        codec_dbg(codec, "cs_8409_playback_pcm_prepare: NID=0x%x, stream=0x%x, format=0x%x\n",
+        mycodec_dbg(codec, "cs_8409_playback_pcm_prepare: NID=0x%x, stream=0x%x, format=0x%x\n",
                   hinfo->nid, stream_tag, format);
 
         cs_8409_pcm_playback_pre_prepare_hook(hinfo, codec, stream_tag, format, substream,
@@ -490,7 +490,7 @@ static int cs_8409_playback_pcm_prepare(struct hda_pcm_stream *hinfo,
         //                               HDA_GEN_PCM_ACT_PREPARE);
 	// but its a trivial function - at least for the moment!!
 	if (err)
-                codec_dbg(codec, "cs_8409_playback_pcm_prepare err %d\n", err);
+                mycodec_dbg(codec, "cs_8409_playback_pcm_prepare err %d\n", err);
         if (!err)
                 if (spec->pcm_playback_hook)
                         spec->pcm_playback_hook(hinfo, codec, substream, HDA_GEN_PCM_ACT_PREPARE);
@@ -514,9 +514,9 @@ static int cs_8409_capture_pcm_prepare(struct hda_pcm_stream *hinfo,
 {
         struct cs8409_apple_spec *spec = codec->spec;
 
-        codec_dbg(codec, "cs_8409_capture_pcm_prepare\n");
+        mycodec_dbg(codec, "cs_8409_capture_pcm_prepare\n");
 
-        codec_dbg(codec, "cs_8409_capture_pcm_prepare: NID=0x%x, stream=0x%x, format=0x%x\n",
+        mycodec_dbg(codec, "cs_8409_capture_pcm_prepare: NID=0x%x, stream=0x%x, format=0x%x\n",
                   hinfo->nid, stream_tag, format);
 
 
@@ -652,37 +652,37 @@ static void cs_8409_add_chmap_ctls(struct hda_codec *codec)
         int err = 0;
         struct hda_pcm *pcm;
 
-        codec_dbg(codec, "cs_8409_add_chmap_ctls enter");
+        mycodec_dbg(codec, "cs_8409_add_chmap_ctls enter");
 
         list_for_each_entry(pcm, &codec->pcm_list_head, list) {
                 struct hda_pcm_stream *hinfo =
                         &pcm->stream[SNDRV_PCM_STREAM_PLAYBACK];
                 struct snd_pcm_chmap *chmap;
-                const struct snd_pcm_chmap_elem *elem;
+		const struct snd_pcm_chmap_elem *elem;
 
 		if (pcm != NULL) {
-        		codec_dbg(codec, "cs_8409_add_chmap_ctls pcm name %s", pcm->name);
+			mycodec_dbg(codec, "cs_8409_add_chmap_ctls pcm name %s", pcm->name);
 
 			if (hinfo != NULL) {
-        			codec_dbg(codec, "cs_8409_add_chmap_ctls pcm hinfo OK");
+				mycodec_dbg(codec, "cs_8409_add_chmap_ctls pcm hinfo OK");
                 		elem = cs_8409_chmap;
                 		if (hinfo->channels_max == 4) {
-        				codec_dbg(codec, "cs_8409_add_chmap_ctls pcm hinfo chan == 4");
+					mycodec_dbg(codec, "cs_8409_add_chmap_ctls pcm hinfo chan == 4");
                         		err = snd_pcm_add_chmap_ctls(pcm->pcm,
                                         		SNDRV_PCM_STREAM_PLAYBACK,
                                         		elem, hinfo->channels_max, 0, &chmap);
                         		if (err < 0)
-                                		codec_dbg(codec, "cs_8409_add_chmap_ctls failed!");
+						mycodec_dbg(codec, "cs_8409_add_chmap_ctls failed!");
                 		}
 			} else {
-        			codec_dbg(codec, "cs_8409_add_chmap_ctls pcm hinfo NULL");
+				mycodec_dbg(codec, "cs_8409_add_chmap_ctls pcm hinfo NULL");
 			}
 		} else {
-        		codec_dbg(codec, "cs_8409_add_chmap_ctls pcm NULL");
+			mycodec_dbg(codec, "cs_8409_add_chmap_ctls pcm NULL");
 		}
         }
 
-        codec_dbg(codec, "cs_8409_add_chmap_ctls exit");
+        mycodec_dbg(codec, "cs_8409_add_chmap_ctls exit");
 }
 #endif
 
@@ -730,17 +730,13 @@ static void cs_8409_dump_auto_config(struct hda_codec *codec, const char *label_
         myprintk("snd_hda_intel: auto config pins hp_outs 0x%02x\n", spec->gen.autocfg.hp_pins[0]);
         myprintk("snd_hda_intel: auto config pins inputs %d\n", spec->gen.autocfg.num_inputs);
 
-        myprintk("snd_hda_intel: auto config pins inputs  pin 0x%02x\n", spec->gen.autocfg.inputs[0].pin);
-        myprintk("snd_hda_intel: auto config pins inputs type %d\n", spec->gen.autocfg.inputs[0].type);
-        myprintk("snd_hda_intel: auto config pins inputs is head set mic %d\n", spec->gen.autocfg.inputs[0].is_headset_mic);
-        myprintk("snd_hda_intel: auto config pins inputs is head phn mic %d\n", spec->gen.autocfg.inputs[0].is_headphone_mic);
-        myprintk("snd_hda_intel: auto config pins inputs is        boost %d\n", spec->gen.autocfg.inputs[0].has_boost_on_pin);
-
-        myprintk("snd_hda_intel: auto config pins inputs  pin 0x%02x\n", spec->gen.autocfg.inputs[1].pin);
-        myprintk("snd_hda_intel: auto config pins inputs type %d\n", spec->gen.autocfg.inputs[1].type);
-        myprintk("snd_hda_intel: auto config pins inputs is head set mic %d\n", spec->gen.autocfg.inputs[1].is_headset_mic);
-        myprintk("snd_hda_intel: auto config pins inputs is head phn mic %d\n", spec->gen.autocfg.inputs[1].is_headphone_mic);
-        myprintk("snd_hda_intel: auto config pins inputs is        boost %d\n", spec->gen.autocfg.inputs[1].has_boost_on_pin);
+        for (itm = 0; itm < spec->gen.autocfg.num_inputs; itm++) {
+                myprintk("snd_hda_intel: auto config pins inputs  pin 0x%02x\n", spec->gen.autocfg.inputs[itm].pin);
+                myprintk("snd_hda_intel: auto config pins inputs type %d\n", spec->gen.autocfg.inputs[itm].type);
+                myprintk("snd_hda_intel: auto config pins inputs is head set mic %d\n", spec->gen.autocfg.inputs[itm].is_headset_mic);
+                myprintk("snd_hda_intel: auto config pins inputs is head phn mic %d\n", spec->gen.autocfg.inputs[itm].is_headphone_mic);
+                myprintk("snd_hda_intel: auto config pins inputs is        boost %d\n", spec->gen.autocfg.inputs[itm].has_boost_on_pin);
+        }
 
         myprintk("snd_hda_intel: auto config inputs num_adc_nids %d\n", spec->gen.num_adc_nids);
         for (itm = 0; itm < spec->gen.num_adc_nids; itm++) {
@@ -817,33 +813,33 @@ static int cs_8409_apple_init(struct hda_codec *codec)
         hinfo = spec->gen.stream_analog_playback;
 	if (hinfo != NULL)
 	{
-		codec_dbg(codec, "hinfo stream nid 0x%02x rates 0x%08x formats 0x%016llx\n",hinfo->nid,hinfo->rates,hinfo->formats);
+		mycodec_dbg(codec, "hinfo stream nid 0x%02x rates 0x%08x formats 0x%016llx\n",hinfo->nid,hinfo->rates,hinfo->formats);
 	}
 	else
-		codec_dbg(codec, "hinfo stream NULL\n");
+		mycodec_dbg(codec, "hinfo stream NULL\n");
 
 	// think this is what I need to fixup
 
         list_for_each_entry(info, &codec->pcm_list_head, list) {
                 int stream;
 
-                codec_dbg(codec, "cs_8409_apple_init pcm %d\n",pcmcnt);
+                mycodec_dbg(codec, "cs_8409_apple_init pcm %d\n",pcmcnt);
 
                 for (stream = 0; stream < 2; stream++) {
                         struct hda_pcm_stream *hinfo = &info->stream[stream];
 
-			codec_dbg(codec, "cs_8409_apple_init info stream %d pointer %p\n",stream,hinfo);
+			mycodec_dbg(codec, "cs_8409_apple_init info stream %d pointer %p\n",stream,hinfo);
 
 			if (hinfo != NULL)
 			{
-				codec_dbg(codec, "cs_8409_apple_init info stream %d nid 0x%02x rates 0x%08x formats 0x%016llx\n",stream,hinfo->nid,hinfo->rates,hinfo->formats);
-				codec_dbg(codec, "cs_8409_apple_init        stream substreams %d\n",hinfo->substreams);
-				codec_dbg(codec, "cs_8409_apple_init        stream channels min %d\n",hinfo->channels_min);
-				codec_dbg(codec, "cs_8409_apple_init        stream channels max %d\n",hinfo->channels_max);
-				codec_dbg(codec, "cs_8409_apple_init        stream maxbps %d\n",hinfo->maxbps);
+				mycodec_dbg(codec, "cs_8409_apple_init info stream %d nid 0x%02x rates 0x%08x formats 0x%016llx\n",stream,hinfo->nid,hinfo->rates,hinfo->formats);
+				mycodec_dbg(codec, "cs_8409_apple_init        stream substreams %d\n",hinfo->substreams);
+				mycodec_dbg(codec, "cs_8409_apple_init        stream channels min %d\n",hinfo->channels_min);
+				mycodec_dbg(codec, "cs_8409_apple_init        stream channels max %d\n",hinfo->channels_max);
+				mycodec_dbg(codec, "cs_8409_apple_init        stream maxbps %d\n",hinfo->maxbps);
 			}
 			else
-				codec_dbg(codec, "cs_8409_apple_init info stream %d NULL\n", stream);
+				mycodec_dbg(codec, "cs_8409_apple_init info stream %d NULL\n", stream);
 		}
 		pcmcnt++;
 	}
@@ -869,13 +865,13 @@ static int cs_8409_apple_init(struct hda_codec *codec)
 				{
 					if (hinfo->nid == 0x02)
 					{
-						codec_dbg(codec, "cs_8409_apple_init info playback stream %d pointer %p\n",stream,hinfo);
+						mycodec_dbg(codec, "cs_8409_apple_init info playback stream %d pointer %p\n",stream,hinfo);
 						// so now we need to force the rates and formats to the single one Apple defines ie 44.1 kHz and S24_LE
 						// probably can leave S32_LE
 						// we can still handle 2/4 channel (what about 1 channel?)
 						hinfo->rates = SNDRV_PCM_RATE_44100;
 						hinfo->formats = SNDRV_PCM_FMTBIT_S32_LE | SNDRV_PCM_FMTBIT_S24_LE;
-						codec_dbg(codec, "playback info stream forced nid 0x%02x rates 0x%08x formats 0x%016llx\n",hinfo->nid,hinfo->rates,hinfo->formats);
+						mycodec_dbg(codec, "playback info stream forced nid 0x%02x rates 0x%08x formats 0x%016llx\n",hinfo->nid,hinfo->rates,hinfo->formats);
 
 						// update the playback function
 						hinfo->ops.prepare = cs_8409_playback_pcm_prepare;
@@ -889,7 +885,7 @@ static int cs_8409_apple_init(struct hda_codec *codec)
 						// this is the internal mike
 						// this is a bit weird - the output nodes are id'ed by input pin nid
 						// but the input nodes are done by the input (adc) nid - not the input pin nid
-						codec_dbg(codec, "cs_8409_apple_init info capture stream %d pointer %p\n",stream,hinfo);
+						mycodec_dbg(codec, "cs_8409_apple_init info capture stream %d pointer %p\n",stream,hinfo);
 						// so now we could force the rates and formats to the single one Apple defines ie 44.1 kHz and S24_LE
 						// but this internal mike seems to be a standard HDA input setup so we could have any format here
 						//hinfo->rates = SNDRV_PCM_RATE_44100;
@@ -898,7 +894,7 @@ static int cs_8409_apple_init(struct hda_codec *codec)
 						//hinfo->formats = SNDRV_PCM_FMTBIT_S24_3LE;
 						hinfo->formats = SNDRV_PCM_FMTBIT_S32_LE | SNDRV_PCM_FMTBIT_S24_LE | SNDRV_PCM_FMTBIT_S24_3LE;
 						//hinfo->maxbps = 24;
-						codec_dbg(codec, "capture info stream forced nid 0x%02x rates 0x%08x formats 0x%016llx maxbps %d\n",hinfo->nid,hinfo->rates,hinfo->formats,hinfo->maxbps);
+						mycodec_dbg(codec, "capture info stream forced nid 0x%02x rates 0x%08x formats 0x%016llx maxbps %d\n",hinfo->nid,hinfo->rates,hinfo->formats,hinfo->maxbps);
 						// update the capture function
 						hinfo->ops.prepare = cs_8409_capture_pcm_prepare;
 					}
@@ -907,14 +903,14 @@ static int cs_8409_apple_init(struct hda_codec *codec)
 						// this is the external mike ie headset mike
 						// this is a bit weird - the output nodes are id'ed by input pin nid
 						// but the input nodes are done by the input (adc) nid - not the input pin nid
-						codec_dbg(codec, "cs_8409_apple_init info capture stream %d pointer %p\n",stream,hinfo);
+						mycodec_dbg(codec, "cs_8409_apple_init info capture stream %d pointer %p\n",stream,hinfo);
 						// so now we force the rates and formats to the single one Apple defines ie 44.1 kHz and S24_LE
 						// - because this format is the one being returned by the cs42l83 which is setup by undocumented i2c commands
 						hinfo->rates = SNDRV_PCM_RATE_44100;
 						//hinfo->formats = SNDRV_PCM_FMTBIT_S24_LE;
 						hinfo->formats = SNDRV_PCM_FMTBIT_S32_LE | SNDRV_PCM_FMTBIT_S24_LE | SNDRV_PCM_FMTBIT_S24_3LE;
 						//hinfo->maxbps = 24;
-						codec_dbg(codec, "capture info stream forced nid 0x%02x rates 0x%08x formats 0x%016llx maxbps %d\n",hinfo->nid,hinfo->rates,hinfo->formats,hinfo->maxbps);
+						mycodec_dbg(codec, "capture info stream forced nid 0x%02x rates 0x%08x formats 0x%016llx maxbps %d\n",hinfo->nid,hinfo->rates,hinfo->formats,hinfo->maxbps);
 						// update the capture function
 						hinfo->ops.prepare = cs_8409_capture_pcm_prepare;
 					}
@@ -923,7 +919,7 @@ static int cs_8409_apple_init(struct hda_codec *codec)
 				}
 			}
 			else
-				codec_dbg(codec, "cs_8409_apple_init info pcm stream %d NULL\n", stream);
+				mycodec_dbg(codec, "cs_8409_apple_init info pcm stream %d NULL\n", stream);
 		}
 		pcmcnt++;
 	}
@@ -935,9 +931,9 @@ static int cs_8409_apple_init(struct hda_codec *codec)
 
 	// read UNSOL enable data to see what initial setup is
         //ret_unsol_enable = snd_hda_codec_read(codec, codec->core.afg, 0, AC_VERB_GET_UNSOLICITED_RESPONSE, 0);
-	//codec_dbg(codec,"UNSOL event 0x01 boot setup is 0x%08x\n",ret_unsol_enable);
+	//mycodec_dbg(codec,"UNSOL event 0x01 boot setup is 0x%08x\n",ret_unsol_enable);
         //ret_unsol_enable = snd_hda_codec_read(codec, 0x47, 0, AC_VERB_GET_UNSOLICITED_RESPONSE, 0);
-	//codec_dbg(codec,"UNSOL event 0x47 boot setup is 0x%08x\n",ret_unsol_enable);
+	//mycodec_dbg(codec,"UNSOL event 0x47 boot setup is 0x%08x\n",ret_unsol_enable);
 
 
 	//if (spec->gpio_mask) {
@@ -1043,9 +1039,9 @@ void cs_8409_cs42l83_jack_unsol_event(struct hda_codec *codec, unsigned int res)
 
 	//// read UNSOL enable data to see what current setup is
         //ret_unsol_enable = snd_hda_codec_read(codec, codec->core.afg, 0, AC_VERB_GET_UNSOLICITED_RESPONSE, 0);
-	//codec_dbg(codec,"UNSOL event 0x01 at unsol is 0x%08x\n",ret_unsol_enable);
+	//mycodec_dbg(codec,"UNSOL event 0x01 at unsol is 0x%08x\n",ret_unsol_enable);
         //ret_unsol_enable = snd_hda_codec_read(codec, 0x47, 0, AC_VERB_GET_UNSOLICITED_RESPONSE, 0);
-	//codec_dbg(codec,"UNSOL event 0x47 at unsol is 0x%08x\n",ret_unsol_enable);
+	//mycodec_dbg(codec,"UNSOL event 0x47 at unsol is 0x%08x\n",ret_unsol_enable);
 
 	// so it seems the low order byte of the res for the 8409 is a copy of the GPIO register state
 	// - except that we dont seem to pass this to the callback functions!!
@@ -1232,7 +1228,7 @@ static int cs_8409_add_adc_nid(struct hda_codec *codec, hda_nid_t pin)
 	}
 
 
-	codec_dbg(codec, "snd_hda_intel: cs_8409_add_adc_nid num nids %d\n",nums);
+	mycodec_dbg(codec, "snd_hda_intel: cs_8409_add_adc_nid num nids %d\n",nums);
 
 	for (itm = 0; itm < spec->num_adc_nids; itm++) {
 		myprintk("snd_hda_intel: cs_8409_add_adc_nid 0x%02x\n", spec->adc_nids[itm]);
@@ -1608,7 +1604,7 @@ static int patch_cs8409_apple_nouse(struct hda_codec *codec)
 
         snd_hda_pick_fixup(codec, cs8409_apple_models, cs8409_apple_fixup_tbl, cs8409_apple_fixups);
 
-        codec_dbg(codec, "Picked ID=%d, VID=%08x, DEV=%08x\n", codec->fixup_id,
+        mycodec_dbg(codec, "Picked ID=%d, VID=%08x, DEV=%08x\n", codec->fixup_id,
                          codec->bus->pci->subsystem_vendor,
                          codec->bus->pci->subsystem_device);
 
@@ -1658,7 +1654,7 @@ static int patch_cs8409_apple(struct hda_codec *codec)
         //myprintk("cs8409 - 1\n");
         //snd_hda_pick_fixup(codec, cs8409_apple_models, cs8409_apple_fixup_tbl, cs8409_apple_fixups);
 
-        //codec_dbg(codec, "Picked ID=%d, VID=%08x, DEV=%08x\n", codec->fixup_id,
+        //mycodec_dbg(codec, "Picked ID=%d, VID=%08x, DEV=%08x\n", codec->fixup_id,
         //                 codec->bus->pci->subsystem_vendor,
         //                 codec->bus->pci->subsystem_device);
 
@@ -1854,12 +1850,12 @@ static int patch_cs8409_apple(struct hda_codec *codec)
        //{
        //       hinfo = &(info->stream[SNDRV_PCM_STREAM_PLAYBACK]);
        //       if (hinfo != NULL)
-       //              codec_dbg(codec, "playback info stream nid 0x%02x rates 0x%08x formats 0x%016llx\n",hinfo->nid,hinfo->rates,hinfo->formats);
+       //              mycodec_dbg(codec, "playback info stream nid 0x%02x rates 0x%08x formats 0x%016llx\n",hinfo->nid,hinfo->rates,hinfo->formats);
        //       else
-       //              codec_dbg(codec, "playback info stream NULL\n");
+       //              mycodec_dbg(codec, "playback info stream NULL\n");
        //}
        //else
-       //       codec_dbg(codec, "playback info NULL\n");
+       //       mycodec_dbg(codec, "playback info NULL\n");
 
 
        // try removing the unused nodes
