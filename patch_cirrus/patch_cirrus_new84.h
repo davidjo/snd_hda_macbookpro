@@ -118,7 +118,7 @@ static void hda_check_power_state(struct hda_codec *codec, hda_nid_t nid, int fl
 
 static inline unsigned int cs_8409_vendor_coef_get(struct hda_codec *codec, unsigned int idx)
 {
-        struct cs_spec *spec = codec->spec;
+        struct cs8409_apple_spec *spec = codec->spec;
         unsigned int retval;
         snd_hda_codec_read(codec, spec->vendor_nid, 0,
                             AC_VERB_GET_COEF_INDEX, 0);
@@ -134,7 +134,7 @@ static inline unsigned int cs_8409_vendor_coef_get(struct hda_codec *codec, unsi
 static inline void cs_8409_vendor_coef_set(struct hda_codec *codec, unsigned int idx,
                                       unsigned int coef)
 {
-        struct cs_spec *spec = codec->spec;
+        struct cs8409_apple_spec *spec = codec->spec;
         snd_hda_codec_read(codec, spec->vendor_nid, 0,
                             AC_VERB_GET_COEF_INDEX, 0);
         snd_hda_codec_write(codec, spec->vendor_nid, 0,
@@ -150,7 +150,7 @@ static inline unsigned int cs_8409_vendor_coef_set_mask(struct hda_codec *codec,
                                       unsigned int coef, unsigned int mask, unsigned int srcval, int srcidx)
 {
         // for the moment hackily add srcidx argument while debugging
-        struct cs_spec *spec = codec->spec;
+        struct cs8409_apple_spec *spec = codec->spec;
         unsigned int retval;
         unsigned int mask_coef;
         snd_hda_codec_read(codec, spec->vendor_nid, 0,
@@ -569,7 +569,7 @@ void snd_hda_double_reset(struct hda_codec *codec)
 
 static void clear_pins(struct hda_codec *codec)
 {
-	//struct cs_spec *spec = codec->spec;
+	//struct cs8409_apple_spec *spec = codec->spec;
         hda_nid_t nid;
 
 	mycodec_info(codec, "start clear_pins\n");
@@ -585,7 +585,7 @@ static void clear_pins(struct hda_codec *codec)
 
 static void read_coefs_all_loop(struct hda_codec *codec)
 {
-	//struct cs_spec *spec = codec->spec;
+	//struct cs8409_apple_spec *spec = codec->spec;
 	int idx;
 	mycodec_info(codec, "start read_coefs_all\n");
 	for (idx = 0; idx < 130; idx++)
@@ -940,7 +940,7 @@ static int cs_8409_real_config(struct hda_codec *codec);
 static int cs_8409_boot_setup(struct hda_codec *codec)
 {
 	int err = 0;
-        struct cs_spec *spec = codec->spec;
+        struct cs8409_apple_spec *spec = codec->spec;
 
         // so it appears we break up the subsystem_id into 2 parts
         // a codec vendor id (16 bits) and a subvendor id (8 bits) plus an assembly id
@@ -986,7 +986,7 @@ static int cs_8409_boot_setup(struct hda_codec *codec)
 
 void cs_8409_play_setup(struct hda_codec *codec)
 {
-        struct cs_spec *spec = codec->spec;
+        struct cs8409_apple_spec *spec = codec->spec;
         if (codec->core.subsystem_id == 0x106b3900) {
 		if (spec->use_data) {
                         //cs_8409_unmute_data(codec);
@@ -1021,7 +1021,7 @@ void cs_8409_play_setup(struct hda_codec *codec)
 
 void cs_8409_play_cleanup(struct hda_codec *codec)
 {
-        struct cs_spec *spec = codec->spec;
+        struct cs8409_apple_spec *spec = codec->spec;
         if (codec->core.subsystem_id == 0x106b3900) {
 		if (spec->use_data) {
                        cs_8409_playstop_data(codec);
@@ -1056,7 +1056,7 @@ void cs_8409_play_cleanup(struct hda_codec *codec)
 
 void cs_8409_capture_setup(struct hda_codec *codec)
 {
-        struct cs_spec *spec = codec->spec;
+        struct cs8409_apple_spec *spec = codec->spec;
         if (codec->core.subsystem_id == 0x106b3300 || codec->core.subsystem_id == 0x106b3600 || codec->core.subsystem_id == 0x106b3900
                 || codec->core.subsystem_id == 0x106b1000) {
 		if (spec->use_data) {
@@ -1074,7 +1074,7 @@ void cs_8409_capture_setup(struct hda_codec *codec)
 
 void cs_8409_capture_cleanup(struct hda_codec *codec)
 {
-        struct cs_spec *spec = codec->spec;
+        struct cs8409_apple_spec *spec = codec->spec;
         if (codec->core.subsystem_id == 0x106b3300 || codec->core.subsystem_id == 0x106b3600 || codec->core.subsystem_id == 0x106b3900
                 || codec->core.subsystem_id == 0x106b1000) {
 		if (spec->use_data) {
@@ -1095,7 +1095,7 @@ static void cs_8409_cs42l83_unsolicited_response_finalize(struct hda_codec *code
 
 static void cs_8409_perform_external_device_unsolicited_responses(struct hda_codec *codec)
 {
-	struct cs_spec *spec = codec->spec;
+	struct cs8409_apple_spec *spec = codec->spec;
 	struct unsol_item *unsol_entry = NULL;
 	struct unsol_item *unsol_temp = NULL;
 	mycodec_info(codec, "cs_8409_perform_external_device_unsolicited_responses UNSOL start\n");
@@ -1112,7 +1112,7 @@ static void cs_8409_perform_external_device_unsolicited_responses(struct hda_cod
 
 static void cs_8409_cs42l83_unsolicited_response(struct hda_codec *codec, unsigned int res)
 {
-	struct cs_spec *spec = codec->spec;
+	struct cs8409_apple_spec *spec = codec->spec;
 
 	// not clear if want to use the GPIO pins apparently passed in res to determine
 	// if want to do interrupt checking here and if no interrupts then to do
@@ -1169,7 +1169,7 @@ static void cs_8409_cs42l83_unsolicited_response(struct hda_codec *codec, unsign
 
 static void cs_8409_cs42l83_unsolicited_response_finalize(struct hda_codec *codec, unsigned int res)
 {
-	struct cs_spec *spec = codec->spec;
+	struct cs8409_apple_spec *spec = codec->spec;
 
 	if (spec->use_data)
 		cs_8409_external_device_unsolicited_response_data(codec, res);
@@ -1191,7 +1191,7 @@ static void cs_8409_cs42l83_unsolicited_response_finalize(struct hda_codec *code
 
 static void cs_8409_headset_mike_setup_nouse(struct hda_codec *codec)
 {
-        struct cs_spec *spec = codec->spec;
+        struct cs8409_apple_spec *spec = codec->spec;
 
         cs_8409_intmike_linein_disable(codec);
 
@@ -1202,7 +1202,7 @@ static void cs_8409_headset_mike_setup_nouse(struct hda_codec *codec)
 
 void cs_8409_headplay_setup(struct hda_codec *codec)
 {
-        struct cs_spec *spec = codec->spec;
+        struct cs8409_apple_spec *spec = codec->spec;
         if (codec->core.subsystem_id == 0x106b3900) {
 		if (spec->use_data) {
                         cs_8409_headplay_data(codec);
@@ -1242,7 +1242,7 @@ void cs_8409_headplay_setup(struct hda_codec *codec)
 
 void cs_8409_headplay_cleanup(struct hda_codec *codec)
 {
-        struct cs_spec *spec = codec->spec;
+        struct cs8409_apple_spec *spec = codec->spec;
         if (codec->core.subsystem_id == 0x106b3900) {
 		if (spec->use_data) {
                         cs_8409_headplaystop_data(codec);
@@ -1286,7 +1286,7 @@ void cs_8409_headplay_cleanup(struct hda_codec *codec)
 
 void cs_8409_headcapture_setup(struct hda_codec *codec)
 {
-        struct cs_spec *spec = codec->spec;
+        struct cs8409_apple_spec *spec = codec->spec;
         if (codec->core.subsystem_id == 0x106b3300 || codec->core.subsystem_id == 0x106b3600 || codec->core.subsystem_id == 0x106b3900
                 || codec->core.subsystem_id == 0x106b1000) {
 		if (spec->use_data) {
@@ -1312,7 +1312,7 @@ void cs_8409_headcapture_setup(struct hda_codec *codec)
 
 void cs_8409_headcapture_cleanup(struct hda_codec *codec)
 {
-        struct cs_spec *spec = codec->spec;
+        struct cs8409_apple_spec *spec = codec->spec;
         if (codec->core.subsystem_id == 0x106b3300 || codec->core.subsystem_id == 0x106b3600 || codec->core.subsystem_id == 0x106b3900
                 || codec->core.subsystem_id == 0x106b1000) {
 		if (spec->use_data) {
@@ -1341,7 +1341,7 @@ static void cs_8409_pcm_playback_pre_prepare_hook(struct hda_pcm_stream *hinfo, 
                                unsigned int stream_tag, unsigned int format, struct snd_pcm_substream *substream,
                                int action)
 {
-	struct cs_spec *spec = codec->spec;
+	struct cs8409_apple_spec *spec = codec->spec;
 
 	if (action == HDA_GEN_PCM_ACT_PREPARE) {
 		struct timespec curtim;
@@ -1438,7 +1438,7 @@ static void cs_8409_pcm_playback_pre_prepare_hook(struct hda_pcm_stream *hinfo, 
 static void cs_8409_playback_pcm_hook(struct hda_pcm_stream *hinfo, struct hda_codec *codec, struct snd_pcm_substream *substream, int action)
 {
 
-	struct cs_spec *spec = codec->spec;
+	struct cs8409_apple_spec *spec = codec->spec;
 
 	// so finally getting a handle on ordering here
 	// we need to do the OSX setup in the OPEN section
@@ -1522,7 +1522,7 @@ static void cs_8409_pcm_capture_pre_prepare_hook(struct hda_pcm_stream *hinfo, s
                                unsigned int stream_tag, unsigned int format, struct snd_pcm_substream *substream,
                                int action)
 {
-	struct cs_spec *spec = codec->spec;
+	struct cs8409_apple_spec *spec = codec->spec;
 
 	if (action == HDA_GEN_PCM_ACT_PREPARE) {
 		myprintk("snd_hda_intel: command cs_8409_pcm_capture_pre_prepare_hook HOOK PREPARE init %d",spec->capture_init);
@@ -1582,7 +1582,7 @@ static void cs_8409_pcm_capture_pre_prepare_hook(struct hda_pcm_stream *hinfo, s
 static void cs_8409_capture_pcm_hook(struct hda_pcm_stream *hinfo, struct hda_codec *codec, struct snd_pcm_substream *substream, int action)
 {
 
-	struct cs_spec *spec = codec->spec;
+	struct cs8409_apple_spec *spec = codec->spec;
 
 	// so now no setup is done here - we only check for unsolicited responses
 	// - we do do cleanup for the CLEANUP action
@@ -1657,7 +1657,7 @@ static void cs_8409_capture_pcm_hook(struct hda_pcm_stream *hinfo, struct hda_co
 // this version runs all explicit commands as logged on OSX
 static int cs_8409_data_config(struct hda_codec *codec)
 {
-	//struct cs_spec *spec = codec->spec;
+	//struct cs8409_apple_spec *spec = codec->spec;
 	//hda_nid_t beep_nid = spec->beep_nid;
 
 	unsigned int tmpstate1 = -1;
@@ -1689,7 +1689,7 @@ static int cs_8409_data_config(struct hda_codec *codec)
 // this version runs the setup using functions based on the setup using the logged data
 static int cs_8409_real_config(struct hda_codec *codec)
 {
-	//struct cs_spec *spec = codec->spec;
+	//struct cs8409_apple_spec *spec = codec->spec;
 	//hda_nid_t beep_nid = spec->beep_nid;
 
 	unsigned int tmpstate1 = -1;

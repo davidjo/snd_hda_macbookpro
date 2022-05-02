@@ -77,7 +77,7 @@ static void cs_8409_intmike_format_setup_format33_nouse(struct hda_codec *codec)
         int ret_coef9 = 0;
         int new_coef9 = 0;
 
-        struct cs_spec *spec = codec->spec;
+        struct cs8409_apple_spec *spec = codec->spec;
 
         // 0x44 -> 0x22 is internal (I think) mike input (macbook pro)
 
@@ -91,7 +91,7 @@ static void cs_8409_intmike_format_setup_format_nouse(struct hda_codec *codec)
 {
         int retval;
 
-        struct cs_spec *spec = codec->spec;
+        struct cs8409_apple_spec *spec = codec->spec;
 
         snd_hda_codec_write(codec, spec->intmike_adc_nid, 0, AC_VERB_SET_STREAM_FORMAT, 0x00004031); // 0x02224031
         //snd_hda_codec_write(codec, 0x22, 0, AC_VERB_SET_STREAM_FORMAT, 0x00004031); // 0x02224031
@@ -105,7 +105,7 @@ static void cs_8409_intmike_format_setup_enable(struct hda_codec *codec, int hda
         int ret_coef9 = 0;
         int new_coef9 = 0;
 
-        struct cs_spec *spec = codec->spec;
+        struct cs8409_apple_spec *spec = codec->spec;
 
         // 0x44 -> 0x22 is internal (I think) mike input (macbook pro)
 
@@ -219,43 +219,43 @@ static void cs_8409_volume_unmute(struct hda_codec *codec, hda_nid_t nid)
 
 static void cs_8409_intmike_volume_set(struct hda_codec *codec, int volume)
 {
-        struct cs_spec *spec = codec->spec;
+        struct cs8409_apple_spec *spec = codec->spec;
         cs_8409_volume_set(codec, spec->intmike_adc_nid, volume);
 }
 
 static void cs_8409_linein_volume_set(struct hda_codec *codec, int volume)
 {
-        struct cs_spec *spec = codec->spec;
+        struct cs8409_apple_spec *spec = codec->spec;
         cs_8409_volume_set(codec, spec->linein_amp_nid, volume);
 }
 
 static void cs_8409_intmike_volume_unmute(struct hda_codec *codec)
 {
-        struct cs_spec *spec = codec->spec;
+        struct cs8409_apple_spec *spec = codec->spec;
         cs_8409_volume_unmute(codec, spec->intmike_adc_nid);
 }
 
 static void cs_8409_linein_volume_unmute(struct hda_codec *codec)
 {
-        struct cs_spec *spec = codec->spec;
+        struct cs8409_apple_spec *spec = codec->spec;
         cs_8409_volume_unmute(codec, spec->linein_amp_nid);
 }
 
 static void cs_8409_intmike_volume_mute(struct hda_codec *codec)
 {
-        struct cs_spec *spec = codec->spec;
+        struct cs8409_apple_spec *spec = codec->spec;
         cs_8409_volume_mute(codec, spec->intmike_adc_nid);
 }
 
 static void cs_8409_linein_volume_mute(struct hda_codec *codec)
 {
-        struct cs_spec *spec = codec->spec;
+        struct cs8409_apple_spec *spec = codec->spec;
         cs_8409_volume_mute(codec, spec->linein_amp_nid);
 }
 
 static void cs_8409_intmike_volume_setup_new(struct hda_codec *codec, int volume)
 {
-        struct cs_spec *spec = codec->spec;
+        struct cs8409_apple_spec *spec = codec->spec;
 
         cs_8409_volume_set(codec, spec->intmike_adc_nid, volume);
 
@@ -267,7 +267,7 @@ static void cs_8409_intmike_volume_setup_new(struct hda_codec *codec, int volume
 
 static void cs_8409_linein_volume_setup_new(struct hda_codec *codec, int volume)
 {
-        struct cs_spec *spec = codec->spec;
+        struct cs8409_apple_spec *spec = codec->spec;
 
         cs_8409_volume_set(codec, spec->linein_amp_nid, volume);
 
@@ -283,7 +283,7 @@ static void cs_8409_intmike_volume_setup(struct hda_codec *codec, int volume)
         int retgain;
         int newgain;
 
-        struct cs_spec *spec = codec->spec;
+        struct cs8409_apple_spec *spec = codec->spec;
 
         // plausibly AppleHDAWidget::setWidgetAmplifierGain
 
@@ -374,7 +374,7 @@ static void cs_8409_linein_volume_setup(struct hda_codec *codec, int volume)
         int retgain;
         int newgain;
 
-        struct cs_spec *spec = codec->spec;
+        struct cs8409_apple_spec *spec = codec->spec;
 
         // so as far as I can see the 1st section sets the gain and the second section sets the mute
         // it appears we do masked updates 
@@ -467,7 +467,7 @@ static void cs_8409_intmike_stream_on_nid(struct hda_codec *codec)
         int reg_coef82 = 0;
         int new_coef82 = 0;
 
-        struct cs_spec *spec = codec->spec;
+        struct cs8409_apple_spec *spec = codec->spec;
 
         reg_coef82 = snd_hda_coef_item_check(codec, 0, CS8409_VENDOR_NID, 0x0082, 0x0000, 0x00005400, 0 ); //   coef read 10544
 
@@ -498,7 +498,7 @@ static void cs_8409_intmike_format_setup_disable(struct hda_codec *codec)
         int reg_coef82 = 0;
         int new_coef82 = 0;
 
-        struct cs_spec *spec = codec->spec;
+        struct cs8409_apple_spec *spec = codec->spec;
 
 
         // set to defaults and disable input
@@ -556,7 +556,7 @@ static void cs_8409_linein_format_setup_disable(struct hda_codec *codec)
         int reg_coef82 = 0;
         int new_coef82 = 0;
 
-        struct cs_spec *spec = codec->spec;
+        struct cs8409_apple_spec *spec = codec->spec;
 
         // 0x45 -> 0x23 is line input (macbook pro)
 
@@ -613,7 +613,7 @@ static void cs_8409_intmike_stream_conn_off(struct hda_codec *codec)
 {
         int retval;
 
-        struct cs_spec *spec = codec->spec;
+        struct cs8409_apple_spec *spec = codec->spec;
 
         snd_hda_codec_write(codec, CS8409_VENDOR_NID, 0, AC_VERB_SET_PROC_STATE, 0x00000001); // 0x04770301
 
@@ -649,7 +649,7 @@ static void cs_8409_linein_stream_conn_off(struct hda_codec *codec)
 {
         int retval;
 
-        struct cs_spec *spec = codec->spec;
+        struct cs8409_apple_spec *spec = codec->spec;
 
         // Im thinking of a bugfix here to turn off bit 0x80 of index 0x0009
 
@@ -687,7 +687,7 @@ static void cs_8409_intmike_stream_off_nid(struct hda_codec *codec)
 {
         int retval;
 
-        struct cs_spec *spec = codec->spec;
+        struct cs8409_apple_spec *spec = codec->spec;
 
         //retval = snd_hda_codec_read_check(codec, 0x22, 0, AC_VERB_GET_POWER_STATE, 0x00000000, 0x00000033, 12189); // 0x022f0500
         //snd_hda_codec_write(codec, 0x22, 0, AC_VERB_SET_POWER_STATE, 0x00000000); // 0x02270500
@@ -709,7 +709,7 @@ static void cs_8409_linein_stream_off_nid(struct hda_codec *codec)
 {
         int retval;
 
-        struct cs_spec *spec = codec->spec;
+        struct cs8409_apple_spec *spec = codec->spec;
 
         //retval = snd_hda_codec_read_check(codec, 0x23, 0, AC_VERB_GET_POWER_STATE, 0x00000000, 0x00000033, 12197); // 0x023f0500
         //snd_hda_codec_write(codec, 0x23, 0, AC_VERB_SET_POWER_STATE, 0x00000000); // 0x02370500
@@ -732,7 +732,7 @@ static void cs_8409_intmike_volume_mute_nouse(struct hda_codec *codec)
 {
         int retval;
 
-        struct cs_spec *spec = codec->spec;
+        struct cs8409_apple_spec *spec = codec->spec;
 
         // nodes 0x44 is connected to 0x22 which is labelled mic input (macbook pro)
 
@@ -760,7 +760,7 @@ static void cs_8409_linein_volume_mute_nouse(struct hda_codec *codec)
 {
         int retval;
 
-        struct cs_spec *spec = codec->spec;
+        struct cs8409_apple_spec *spec = codec->spec;
 
         // nodes 0x45 which are connected to 0x23 is labelled as line input (macbook pro)
 
@@ -785,7 +785,7 @@ static void cs_8409_intmike_volume_unmute_nouse(struct hda_codec *codec)
 {
         int retval;
 
-        struct cs_spec *spec = codec->spec;
+        struct cs8409_apple_spec *spec = codec->spec;
 
         // nodes 0x44 is connected to 0x22 which is labelled mic input (macbook pro)
 
@@ -810,7 +810,7 @@ static void cs_8409_linein_volume_unmute_nouse(struct hda_codec *codec)
 {
         int retval;
 
-        struct cs_spec *spec = codec->spec;
+        struct cs8409_apple_spec *spec = codec->spec;
 
         // nodes 0x45 which are connected to 0x23 is labelled as line input (macbook pro)
 
@@ -1988,7 +1988,7 @@ static void cs_8409_inputs_power_nids_on(struct hda_codec *codec)
 {
         int retval;
 
-        struct cs_spec *spec = codec->spec;
+        struct cs8409_apple_spec *spec = codec->spec;
 
         //retval = snd_hda_codec_read_check(codec, 0x22, 0, AC_VERB_GET_POWER_STATE, 0x00000000, 0x00000033, 2785); // 0x022f0500
         //retval = snd_hda_codec_read_check(codec, 0x23, 0, AC_VERB_GET_POWER_STATE, 0x00000000, 0x00000033, 2786); // 0x023f0500
@@ -2002,7 +2002,7 @@ static void cs_8409_inputs_power_nids_off(struct hda_codec *codec)
 {
         int retval;
 
-        struct cs_spec *spec = codec->spec;
+        struct cs8409_apple_spec *spec = codec->spec;
 
         //retval = snd_hda_codec_read_check(codec, 0x22, 0, AC_VERB_GET_POWER_STATE, 0x00000000, 0x00000033, 10741); // 0x022f0500
         //retval = snd_hda_codec_read_check(codec, 0x23, 0, AC_VERB_GET_POWER_STATE, 0x00000000, 0x00000033, 10742); // 0x023f0500
@@ -2033,7 +2033,7 @@ static int cs_8409_boot_setup_real(struct hda_codec *codec)
 {
         int headset_on_boot = 0, retval;
 
-        struct cs_spec *spec = codec->spec;
+        struct cs8409_apple_spec *spec = codec->spec;
 
         //hda_nid_t beep_nid = spec->beep_nid;
 
@@ -2936,7 +2936,7 @@ static int cs_8409_boot_setup_real(struct hda_codec *codec)
 static void cs_8409_play_real(struct hda_codec *codec)
 {
         int retval;
-        //struct cs_spec *spec = codec->spec;
+        //struct cs8409_apple_spec *spec = codec->spec;
 
         //cs_8409_play_data(codec);
 
@@ -2995,7 +2995,7 @@ static void cs_8409_amps_disable_streaming(struct hda_codec *codec)
 static void cs_8409_playstop_real(struct hda_codec *codec)
 {
         //int retval;
-        //struct cs_spec *spec = codec->spec;
+        //struct cs8409_apple_spec *spec = codec->spec;
 
         mycodec_info(codec, "command cs_8409_playstop_real start");
 
@@ -3019,7 +3019,7 @@ static void cs_8409_playstop_real(struct hda_codec *codec)
 static void cs_8409_capture_real(struct hda_codec *codec)
 {
         int retval;
-        //struct cs_spec *spec = codec->spec;
+        //struct cs8409_apple_spec *spec = codec->spec;
 
         //cs_8409_capture_data(codec);
 
@@ -3064,7 +3064,7 @@ static void cs_8409_intmike_stream_reset_nid_on(struct hda_codec *codec)
 {
         int retval;
 
-        struct cs_spec *spec = codec->spec;
+        struct cs8409_apple_spec *spec = codec->spec;
 
 	// OK dont get this  - we turn the stream back on for the internal mike
 	// - but assume pin is OK??
@@ -3085,7 +3085,7 @@ static void cs_8409_linein_stream_reset_nid_off(struct hda_codec *codec)
 {
         int retval;
 
-        struct cs_spec *spec = codec->spec;
+        struct cs8409_apple_spec *spec = codec->spec;
 
 	// OK dont get this  - we turn the stream off for the linein
 	// - but assume pin is OK??
@@ -3103,7 +3103,7 @@ static void cs_8409_linein_stream_reset_nid_off(struct hda_codec *codec)
 static void cs_8409_capturestop_real(struct hda_codec *codec)
 {
         //int retval;
-        struct cs_spec *spec = codec->spec;
+        struct cs8409_apple_spec *spec = codec->spec;
 
         mycodec_info(codec, "command cs_8409_capturestop_real start");
 
@@ -4048,7 +4048,7 @@ static void cs_8409_linein_format_setup_enable(struct hda_codec *codec)
         int ret_coef9 = 0;
         int new_coef9 = 0;
 
-        struct cs_spec *spec = codec->spec;
+        struct cs8409_apple_spec *spec = codec->spec;
 
         // theres some weird issue here
         // index 0x0009 has bit 0x0080 set only after an unplug event with headset with mike
@@ -4105,7 +4105,7 @@ static void cs_8409_linein_stream_on_nid(struct hda_codec *codec)
         int reg_coef82 = 0;
         int new_coef82 = 0;
 
-        struct cs_spec *spec = codec->spec;
+        struct cs8409_apple_spec *spec = codec->spec;
 
         reg_coef82 = snd_hda_coef_item_check(codec, 0, CS8409_VENDOR_NID, 0x0082, 0x0000, 0x00005401, 0 ); //   coef read 10584
 
@@ -4130,7 +4130,7 @@ static void cs_8409_intmike_stream_conn_off_disable(struct hda_codec *codec)
 {
         int retval;
 
-        struct cs_spec *spec = codec->spec;
+        struct cs8409_apple_spec *spec = codec->spec;
 
         // more weird issue here
         // index 0x0009 has bit 0x0100 set only after an unplug event with headset with mike
@@ -4169,7 +4169,7 @@ static void cs_8409_intmike_stream_conn_off_enable(struct hda_codec *codec)
 {
         int retval;
 
-        struct cs_spec *spec = codec->spec;
+        struct cs8409_apple_spec *spec = codec->spec;
 
         snd_hda_codec_write(codec, CS8409_VENDOR_NID, 0, AC_VERB_SET_PROC_STATE, 0x00000001); // 0x04770301
 
@@ -4200,7 +4200,7 @@ static void cs_8409_intmike_stream_conn_off_enable(struct hda_codec *codec)
 
 static void cs_8409_intmike_linein_resetup(struct hda_codec *codec)
 {
-        struct cs_spec *spec = codec->spec;
+        struct cs8409_apple_spec *spec = codec->spec;
 
         // for some very strange reason we setup a 4 channel format after unplug of headset with mike
 
@@ -4297,7 +4297,7 @@ static void cs_8409_interrupt_action(struct hda_codec *codec, int int_response)
 {
         int retval;
         int headset_state;
-        struct cs_spec *spec = codec->spec;
+        struct cs8409_apple_spec *spec = codec->spec;
 
         if ((int_response & TIP_SENSE_PLUG) == TIP_SENSE_PLUG)
         {
@@ -4369,7 +4369,7 @@ static void cs_8409_headset_mike_buttons_enable(struct hda_codec *codec);
 
 static void cs_8409_plugin_event_continued(struct hda_codec *codec)
 {
-        struct cs_spec *spec = codec->spec;
+        struct cs8409_apple_spec *spec = codec->spec;
         int headset_plugged_in = 0;
         int retval = 0;
 
@@ -4515,7 +4515,7 @@ static void cs_8409_plugin_complete_detect(struct hda_codec *codec);
 static void cs_8409_headset_plugin_event(struct hda_codec *codec)
 {
         int retval;
-        struct cs_spec *spec = codec->spec;
+        struct cs8409_apple_spec *spec = codec->spec;
 
         mycodec_info(codec, "cs_8409_headset_plugin_event pre  plugin handle_detect\n");
 
@@ -4551,7 +4551,7 @@ static void cs_8409_headset_plugin_event(struct hda_codec *codec)
 static void cs_8409_plugin_handle_detect(struct hda_codec *codec)
 {
         //int retval;
-        struct cs_spec *spec = codec->spec;
+        struct cs8409_apple_spec *spec = codec->spec;
 
         // now think this is AppleHDAMikeyInternalCS8409::handleJackDetectUR
 
@@ -4571,7 +4571,7 @@ static void cs_8409_plugin_handle_detect(struct hda_codec *codec)
 static void cs_8409_plugin_complete_detect(struct hda_codec *codec)
 {
         int retval;
-        struct cs_spec *spec = codec->spec;
+        struct cs8409_apple_spec *spec = codec->spec;
 
         // so AppleHDAMikeyInternalCS8409::generalTimerCallback calls AppleHDAMikeyInternalCS8409::completeJackDetectUR
         // AppleHDAMikeyInternalCS8409::generalTimerCallback is set as a timer callback in the AppleHDAMikeyInternal::init
@@ -4642,7 +4642,7 @@ static void cs_8409_headset_type_detect_event(struct hda_codec *codec)
         int retstate;
         int flag = 1;
         int headset_type = 0;
-        struct cs_spec *spec = codec->spec;
+        struct cs8409_apple_spec *spec = codec->spec;
 
         // this is AppleHDAMikeyInternalCS8409::handleTypeDetectUR
         // dont yet see the path to call this - Im guessing from some messaging call
@@ -4872,7 +4872,7 @@ static void cs_8409_headset_button_detect_event(struct hda_codec *codec)
 {
         int ret_button;
         int ret_mike;
-        struct cs_spec *spec = codec->spec;
+        struct cs8409_apple_spec *spec = codec->spec;
 
         mycodec_info(codec, "cs_8409_headset_button_detect_event start\n");
 
@@ -5037,7 +5037,7 @@ static void cs_8409_unplug_handle_disconnect(struct hda_codec *codec);
 static void cs_8409_headset_unplug_event(struct hda_codec *codec)
 {
         int retval;
-        struct cs_spec *spec = codec->spec;
+        struct cs8409_apple_spec *spec = codec->spec;
 
         mycodec_info(codec, "cs_8409_headset_unplug_event start\n");
 
@@ -5062,7 +5062,7 @@ static void cs_8409_headset_unplug_event(struct hda_codec *codec)
 static void cs_8409_unplug_handle_disconnect(struct hda_codec *codec)
 {
         int retval;
-        struct cs_spec *spec = codec->spec;
+        struct cs8409_apple_spec *spec = codec->spec;
 
         mycodec_info(codec, "cs_8409_unplug_handle_disconnect start\n");
 
@@ -5431,7 +5431,7 @@ static void cs_8409_disable_headset_streaming(struct hda_codec *codec)
 static void cs_8409_headplay_real(struct hda_codec *codec)
 {
         //int retval;
-        struct cs_spec *spec = codec->spec;
+        struct cs8409_apple_spec *spec = codec->spec;
 
         mycodec_info(codec, "cs_8409_headplay_real start\n");
 
@@ -5656,7 +5656,7 @@ static void cs_8409_disable_headset_mike_streaming(struct hda_codec *codec)
 static void cs_8409_headcapture_real(struct hda_codec *codec)
 {
         //int retval;
-        struct cs_spec *spec = codec->spec;
+        struct cs8409_apple_spec *spec = codec->spec;
 
         mycodec_info(codec, "cs_8409_headcapture_real start\n");
 

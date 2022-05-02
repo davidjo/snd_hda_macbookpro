@@ -1634,7 +1634,7 @@ static void setup_jack_pin_config(struct hda_codec *codec)
 {
 
         //int retval;
-        struct cs_spec *spec = codec->spec;
+        struct cs8409_apple_spec *spec = codec->spec;
 
         // this is likely some call of setPinConfigDefault
 	// 0x45 -> 0x23 (macbook pro) is the line in path - so why does it say its a mike??

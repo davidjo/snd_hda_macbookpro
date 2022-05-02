@@ -63,19 +63,25 @@
 
 
 /* CS8409 */
-// for the moment leave my old definition names but map to the new module enum values
-#define CS8409_IDX_DEV_CFG     CS8409_PIN_AFG
-#define CS8409_VENDOR_NID      CS8409_PIN_VENDOR_WIDGET
-#define CS8409_BEEP_NID        CS8409_PIN_BEEP_GEN
+#define CS8409_IDX_DEV_CFG     0x01
+#define CS8409_VENDOR_NID      0x47
+#define CS8409_BEEP_NID        0x46
 
 
-// nid devs based on Dell fixups
-//#define CS8409_CS42L83_MACBOOK_HP_PIN_NID               CS8409_PIN_ASP1_TRANSMITTER_A
-//#define CS8409_CS42L83_MACBOOK_AMIC_PIN_NID             CS8409_PIN_ASP2_RECEIVER_A
-//#define CS8409_CS42L83_IMAC_HP_PIN_NID               CS8409_PIN_ASP2_TRANSMITTER_A
-//#define CS8409_CS42L83_IMAC_AMIC_PIN_NID             CS8409_PIN_ASP1_RECEIVER_A
-//#define CS8409_CS42L83_DMIC_PIN_NID             CS8409_PIN_DMIC1_IN
-//#define CS8409_CS42L83_DMIC_ADC_PIN_NID         CS8409_PIN_DMIC1
+#define CS8409_CS42L83_HP_PIN_NID                       0x2c
+#define CS8409_CS42L83_HP_MIC_PIN_NID                   0x3c
+#define CS8409_CS42L83_MACBOOK_MIC_PIN_NID              0x44
+#define CS8409_CS42L83_MACBOOK_LINEIN_PIN_NID           0x45
+#define CS8409_CS42L83_IMAC_MIC_PIN_NID                 0x45
+#define CS8409_CS42L83_IMAC_LINEIN_PIN_NID              0x44
+#define CS8409_CS42L83_MACBOOK_LINEIN_ADC_PIN_NID       0x23
+#define CS8409_CS42L83_IMAC_LINEIN_ADC_PIN_NID          0x22
+
+// add in coding based on Dell fixups
+
+#define CS42L83_I2C_ADDR	0x90	// for some reason given as (0x48 << 1)
+#define CS8409_CS42L83_RESET	0x02	// gpio interrupt mask - see cs42l83_external_control_GPIO
+#define CS8409_CS42L83_INT	0x01	// gpio interrupt mask
 
 
 /*
@@ -311,13 +317,14 @@
 /*
  */
 
+
 struct unsol_item {
         struct list_head list;
         unsigned int idx;
         unsigned int res;
 };
 
-struct cs_spec {
+struct cs8409_apple_spec {
 	struct hda_gen_spec gen;
 
 	unsigned int gpio_mask;
@@ -505,7 +512,7 @@ static int cs_8409_capture_pcm_prepare(struct hda_pcm_stream *hinfo,
                                unsigned int format,
                                struct snd_pcm_substream *substream)
 {
-        struct cs_spec *spec = codec->spec;
+        struct cs8409_apple_spec *spec = codec->spec;
 
         codec_dbg(codec, "cs_8409_capture_pcm_prepare\n");
 
@@ -686,7 +693,7 @@ static void cs_8409_set_extended_codec_verb(void);
 
 static void cs_8409_dump_auto_config(struct hda_codec *codec, const char *label_string)
 {
-	struct cs_spec *spec = codec->spec;
+	struct cs8409_apple_spec *spec = codec->spec;
 	//struct cs8409_spec *spec = codec->spec;
 	int itm = 0;
 
@@ -762,11 +769,11 @@ static void cs_8409_dump_auto_config(struct hda_codec *codec, const char *label_
 }
 
 
-static int cs_8409_init(struct hda_codec *codec)
+static int cs_8409_apple_init(struct hda_codec *codec)
 {
 	struct hda_pcm *info = NULL;
 	struct hda_pcm_stream *hinfo = NULL;
-	struct cs_spec *spec = NULL;
+	struct cs8409_apple_spec *spec = NULL;
 	//struct snd_kcontrol *kctl = NULL;
 	int pcmcnt = 0;
 	int ret_unsol_enable = 0;
@@ -776,7 +783,7 @@ static int cs_8409_init(struct hda_codec *codec)
 	// is that what we want here??
 	// NOTE this is called for either playback or capture
 
-        myprintk("snd_hda_intel: cs_8409_init\n");
+        myprintk("snd_hda_intel: cs_8409_apple_init\n");
 
 
         // NOTE that this function is called after the build pcm functions
@@ -820,23 +827,23 @@ static int cs_8409_init(struct hda_codec *codec)
         list_for_each_entry(info, &codec->pcm_list_head, list) {
                 int stream;
 
-                codec_dbg(codec, "cs_8409_init pcm %d\n",pcmcnt);
+                codec_dbg(codec, "cs_8409_apple_init pcm %d\n",pcmcnt);
 
                 for (stream = 0; stream < 2; stream++) {
                         struct hda_pcm_stream *hinfo = &info->stream[stream];
 
-			codec_dbg(codec, "cs_8409_init info stream %d pointer %p\n",stream,hinfo);
+			codec_dbg(codec, "cs_8409_apple_init info stream %d pointer %p\n",stream,hinfo);
 
 			if (hinfo != NULL)
 			{
-				codec_dbg(codec, "cs_8409_init info stream %d nid 0x%02x rates 0x%08x formats 0x%016llx\n",stream,hinfo->nid,hinfo->rates,hinfo->formats);
-				codec_dbg(codec, "cs_8409_init        stream substreams %d\n",hinfo->substreams);
-				codec_dbg(codec, "cs_8409_init        stream channels min %d\n",hinfo->channels_min);
-				codec_dbg(codec, "cs_8409_init        stream channels max %d\n",hinfo->channels_max);
-				codec_dbg(codec, "cs_8409_init        stream maxbps %d\n",hinfo->maxbps);
+				codec_dbg(codec, "cs_8409_apple_init info stream %d nid 0x%02x rates 0x%08x formats 0x%016llx\n",stream,hinfo->nid,hinfo->rates,hinfo->formats);
+				codec_dbg(codec, "cs_8409_apple_init        stream substreams %d\n",hinfo->substreams);
+				codec_dbg(codec, "cs_8409_apple_init        stream channels min %d\n",hinfo->channels_min);
+				codec_dbg(codec, "cs_8409_apple_init        stream channels max %d\n",hinfo->channels_max);
+				codec_dbg(codec, "cs_8409_apple_init        stream maxbps %d\n",hinfo->maxbps);
 			}
 			else
-				codec_dbg(codec, "cs_8409_init info stream %d NULL\n", stream);
+				codec_dbg(codec, "cs_8409_apple_init info stream %d NULL\n", stream);
 		}
 		pcmcnt++;
 	}
@@ -862,7 +869,7 @@ static int cs_8409_init(struct hda_codec *codec)
 				{
 					if (hinfo->nid == 0x02)
 					{
-						codec_dbg(codec, "cs_8409_init info playback stream %d pointer %p\n",stream,hinfo);
+						codec_dbg(codec, "cs_8409_apple_init info playback stream %d pointer %p\n",stream,hinfo);
 						// so now we need to force the rates and formats to the single one Apple defines ie 44.1 kHz and S24_LE
 						// probably can leave S32_LE
 						// we can still handle 2/4 channel (what about 1 channel?)
@@ -882,7 +889,7 @@ static int cs_8409_init(struct hda_codec *codec)
 						// this is the internal mike
 						// this is a bit weird - the output nodes are id'ed by input pin nid
 						// but the input nodes are done by the input (adc) nid - not the input pin nid
-						codec_dbg(codec, "cs_8409_init info capture stream %d pointer %p\n",stream,hinfo);
+						codec_dbg(codec, "cs_8409_apple_init info capture stream %d pointer %p\n",stream,hinfo);
 						// so now we could force the rates and formats to the single one Apple defines ie 44.1 kHz and S24_LE
 						// but this internal mike seems to be a standard HDA input setup so we could have any format here
 						//hinfo->rates = SNDRV_PCM_RATE_44100;
@@ -900,7 +907,7 @@ static int cs_8409_init(struct hda_codec *codec)
 						// this is the external mike ie headset mike
 						// this is a bit weird - the output nodes are id'ed by input pin nid
 						// but the input nodes are done by the input (adc) nid - not the input pin nid
-						codec_dbg(codec, "cs_8409_init info capture stream %d pointer %p\n",stream,hinfo);
+						codec_dbg(codec, "cs_8409_apple_init info capture stream %d pointer %p\n",stream,hinfo);
 						// so now we force the rates and formats to the single one Apple defines ie 44.1 kHz and S24_LE
 						// - because this format is the one being returned by the cs42l83 which is setup by undocumented i2c commands
 						hinfo->rates = SNDRV_PCM_RATE_44100;
@@ -916,7 +923,7 @@ static int cs_8409_init(struct hda_codec *codec)
 				}
 			}
 			else
-				codec_dbg(codec, "cs_8409_init info pcm stream %d NULL\n", stream);
+				codec_dbg(codec, "cs_8409_apple_init info pcm stream %d NULL\n", stream);
 		}
 		pcmcnt++;
 	}
@@ -952,16 +959,16 @@ static int cs_8409_init(struct hda_codec *codec)
 #endif
 
 
-        myprintk("snd_hda_intel: end cs_8409_init\n");
+        myprintk("snd_hda_intel: end cs_8409_apple_init\n");
 
 	return 0;
 }
 
-static int cs_8409_build_controls(struct hda_codec *codec)
+static int cs_8409_apple_build_controls(struct hda_codec *codec)
 {
 	int err;
 
-	myprintk("snd_hda_intel: cs_8409_build_controls\n");
+	myprintk("snd_hda_intel: cs_8409_apple_build_controls\n");
 
 	err = snd_hda_gen_build_controls(codec);
 	if (err < 0)
@@ -971,28 +978,28 @@ static int cs_8409_build_controls(struct hda_codec *codec)
 	// before or after the snd_hda_apply_fixup??
 	//cs_8409_add_chmap_ctls(codec);
 
-	myprintk("snd_hda_intel: end cs_8409_build_controls\n");
+	myprintk("snd_hda_intel: end cs_8409_apple_build_controls\n");
 	return 0;
 }
 
-int cs_8409_build_pcms(struct hda_codec *codec)
+int cs_8409_apple_build_pcms(struct hda_codec *codec)
 {
 	int retval;
         struct hda_pcm *pcm;
-	//struct cs_spec *spec = codec->spec;
+	//struct cs8409_apple_spec *spec = codec->spec;
 	//struct hda_pcm *info = NULL;
 	//struct hda_pcm_stream *hinfo = NULL;
 
-        myprintk("snd_hda_intel: cs_8409_build_pcms\n");
+        myprintk("snd_hda_intel: cs_8409_apple_build_pcms\n");
 	retval =  snd_hda_gen_build_pcms(codec);
 
         //list_for_each_entry(pcm, &codec->pcm_list_head, list) {
         //        struct snd_pcm_chmap *chmap;
         //        const struct snd_pcm_chmap_elem *elem;
 	//	if (pcm != NULL) {
-        //		myprintk("snd_hda_intel: cs_8409_build_pcms name %s\n", pcm->name);
+        //		myprintk("snd_hda_intel: cs_8409_apple_build_pcms name %s\n", pcm->name);
 	//		if (pcm->stream[SNDRV_PCM_STREAM_PLAYBACK].channels_max == 4) {
-        //			myprintk("snd_hda_intel: cs_8409_build_pcms - adding chmap OK\n");
+        //			myprintk("snd_hda_intel: cs_8409_apple_build_pcms - adding chmap OK\n");
 	//			pcm->own_chmap = true;
 	//			pcm->stream[SNDRV_PCM_STREAM_PLAYBACK].chmap = cs_8409_chmap;
 	//		}
@@ -1003,12 +1010,12 @@ int cs_8409_build_pcms(struct hda_codec *codec)
 	// ah this is all done in snd_hda_codec_build_pcms
 	// which calls this patch routine or snd_hda_gen_build_pcms
 	// but the query supported pcms is only done after this
-        myprintk("snd_hda_intel: end cs_8409_build_pcms\n");
+        myprintk("snd_hda_intel: end cs_8409_apple_build_pcms\n");
 	return retval;
 }
 
 
-static void cs_8409_call_jack_callback(struct hda_codec *codec,
+static void cs_8409_apple_call_jack_callback(struct hda_codec *codec,
                                              struct hda_jack_tbl *jack)
 {
         struct hda_jack_callback *cb;
@@ -1028,7 +1035,7 @@ static void cs_8409_call_jack_callback(struct hda_codec *codec,
 // so I think this is what gets called for any unsolicited event - including jack plug events
 // so anything we do to switch amp/headphone should be done from here
 
-void cs_8409_jack_unsol_event(struct hda_codec *codec, unsigned int res)
+void cs_8409_cs42l83_jack_unsol_event(struct hda_codec *codec, unsigned int res)
 {
         struct hda_jack_tbl *event;
         //int ret_unsol_enable = 0;
@@ -1043,7 +1050,7 @@ void cs_8409_jack_unsol_event(struct hda_codec *codec, unsigned int res)
 	// so it seems the low order byte of the res for the 8409 is a copy of the GPIO register state
 	// - except that we dont seem to pass this to the callback functions!!
 
-        mycodec_info(codec, "cs_8409_jack_unsol_event UNSOL 0x%08x tag 0x%02x\n",res,tag);
+        mycodec_info(codec, "cs_8409_cs42l83_jack_unsol_event UNSOL 0x%08x tag 0x%02x\n",res,tag);
 
         event = snd_hda_jack_tbl_get_from_tag(codec, tag);
         if (!event)
@@ -1056,7 +1063,7 @@ void cs_8409_jack_unsol_event(struct hda_codec *codec, unsigned int res)
 
         // leave this as is even tho so far have only 1 tag so not really needed
         // so could just call the callback routine directly here
-        cs_8409_call_jack_callback(codec, event);
+        cs_8409_apple_call_jack_callback(codec, event);
 
 	// this is the code that generates the 0xf09 verb
 	// however if we define the jack as a phantom_jack we do not send the 0xf09 verb
@@ -1080,9 +1087,9 @@ void cs_8409_jack_unsol_event(struct hda_codec *codec, unsigned int res)
 
 // have an explict one for 8409
 // cs_free is just a definition
-//#define cs_8409_free		snd_hda_gen_free
+//#define cs_8409_apple_free		snd_hda_gen_free
 
-void cs_8409_free(struct hda_codec *codec)
+void cs_8409_apple_free(struct hda_codec *codec)
 {
 	//del_timer(&cs_8409_hp_timer);
 
@@ -1092,25 +1099,25 @@ void cs_8409_free(struct hda_codec *codec)
 
 // note this must come after any function definitions used
 
-static const struct hda_codec_ops cs_8409_patch_ops = {
-	.build_controls = cs_8409_build_controls,
-	.build_pcms = cs_8409_build_pcms,
-	.init = cs_8409_init,
+static const struct hda_codec_ops cs_8409_apple_patch_ops = {
+	.build_controls = cs_8409_apple_build_controls,
+	.build_pcms = cs_8409_apple_build_pcms,
+	.init = cs_8409_apple_init,
 	.free = cs_8409_free,
-	.unsol_event = cs_8409_jack_unsol_event,
+	.unsol_event = cs_8409_cs42l83_jack_unsol_event,
 };
 
 
-static int cs_8409_create_input_ctls(struct hda_codec *codec);
+static int cs_8409_apple_create_input_ctls(struct hda_codec *codec);
 
 
-static int cs_8409_parse_auto_config(struct hda_codec *codec)
+static int cs_8409_apple_parse_auto_config(struct hda_codec *codec)
 {
-	struct cs_spec *spec = codec->spec;
+	struct cs8409_apple_spec *spec = codec->spec;
 	int err;
 	int i;
 
-        myprintk("snd_hda_intel: cs_8409_parse_auto_config\n");
+        myprintk("snd_hda_intel: cs_8409_apple_parse_auto_config\n");
 
 	err = snd_hda_parse_pin_defcfg(codec, &spec->gen.autocfg, NULL, 0);
 	if (err < 0)
@@ -1149,7 +1156,7 @@ static int cs_8409_parse_auto_config(struct hda_codec *codec)
 
 
 	// new routine to setup inputs - based on the hda_generic code
-	cs_8409_create_input_ctls(codec);
+	cs_8409_apple_create_input_ctls(codec);
 
 
         // so do I keep this or not??
@@ -1166,7 +1173,7 @@ static int cs_8409_parse_auto_config(struct hda_codec *codec)
 		}
 	}
 
-        myprintk("snd_hda_intel: end cs_8409_parse_auto_config\n");
+        myprintk("snd_hda_intel: end cs_8409_apple_parse_auto_config\n");
 
 	return 0;
 }
@@ -1291,7 +1298,7 @@ static int cs_8409_parse_capture_source(struct hda_codec *codec, hda_nid_t pin,
 
 // copied from create_input_ctls in hda_generic.c
 
-static int cs_8409_create_input_ctls(struct hda_codec *codec)
+static int cs_8409_apple_create_input_ctls(struct hda_codec *codec)
 {
 	struct hda_gen_spec *spec = codec->spec;
 	const struct auto_pin_cfg *cfg = &spec->autocfg;
@@ -1300,7 +1307,7 @@ static int cs_8409_create_input_ctls(struct hda_codec *codec)
 	int i, err;
 	unsigned int val;
 
-        myprintk("snd_hda_intel: cs_8409_create_input_ctls\n");
+        myprintk("snd_hda_intel: cs_8409_apple_create_input_ctls\n");
 
 	// we cannot do this
 	//num_adcs = cs_8409_fill_adc_nids(codec);
@@ -1317,13 +1324,13 @@ static int cs_8409_create_input_ctls(struct hda_codec *codec)
 		hda_nid_t pin;
 		int fndadc = 0;
 
-		myprintk("snd_hda_intel: cs_8409_create_input_ctls - input %d\n",i);
+		myprintk("snd_hda_intel: cs_8409_apple_create_input_ctls - input %d\n",i);
 
 		pin = cfg->inputs[i].pin;
 		if (!is_input_pin(codec, pin))
 			continue;
 
-		myprintk("snd_hda_intel: cs_8409_create_input_ctls - input %d pin 0x%x\n",i,pin);
+		myprintk("snd_hda_intel: cs_8409_apple_create_input_ctls - input %d pin 0x%x\n",i,pin);
 
 		// now scan all nodes for adc nodes and find one connected to this pin
 		fndadc = cs_8409_add_adc_nid(codec, pin);
@@ -1345,13 +1352,13 @@ static int cs_8409_create_input_ctls(struct hda_codec *codec)
 		hda_nid_t pin;
 		int fndadc = 0;
 
-		myprintk("snd_hda_intel: cs_8409_create_input_ctls - input %d\n",i);
+		myprintk("snd_hda_intel: cs_8409_apple_create_input_ctls - input %d\n",i);
 
 		pin = cfg->inputs[i].pin;
 		if (!is_input_pin(codec, pin))
 			continue;
 
-		myprintk("snd_hda_intel: cs_8409_create_input_ctls - input %d pin 0x%x\n",i,pin);
+		myprintk("snd_hda_intel: cs_8409_apple_create_input_ctls - input %d pin 0x%x\n",i,pin);
 
 		//// now scan the adc nodes and find one connected to this pin
 		//fndadc = cs_8409_add_adc_nid(codec, pin);
@@ -1362,13 +1369,13 @@ static int cs_8409_create_input_ctls(struct hda_codec *codec)
 		if (cfg->inputs[i].type == AUTO_PIN_MIC)
 			val |= snd_hda_get_default_vref(codec, pin);
 
-		myprintk("snd_hda_intel: cs_8409_create_input_ctls - input %d pin 0x%x val 0x%x\n",i,pin,val);
+		myprintk("snd_hda_intel: cs_8409_apple_create_input_ctls - input %d pin 0x%x val 0x%x\n",i,pin,val);
 
 		if (pin != spec->hp_mic_pin &&
 		    !snd_hda_codec_get_pin_target(codec, pin))
 			set_pin_target(codec, pin, val, false);
 
-		myprintk("snd_hda_intel: cs_8409_create_input_ctls - input %d pin 0x%x val 0x%x mixer 0x%x\n",i,pin,val,mixer);
+		myprintk("snd_hda_intel: cs_8409_apple_create_input_ctls - input %d pin 0x%x val 0x%x mixer 0x%x\n",i,pin,val,mixer);
 
 		if (mixer) {
 			if (is_reachable_path(codec, pin, mixer)) {
@@ -1387,9 +1394,9 @@ static int cs_8409_create_input_ctls(struct hda_codec *codec)
 		//const hda_nid_t *connptr = conn;
 		//int num_conns = snd_hda_get_conn_list(codec, pin, &connptr);
 		//int i;
-		//myprintk("snd_hda_intel: cs_8409_create_input_ctls pin 0x%x num conn %d\n",pin,num_conns);
+		//myprintk("snd_hda_intel: cs_8409_apple_create_input_ctls pin 0x%x num conn %d\n",pin,num_conns);
 		//for (i = 0; i < num_conns; i++) {
-		//	myprintk("snd_hda_intel: cs_8409_create_input_ctls pin 0x%x conn 0x%x\n",pin,conn[i]);
+		//	myprintk("snd_hda_intel: cs_8409_apple_create_input_ctls pin 0x%x conn 0x%x\n",pin,conn[i]);
 		//}
 		//}
 
@@ -1420,17 +1427,17 @@ static int cs_8409_create_input_ctls(struct hda_codec *codec)
 			spec->suppress_auto_mic = 1;
 	}
 
-        myprintk("snd_hda_intel: end cs_8409_create_input_ctls\n");
+        myprintk("snd_hda_intel: end cs_8409_apple_create_input_ctls\n");
 
 	return 0;
 }
 
 
 /* do I need this for 8409 - I certainly need some gpio patching */
-static void cs_8409_fixup_gpio(struct hda_codec *codec,
+static void cs_8409_apple_fixup_gpio(struct hda_codec *codec,
                                      const struct hda_fixup *fix, int action)
 {
-       myprintk("snd_hda_intel: cs_8409_fixup_gpio\n");
+       myprintk("snd_hda_intel: cs_8409_apple_fixup_gpio\n");
 
        // allowable states
        // HDA_FIXUP_ACT_PRE_PROBE,
@@ -1442,9 +1449,9 @@ static void cs_8409_fixup_gpio(struct hda_codec *codec,
        // so inspection suggests no eapd usage on macs - no 0xf0c or 0x70c commands sent
 
        if (action == HDA_FIXUP_ACT_PRE_PROBE) {
-               //struct cs_spec *spec = codec->spec;
+               //struct cs8409_apple_spec *spec = codec->spec;
 
-               myprintk("snd_hda_intel: cs_8409_fixup_gpio pre probe\n");
+               myprintk("snd_hda_intel: cs_8409_apple_fixup_gpio pre probe\n");
 
                //myprintk("fixup gpio hp=0x%x speaker=0x%x\n", hp_out_mask, speaker_out_mask);
                //spec->gpio_eapd_hp = hp_out_mask;
@@ -1455,18 +1462,18 @@ static void cs_8409_fixup_gpio(struct hda_codec *codec,
                //  spec->gpio_eapd_hp | spec->gpio_eapd_speaker;
        }
        else if (action == HDA_FIXUP_ACT_PROBE) {
-               myprintk("snd_hda_intel: cs_8409_fixup_gpio probe\n");
+               myprintk("snd_hda_intel: cs_8409_apple_fixup_gpio probe\n");
        }
        else if (action == HDA_FIXUP_ACT_INIT) {
-               myprintk("snd_hda_intel: cs_8409_fixup_gpio init\n");
+               myprintk("snd_hda_intel: cs_8409_apple_fixup_gpio init\n");
        }
        else if (action == HDA_FIXUP_ACT_BUILD) {
-               myprintk("snd_hda_intel: cs_8409_fixup_gpio build\n");
+               myprintk("snd_hda_intel: cs_8409_apple_fixup_gpio build\n");
        }
        else if (action == HDA_FIXUP_ACT_FREE) {
-               myprintk("snd_hda_intel: cs_8409_fixup_gpio free\n");
+               myprintk("snd_hda_intel: cs_8409_apple_fixup_gpio free\n");
        }
-       myprintk("snd_hda_intel: end cs_8409_fixup_gpio\n");
+       myprintk("snd_hda_intel: end cs_8409_apple_fixup_gpio\n");
 }
 
 
@@ -1477,18 +1484,18 @@ static void cs_8409_fixup_gpio(struct hda_codec *codec,
 /* CS8409 */
 enum {
        CS8409_MBP131,
-       CS8409_GPIO_0,
+       CS8409_APPLE_GPIO_0,
        CS8409_MBP143,
-       CS8409_GPIO,
+       CS8409_APPLE_GPIO,
 };
 
-static const struct hda_model_fixup cs8409_models[] = {
+static const struct hda_model_fixup cs8409_apple_models[] = {
        { .id = CS8409_MBP131, .name = "mbp131" },
        { .id = CS8409_MBP143, .name = "mbp143" },
        {}
 };
 
-static const struct snd_pci_quirk cs8409_fixup_tbl[] = {
+static const struct snd_pci_quirk cs8409_apple_fixup_tbl[] = {
        SND_PCI_QUIRK(0x106b, 0x3300, "MacBookPro 13,1", CS8409_MBP131),
        SND_PCI_QUIRK(0x106b, 0x3900, "MacBookPro 14,3", CS8409_MBP143),
        {} /* terminator */
@@ -1502,26 +1509,26 @@ static const struct hda_pintbl mbp143_pincfgs[] = {
        {} /* terminator */
 };
 
-static const struct hda_fixup cs8409_fixups[] = {
+static const struct hda_fixup cs8409_apple_fixups[] = {
        [CS8409_MBP131] = {
                .type = HDA_FIXUP_PINS,
                .v.pins = mbp131_pincfgs,
                .chained = true,
-               .chain_id = CS8409_GPIO_0,
+               .chain_id = CS8409_APPLE_GPIO_0,
        },
-       [CS8409_GPIO_0] = {
+       [CS8409_APPLE_GPIO_0] = {
                .type = HDA_FIXUP_FUNC,
-               .v.func = cs_8409_fixup_gpio,
+               .v.func = cs_8409_apple_fixup_gpio,
        },
        [CS8409_MBP143] = {
                .type = HDA_FIXUP_PINS,
                .v.pins = mbp143_pincfgs,
                .chained = true,
-               .chain_id = CS8409_GPIO,
+               .chain_id = CS8409_APPLE_GPIO,
        },
-       [CS8409_GPIO] = {
+       [CS8409_APPLE_GPIO] = {
                .type = HDA_FIXUP_FUNC,
-               .v.func = cs_8409_fixup_gpio,
+               .v.func = cs_8409_apple_fixup_gpio,
        },
 };
 #endif
@@ -1531,7 +1538,7 @@ static void cs_8409_cs42l83_unsolicited_response(struct hda_codec *codec, unsign
 
 static void cs_8409_cs42l83_callback(struct hda_codec *codec, struct hda_jack_callback *event)
 {
-	struct cs_spec *spec = codec->spec;
+	struct cs8409_apple_spec *spec = codec->spec;
 
         mycodec_info(codec, "cs_8409_cs42l83_callback\n");
 
@@ -1572,7 +1579,7 @@ static void cs_8409_cs42l83_callback(struct hda_codec *codec, struct hda_jack_ca
 
 static void cs_8409_automute(struct hda_codec *codec)
 {
-	struct cs_spec *spec = codec->spec;
+	struct cs8409_apple_spec *spec = codec->spec;
 	dev_info(hda_codec_dev(codec), "cs_8409_automute called\n");
 }
 
@@ -1594,7 +1601,7 @@ static void cs_8409_capture_pcm_hook(struct hda_pcm_stream *hinfo,
 #ifdef APPLE_FIXUPS
 static int patch_cs8409_apple_nouse(struct hda_codec *codec)
 {
-	struct cs_spec *spec = codec->spec;
+	struct cs8409_apple_spec *spec = codec->spec;
 	//struct cs8409_spec *spec = codec->spec;
         int err;
         int itm;
@@ -1621,7 +1628,7 @@ static int patch_cs8409_apple_nouse(struct hda_codec *codec)
 
 static int patch_cs8409_apple(struct hda_codec *codec)
 {
-        struct cs_spec *spec;
+        struct cs8409_apple_spec *spec;
         int err;
         int itm;
         //hda_nid_t *dac_nids_ptr = NULL;
@@ -1665,10 +1672,10 @@ static int patch_cs8409_apple(struct hda_codec *codec)
 
         if (explicit)
                {
-               //codec->patch_ops = cs_8409_patch_ops_explicit;
+               //codec->patch_ops = cs_8409_apple_patch_ops_explicit;
                }
         else
-               codec->patch_ops = cs_8409_patch_ops;
+               codec->patch_ops = cs_8409_apple_patch_ops;
 
         //spec->gen.pcm_playback_hook = cs_8409_playback_pcm_hook;
 
@@ -1825,17 +1832,17 @@ static int patch_cs8409_apple(struct hda_codec *codec)
        if (!explicit)
        {
 
-              myprintk("snd_hda_intel: pre cs_8409_parse_auto_config\n");
+              myprintk("snd_hda_intel: pre cs_8409_apple_parse_auto_config\n");
 
-              err = cs_8409_parse_auto_config(codec);
+              err = cs_8409_apple_parse_auto_config(codec);
               if (err < 0)
                       goto error;
 
-              myprintk("snd_hda_intel: post cs_8409_parse_auto_config\n");
+              myprintk("snd_hda_intel: post cs_8409_apple_parse_auto_config\n");
        }
 
 
-       cs_8409_dump_auto_config(codec, "post cs_8409_parse_auto_config");
+       cs_8409_dump_auto_config(codec, "post cs_8409_apple_parse_auto_config");
 
 
        // dump the rates/format of the afg node
@@ -1931,7 +1938,7 @@ static int patch_cs8409_apple(struct hda_codec *codec)
        return 0;
 
  error:
-       cs_8409_free(codec);
+       cs_8409_apple_free(codec);
        return err;
 }
 
