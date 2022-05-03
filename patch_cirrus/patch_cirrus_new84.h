@@ -1344,9 +1344,15 @@ static void cs_8409_pcm_playback_pre_prepare_hook(struct hda_pcm_stream *hinfo, 
 	struct cs8409_apple_spec *spec = codec->spec;
 
 	if (action == HDA_GEN_PCM_ACT_PREPARE) {
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 8, 0)
+		struct timespec64 curtim;
+		ktime_get_real_ts64(&(curtim));
+		myprintk("snd_hda_intel: command cs_8409_pcm_playback_pre_prepare_hook HOOK PREPARE init %d last %lld cur %lld",spec->play_init,spec->last_play_time.tv_sec,curtim.tv_sec);
+#else
 		struct timespec curtim;
 		getnstimeofday(&curtim);
 		myprintk("snd_hda_intel: command cs_8409_pcm_playback_pre_prepare_hook HOOK PREPARE init %d last %ld cur %ld",spec->play_init,spec->last_play_time.tv_sec,curtim.tv_sec);
+#endif
 		if (1) {
 			struct hda_cvt_setup *p = NULL;
 			//int power_chk = 0;
@@ -1460,9 +1466,15 @@ static void cs_8409_playback_pcm_hook(struct hda_pcm_stream *hinfo, struct hda_c
 		myprintk("snd_hda_intel: command cs_8409_playback_pcm_hook open end");
 	} else if (action == HDA_GEN_PCM_ACT_PREPARE) {
 		// so this comes AFTER the stream format, frequency setup verbs are sent for the pcm stream
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 8, 0)
+		struct timespec64 curtim;
+		ktime_get_real_ts64(&(curtim));
+		myprintk("snd_hda_intel: command cs_8409_playback_pcm_hook HOOK PREPARE init %d last %lld cur %lld",spec->play_init,spec->last_play_time.tv_sec,curtim.tv_sec);
+#else
 		struct timespec curtim;
 		getnstimeofday(&curtim);
 		myprintk("snd_hda_intel: command cs_8409_playback_pcm_hook HOOK PREPARE init %d last %ld cur %ld",spec->play_init,spec->last_play_time.tv_sec,curtim.tv_sec);
+#endif
 		//int power_chk = 0;
 		//power_chk = snd_hda_codec_read(codec, codec->core.afg, 0, AC_VERB_GET_POWER_STATE, 0);
 		//myprintk("snd_hda_intel: command cs_8409_playback_pcm_hook power check 0x01 2 %d", power_chk);

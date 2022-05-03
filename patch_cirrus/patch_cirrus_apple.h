@@ -1,6 +1,8 @@
-#include <linux/ctype.h>
+//#include <linux/ctype.h>
 #include <linux/timer.h>
 #include <linux/bitops.h>
+
+#include <linux/version.h>
 
 //#include "hda_generic.h"
 
@@ -422,11 +424,19 @@ struct cs8409_apple_spec {
 	int capture_init;
 
 	// new item to limit times we redo unmute/play
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 8, 0)
+	struct timespec64 last_play_time;
+#else
 	struct timespec last_play_time;
+#endif
 	// record the first play time - we have a problem there
 	// some initial plays that I dont understand - so skip any setup
 	// till sometime after the first play
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 8, 0)
+	struct timespec64 first_play_time;
+#else
 	struct timespec first_play_time;
+#endif
 
 };
 
@@ -578,13 +588,20 @@ static int cs_8409_capture_pcm_prepare(struct hda_pcm_stream *hinfo,
 static struct hda_jack_tbl *
 cs_8409_hda_jack_tbl_new(struct hda_codec *codec, hda_nid_t nid)
 {
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 8, 0)
+	struct hda_jack_tbl *jack = snd_hda_jack_tbl_get_mst(codec, nid, 0);
+#else
         struct hda_jack_tbl *jack = snd_hda_jack_tbl_get(codec, nid);
+#endif
         if (jack)
                 return jack;
         jack = snd_array_new(&codec->jacktbl);
         if (!jack)
                 return NULL;
         jack->nid = nid;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 8, 0)
+        jack->dev_id = 0;
+#endif
         jack->jack_dirty = 1;
         jack->tag = codec->jacktbl.used;
 	// use this to prevent f09 verbs being sent - not seen in OSX logs
@@ -613,6 +630,9 @@ cs_8409_hda_jack_detect_enable_callback(struct hda_codec *codec, hda_nid_t nid, 
 			return ERR_PTR(-ENOMEM);
 		callback->func = func;
 		callback->nid = jack->nid;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 8, 0)
+		callback->dev_id = jack->dev_id;
+#endif
 		callback->next = jack->callback;
 		jack->callback = callback;
 	}
@@ -760,7 +780,11 @@ static void cs_8409_dump_auto_config(struct hda_codec *codec, const char *label_
         }
 
         myprintk("snd_hda_intel: auto config multiout is dig_out_nid 0x%02x\n", spec->gen.multiout.dig_out_nid);
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 8, 0)
+        myprintk("snd_hda_intel: auto config multiout is slv_dig_out %p\n", spec->gen.multiout.slave_dig_outs);
+#else
         myprintk("snd_hda_intel: auto config multiout is slv_dig_out %p\n", spec->gen.multiout.follower_dig_outs);
+#endif
 
 }
 
@@ -1020,7 +1044,11 @@ static void cs_8409_apple_call_jack_callback(struct hda_codec *codec,
                 cb->func(codec, cb);
         if (jack->gated_jack) {
                 struct hda_jack_tbl *gated =
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 8, 0)
+                        snd_hda_jack_tbl_get_mst(codec, jack->gated_jack, jack->dev_id);
+#else
                         snd_hda_jack_tbl_get(codec, jack->gated_jack);
+#endif
                 if (gated) {
                         for (cb = gated->callback; cb; cb = cb->next)
                                 cb->func(codec, cb);
@@ -1048,7 +1076,11 @@ void cs_8409_cs42l83_jack_unsol_event(struct hda_codec *codec, unsigned int res)
 
         mycodec_info(codec, "cs_8409_cs42l83_jack_unsol_event UNSOL 0x%08x tag 0x%02x\n",res,tag);
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 8, 0)
+        event = snd_hda_jack_tbl_get_from_tag(codec, tag, 0);
+#else
         event = snd_hda_jack_tbl_get_from_tag(codec, tag);
+#endif
         if (!event)
                 return;
         event->jack_dirty = 1;
@@ -1099,7 +1131,7 @@ static const struct hda_codec_ops cs_8409_apple_patch_ops = {
 	.build_controls = cs_8409_apple_build_controls,
 	.build_pcms = cs_8409_apple_build_pcms,
 	.init = cs_8409_apple_init,
-	.free = cs_8409_free,
+	.free = cs_8409_apple_free,
 	.unsol_event = cs_8409_cs42l83_jack_unsol_event,
 };
 
@@ -1639,7 +1671,7 @@ static int patch_cs8409_apple(struct hda_codec *codec)
 
         //dump_stack();
 
-        spec = cs_alloc_spec(codec, CS8409_VENDOR_NID);
+        spec = (struct cs8409_apple_spec *) cs_alloc_spec(codec, CS8409_VENDOR_NID);
         if (!spec)
                 return -ENOMEM;
 
@@ -1922,11 +1954,18 @@ static int patch_cs8409_apple(struct hda_codec *codec)
        spec->capture_init = 0;
 
        // init the last play time
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 8, 0)
+       ktime_get_real_ts64(&(spec->last_play_time));
+#else
        getnstimeofday(&(spec->last_play_time));
-       //ktime_get_real_ts64(&(spec->last_play_time));
+#endif
 
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 8, 0)
+       ktime_get_real_ts64(&(spec->first_play_time));
+#else
        getnstimeofday(&(spec->first_play_time));
-       //ktime_get_real_ts64(&(spec->first_play_time));
+#endif
 
        myprintk("snd_hda_intel: Post Patching for CS8409 Apple\n");
        //mycodec_info(codec, "Post Patching for CS8409 Apple\n");
