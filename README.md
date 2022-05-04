@@ -1,47 +1,57 @@
 # snd_hda_macbookpro
 
 This is a kernel driver for sound on Macs with Cirrus 8409 HDA chips.
-This is NOT a complete audio setup as yet and is still at a very alpha stage of development.
+Sound output is now reasonably complete and integrated with Linux.
+Sound input still needs work.
+
 
 It will play audio through Internal speakers or headphones.
 
-NEW: Sound recording from internal mike and headset mike now working.
+The primary audio should be set to  Analogue Stereo Output in the Settings Audio dialog.
 
-NOTE NOTE!!!!!
+
+Sound recording from internal mike and headset mike is not yet fully interfaced with Linux user side.
+
 The recorded sound level is very low but this is the sound level as returned in OSX.
 Amplification will be required eg using something like PulseEffects.
-NOTE NOTE!!!!!
+
 
 The hardware device sound format is limited to 2/4 channel 44.1 kHz S24_LE S32_LE.
-As long as use the default or plughw device volume control, other formats, frequencies work.
+As long as use the default device volume control, other formats, frequencies work.
 
-NOTA BENE: The direct hardware device (hw:0,0) has NO volume control so will be loud!
 
-Currently this works with MAX98706 and SSM3515 amplifiers.
-It will NOT work with other amplifiers (eg TAS5758L and TAS5764L as seen in ioreg dumps)
-as each amplifier requires specific programming.
+NOTA BENE: The direct hardware device (hw:0,0) and plughw:0,0 device have NO volume control so will be VERY loud!
+
+
+Currently this works with MAX98706, SSM3515 and TAS5764L amplifiers.
+It will NOT work with other amplifiers as each amplifier requires specific programming.
 
 
 Power down/sleep completely unknown and untested.
+At the moment everything is permanently powered on.
 
 
-Much more work is needed to correctly interface this kernel driver to the higher level
-linux audio drivers eg pulse.
+The Apple speaker setup is 4 speakers as a left tweeter, left woofer, right tweeter and right woofer
+so this is actually a classic HiFi stereo (ie 2 channel) speaker system.
+(These names are listed in the layout files under AppleHDA.kext/Contents/Resources).
 
-For example, the speakers are driven by a 4 channel audio stream which pulse wrongly
-interprets as a 4 channel surround source.
-(Note this means the Ubuntu speaker test does not work properly).
-My interpretation is this is really a woofer/tweeter setup and we need specific
-filters eg from PulseEffects to create a sound similar to that of OSX (which is known
-to be using specific digital filter effects in CoreAudio).
+The channel order for Linux has been modified to left tweeter, right tweeter and left woofer, right woofer
+as this fits in with the Linux way much better.
+
+The driver also has been modified to duplicate a stereo sound source onto the second stereo channel so all
+speakers are driven (this essentially replicates the snd_hda_multi_out_analog_prepare function).
+
+This will not sound the same as Apple (which is known to be using specific digital filter effects in CoreAudio).
+
+To create a more Apple-like sound requires creating eg an Alsa pseudo device to channel duplicate a stereo sound
+and apply different digital filters to the tweeter and woofer channels.
 
 
-NOTE. My primary testing kernel is now Ubuntu LTS 20.04 5.4.
-      I have tested building for 5.5 but not 5.6.
+NOTE. My primary testing kernel is now Ubuntu LTS 22.04 5.15.
+
 
 
 The following installation setup provided by leifliddy.
-
 
 
 
@@ -59,6 +69,10 @@ apt install wget make gcc linux-headers-generic
 **arch package install**
 ```
 pacman -S wget make gcc linux-headers
+```
+**void package install**
+```
+xbps-install -S wget make gcc linux-headers
 ```
 
 **build driver**  

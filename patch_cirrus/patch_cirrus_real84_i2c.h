@@ -546,6 +546,7 @@ static void cs42l83_power_hs_bias_off(struct hda_codec *codec)
 static void cs42l83_enable_hsbias_auto_clamp_on(struct hda_codec *codec)
 {
 
+        //int updval;
         //int retval;
 
 	mycodec_i2c_local_info(codec, "cs42l83_enable_hsbias_auto_clamp_on\n");
@@ -560,15 +561,22 @@ static void cs42l83_enable_hsbias_auto_clamp_on(struct hda_codec *codec)
 //      snd_hda i2cPagedRead  i2c address 0x90 i2c reg hi 0x1b lo 0x7000 i2c data 0x7003
 //      snd_hda i2cPagedWrite i2c address 0x90 i2c reg hi 0x1b lo 0x7003 i2c data 0x0003
 
+        // explicit coding
         cs_8409_vendor_i2cRead(codec, 0x90, 0x1b70, 1); // snd_hda
         cs_8409_vendor_i2cWrite(codec, 0x90, 0x1b70, 0x0003, 1); // snd_hda
+
+        // bit coding
+        //updval = cs_8409_vendor_i2cRead(codec, 0x90, 0x1b70, 1); // snd_hda
+        //updval &= 0x3f;
+        //cs_8409_vendor_i2cWrite(codec, 0x90, 0x1b70, updval, 1); // snd_hda
 
 }
 
 static void cs42l83_enable_hsbias_auto_clamp_off(struct hda_codec *codec)
 {
 
-        //int retval;
+        int updval;
+        int retval;
 
 	mycodec_i2c_local_info(codec, "cs42l83_enable_hsbias_auto_clamp_off\n");
 
@@ -580,7 +588,45 @@ static void cs42l83_enable_hsbias_auto_clamp_off(struct hda_codec *codec)
 
         // register 0x1b70 - HSBIAS Sense and Hi-Z Autocontrol
         //                   changed from 0x03 to 0x03 (HS Sense Bias trip 52 microamps
-        //                   set to 0x46 (Tip Sense Enable (0x40) HS Sense Bias trip 93 microamps)
+        //                   set to 0x46 (Tip Sense Enable (0x40) HS Sense Bias trip 93 microamps (0x03 -> 0x06) )
+
+//      snd_hda i2cPagedRead  i2c address 0x90 i2c reg hi 0x1b lo 0x7000 i2c data 0x7003
+//      snd_hda i2cPagedWrite i2c address 0x90 i2c reg hi 0x1b lo 0x7003 i2c data 0x0003
+//      snd_hda i2cPagedWrite i2c address 0x90 i2c reg hi 0x1b lo 0x7046 i2c data 0x0046
+
+        // explicit coding
+        //cs_8409_vendor_i2cRead(codec, 0x90, 0x1b70, 1); // snd_hda
+        //cs_8409_vendor_i2cWrite(codec, 0x90, 0x1b70, 0x0003, 1); // snd_hda
+
+        //cs_8409_vendor_i2cWrite(codec, 0x90, 0x1b70, 0x0046, 1); // snd_hda
+
+        // bit coding
+        retval = cs_8409_vendor_i2cRead(codec, 0x90, 0x1b70, 1); // snd_hda
+        updval = retval & 0x3f;
+        cs_8409_vendor_i2cWrite(codec, 0x90, 0x1b70, updval, 1); // snd_hda
+
+        updval = (retval & 0xb8) | 0x46;
+        cs_8409_vendor_i2cWrite(codec, 0x90, 0x1b70, updval, 1); // snd_hda
+
+}
+
+
+static void cs42l83_enable_hsbias_auto_clamp_off0(struct hda_codec *codec)
+{
+
+        //int retval;
+
+        mycodec_i2c_local_info(codec, "cs42l83_enable_hsbias_auto_clamp_off0\n");
+
+        // in AppleHDAMikeyInternalCS4208::handleTypeDetectUR
+
+        // in AppleHDAMikeyInternalCS8409::setupButtonDetection
+
+        //  AppleHDAMikeyInternalCS8409::enableHSBIASautoclamp
+
+        // register 0x1b70 - HSBIAS Sense and Hi-Z Autocontrol
+        //                   changed from 0x03 to 0x03 (HS Sense Bias trip 52 microamps
+        //                   set to 0x46 (Tip Sense Enable (0x40) HS Sense Bias trip 93 microamps (0x03 -> 0x06) )
 
 //      snd_hda i2cPagedRead  i2c address 0x90 i2c reg hi 0x1b lo 0x7000 i2c data 0x7003
 //      snd_hda i2cPagedWrite i2c address 0x90 i2c reg hi 0x1b lo 0x7003 i2c data 0x0003
@@ -702,7 +748,7 @@ static void cs42l83_enable_hsbias_auto_clamp_off1(struct hda_codec *codec)
 
         // register 0x1b70 - HSBIAS Sense and Hi-Z Autocontrol
         //                   changed from 0x46 to 0x06
-        //                   set to 0x46 (Tip Sense Enable (0x40) HS Sense Bias trip 93 microamps)
+        //                   then set to 0x46 (Tip Sense Enable (0x40) HS Sense Bias trip 93 microamps (0x06 -> 0x06) )
 
 //      snd_hda i2cPagedRead  i2c address 0x90 i2c reg hi 0x1b lo 0x7000 i2c data 0x7046
 //      snd_hda i2cPagedWrite i2c address 0x90 i2c reg hi 0x1b lo 0x7006 i2c data 0x0006
@@ -1328,7 +1374,7 @@ static void cs42l83_enable_hsbias_auto_clamp_off3(struct hda_codec *codec)
 
         // register 0x1b70 - HSBIAS Sense and Hi-Z Autocontrol
         //                   changed from 0xc6 to 0x06 
-        //                   set to 0x46 (Tip Sense Enable (0x40) HS Sense Bias trip 93 microamps)
+        //                   then set to 0x46 (Tip Sense Enable (0x40) HS Sense Bias trip 93 microamps (0x06 ->0x06) )
 
 //      snd_hda i2cPagedRead  i2c address 0x90 i2c reg hi 0x1b lo 0x7000 i2c data 0x70c6
 //      snd_hda i2cPagedWrite i2c address 0x90 i2c reg hi 0x1b lo 0x7006 i2c data 0x0006
@@ -1847,7 +1893,7 @@ static void cs42l83_enable_hsbias_auto_clamp_off2(struct hda_codec *codec)
 
         // register 0x1b70 - HSBIAS Sense and Hi-Z Autocontrol
         //                   changed from 0x46 to 0x06
-        //                   set to 0x46 (Tip Sense Enable (0x40) HS Sense Bias trip 93 microamps)
+        //                   then set to 0x46 (Tip Sense Enable (0x40) HS Sense Bias trip 93 microamps (0x06 ->0x06) )
 
 //      snd_hda i2cPagedRead  i2c address 0x90 i2c reg hi 0x1b lo 0x7000 i2c data 0x7046
 //      snd_hda i2cPagedWrite i2c address 0x90 i2c reg hi 0x1b lo 0x7006 i2c data 0x0006
@@ -1860,25 +1906,31 @@ static void cs42l83_enable_hsbias_auto_clamp_off2(struct hda_codec *codec)
 
 }
 
-static void cs42l83_enable_hsbias_auto_clamp_on3(struct hda_codec *codec)
+static void cs42l83_hsbias_sense_on(struct hda_codec *codec)
 {
 
+        int updval;
         //int retval;
 
-	mycodec_i2c_local_info(codec, "cs42l83_enable_hsbias_auto_clamp_on3\n");
+        mycodec_i2c_local_info(codec, "cs42l83_hsbias_sense_on\n");
 
-        // in AppleHDAMikeyInternalCS8409::setupButtonDetection
-
-        //  AppleHDAMikeyInternalCS8409::enableHSBIASautoclamp
+        // in AppleHDAMikeyInternalCS8409::handleButtonDetectUR
 
         // register 0x1b70 - HSBIAS Sense and Hi-Z Autocontrol
         //                   changed from 0x46 to 0xc6
+        //                   set to 0xc6 (HS Bias Sense Enable (0x80) Tip Sense Enable (0x40) HS Sense Bias trip 93 microamps (0x06 ->0x06) )
 
 //      snd_hda i2cPagedRead  i2c address 0x90 i2c reg hi 0x1b lo 0x7000 i2c data 0x7046
 //      snd_hda i2cPagedWrite i2c address 0x90 i2c reg hi 0x1b lo 0x70c6 i2c data 0x00c6
 
-        cs_8409_vendor_i2cRead(codec, 0x90, 0x1b70, 1); // snd_hda
-        cs_8409_vendor_i2cWrite(codec, 0x90, 0x1b70, 0x00c6, 1); // snd_hda
+        // explicit coding
+        //cs_8409_vendor_i2cRead(codec, 0x90, 0x1b70, 1); // snd_hda
+        //cs_8409_vendor_i2cWrite(codec, 0x90, 0x1b70, 0x00c6, 1); // snd_hda
+
+        // bit coding
+        updval = cs_8409_vendor_i2cRead(codec, 0x90, 0x1b70, 1); // snd_hda
+        updval |= 0x80;
+        cs_8409_vendor_i2cWrite(codec, 0x90, 0x1b70, updval, 1); // snd_hda
 
 }
 

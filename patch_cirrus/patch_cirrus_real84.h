@@ -473,7 +473,7 @@ static void cs_8409_intmike_stream_on_nid(struct hda_codec *codec)
 
         //new_coef82 = (reg_coef82 | 0x1);
         new_coef82 = (reg_coef82 | spec->reg82_intmike_dmic_scl);
-        myprintk_dbg("snd_hda_intel: masked cs_8409_intmike_stream_on_nid coef 0x82 update 0x%04x 0x%04x \n", reg_coef82, new_coef82);
+        myprintk_dbg("snd_hda_intel: masked cs_8409_intmike_stream_on_nid coef 0x0082 update 0x%04x 0x%04x \n", reg_coef82, new_coef82);
 
         //snd_hda_coef_item(codec, 1, CS8409_VENDOR_NID, 0x0082, 0x5401, 0x00000000, 10548 ); //   coef write 10548
         snd_hda_coef_item(codec, 1, CS8409_VENDOR_NID, 0x0082, new_coef82, 0x00000000, 0 ); //   coef write 10548
@@ -534,7 +534,7 @@ static void cs_8409_intmike_format_setup_disable(struct hda_codec *codec)
 
         //new_coef82 = (reg_coef82 & 0xfffffffe);
         new_coef82 = (reg_coef82 & ~spec->reg82_intmike_dmic_scl);
-        myprintk_dbg("snd_hda_intel: masked cs_8409_intmike_format_setup_disable coef 0x82 update 0x%04x 0x%04x \n", reg_coef82, new_coef82);
+        myprintk_dbg("snd_hda_intel: masked cs_8409_intmike_format_setup_disable coef 0x0082 update 0x%04x 0x%04x \n", reg_coef82, new_coef82);
 
         //snd_hda_coef_item(codec, 1, CS8409_VENDOR_NID, 0x0082, 0xa800, 0x00000000, 12230 ); //   coef write 12230
         snd_hda_coef_item(codec, 1, CS8409_VENDOR_NID, 0x0082, new_coef82, 0x00000000, 0 ); //   coef write 12230
@@ -593,7 +593,7 @@ static void cs_8409_linein_format_setup_disable(struct hda_codec *codec)
 
         //new_coef82 = (reg_coef82 & 0xfffffffd);
         new_coef82 = (reg_coef82 & ~spec->reg82_linein_dmic_scl);
-        myprintk_dbg("snd_hda_intel: masked cs_8409_linein_format_setup_disable coef 0x82 update 0x%04x 0x%04x \n", reg_coef82, new_coef82);
+        myprintk_dbg("snd_hda_intel: masked cs_8409_linein_format_setup_disable coef 0x0082 update 0x%04x 0x%04x \n", reg_coef82, new_coef82);
 
         //snd_hda_coef_item(codec, 1, CS8409_VENDOR_NID, 0x0082, 0xa800, 0x00000000, 12261 ); //   coef write 12261
         snd_hda_coef_item(codec, 1, CS8409_VENDOR_NID, 0x0082, new_coef82, 0x00000000, 0 ); //   coef write 12261
@@ -1103,6 +1103,7 @@ static void cs_8409_setup_TDM_proper_amps34(struct hda_codec *codec)
 static void cs_8409_setup_TDM_amps34(struct hda_codec *codec, int nullformat)
 {
         int retval;
+        struct cs8409_apple_spec *spec = codec->spec;
 
         // this seems to be setup for node 0x03 chain - which seems to use node 0x25 and amps 0x74 and 0x72 (or 0x2c and 0x2e)
 
@@ -1654,8 +1655,8 @@ static void cs_8409_sync_converters_off(struct hda_codec *codec, int nullformat)
         }
         else
         {
-               cs_8409_update_from_save_stream_format(codec, 0x02, &p2, 1, 0);
-               cs_8409_update_from_save_stream_format(codec, 0x03, &p3, 1, 0);
+                cs_8409_update_from_save_stream_format(codec, 0x02, &p2, 1, 0);
+                cs_8409_update_from_save_stream_format(codec, 0x03, &p3, 1, 0);
         }
 }
 
@@ -2171,11 +2172,11 @@ static int cs_8409_boot_setup_real(struct hda_codec *codec)
         // likely additional code here if we did boot with headphones plugged in
         //cs42l83_headphone_sense_data(codec);
         retval = cs42l83_headphone_sense(codec);
-        mycodec_info(codec, "cs_8409_boot_setup_real headphone sense 0x%x\n", retval);
+        mycodec_info(codec, "cs_8409_boot_setup_real headphone sense 0x%x %s\n", retval, ((retval & 0x80)?"plugged in":"not plugged in"));
 
         if ((retval & 0x80))
         {
-                dev_info(hda_codec_dev(codec), "cs_8409_boot_setup_real headphone already plugged in!!\n");
+                dev_info(hda_codec_dev(codec), "cs_8409_boot_setup_real headphone ALREADY PLUGGED IN!!\n");
                 // store for after init
                 headset_on_boot = 1;
         }
@@ -2319,7 +2320,7 @@ static int cs_8409_boot_setup_real(struct hda_codec *codec)
                 // this may be the same as one of the multiple headphone sense calls seen if no headset plugged in
 
                 retval = cs42l83_headphone_sense(codec);
-                mycodec_info(codec, "cs_8409_boot_setup_real headphone sense 0x%x\n", retval);
+                mycodec_info(codec, "cs_8409_boot_setup_real headphone sense 0x%x %s\n", retval, ((retval & 0x80)?"plugged in":"not plugged in"));
 
                 if ((retval & 0x80))
                 {
@@ -2374,7 +2375,7 @@ static int cs_8409_boot_setup_real(struct hda_codec *codec)
                 // - this would likely be setting up the amps
 
                 retval = cs42l83_headphone_sense(codec);
-                mycodec_info(codec, "cs_8409_boot_setup_real headphone sense 0x%x\n", retval);
+                mycodec_info(codec, "cs_8409_boot_setup_real headphone sense 0x%x %s\n", retval, ((retval & 0x80)?"plugged in":"not plugged in"));
 
                 if ((retval & 0x80))
                 {
@@ -2385,7 +2386,7 @@ static int cs_8409_boot_setup_real(struct hda_codec *codec)
                 }
 
                 retval = cs42l83_headphone_sense(codec);
-                mycodec_info(codec, "cs_8409_boot_setup_real headphone sense 0x%x\n", retval);
+                mycodec_info(codec, "cs_8409_boot_setup_real headphone sense 0x%x %s\n", retval, ((retval & 0x80)?"plugged in":"not plugged in"));
 
                 if ((retval & 0x80))
                 {
@@ -2399,7 +2400,7 @@ static int cs_8409_boot_setup_real(struct hda_codec *codec)
                 }
 
                 retval = cs42l83_headphone_sense(codec);
-                mycodec_info(codec, "cs_8409_boot_setup_real headphone sense 0x%x\n", retval);
+                mycodec_info(codec, "cs_8409_boot_setup_real headphone sense 0x%x %s\n", retval, ((retval & 0x80)?"plugged in":"not plugged in"));
 
                 if ((retval & 0x80))
                 {
@@ -2416,7 +2417,7 @@ static int cs_8409_boot_setup_real(struct hda_codec *codec)
                 }
 
                 retval = cs42l83_headphone_sense(codec);
-                mycodec_info(codec, "cs_8409_boot_setup_real headphone sense 0x%x\n", retval);
+                mycodec_info(codec, "cs_8409_boot_setup_real headphone sense 0x%x %s\n", retval, ((retval & 0x80)?"plugged in":"not plugged in"));
 
                 if ((retval & 0x80))
                 {
@@ -2575,7 +2576,7 @@ static int cs_8409_boot_setup_real(struct hda_codec *codec)
                 //#9273: cs42l83_headphone_sense
 
                 retval = cs42l83_headphone_sense(codec);
-                mycodec_info(codec, "cs_8409_boot_setup_real headphone sense 0x%x\n", retval);
+                mycodec_info(codec, "cs_8409_boot_setup_real headphone sense 0x%x %s\n", retval, ((retval & 0x80)?"plugged in":"not plugged in"));
 
                 if ((retval & 0x80))
                 {
@@ -2672,7 +2673,6 @@ static int cs_8409_boot_setup_real(struct hda_codec *codec)
                                 //snd_hda_codec_write(codec, 0x3c, 0, AC_VERB_SET_PIN_WIDGET_CONTROL, 0x00000020); // 0x03c70720
                                 ////       snd_hda:     60 ['AC_PINCTL_IN_EN']
 
-
                                 // is this a good position to switch the inputs??
                                 // just before enable buttons is where we switch inputs on plugin
                                 // note that this is just telling Alsa the input source has changed
@@ -2723,13 +2723,13 @@ static int cs_8409_boot_setup_real(struct hda_codec *codec)
                 //setup_TDM_6462(codec);
                 cs_8409_setup_TDM_amps12(codec, 1, 1);
 
-                //setup_amps_6462(codec);
+                //amps_enable2_6462(codec);
                 cs_8409_setup_amps12(codec, 0);
 
                 //setup_TDM_7472(codec);
                 cs_8409_setup_TDM_amps34(codec,  1);
 
-                //setup_amps_7472(codec);
+                //amps_enable2_7472(codec);
                 cs_8409_setup_amps34(codec, 0);
 
                 //sync_converters(codec);
@@ -2865,7 +2865,7 @@ static int cs_8409_boot_setup_real(struct hda_codec *codec)
 
                 //cs42l83_headphone_sense1(codec);
                 retval = cs42l83_headphone_sense(codec);
-                mycodec_info(codec, "cs_8409_boot_setup_real headphone sense 1 0x%x\n", retval);
+                mycodec_info(codec, "cs_8409_boot_setup_real headphone sense 1 0x%x %s\n", retval, ((retval & 0x80)?"plugged in":"not plugged in"));
 
 
                 //setup_mic_vol4(codec);
@@ -2886,12 +2886,12 @@ static int cs_8409_boot_setup_real(struct hda_codec *codec)
 
                 //cs42l83_headphone_sense2(codec);
                 retval = cs42l83_headphone_sense(codec);
-                mycodec_info(codec, "cs_8409_boot_setup_real headphone sense 2 0x%x\n", retval);
+                mycodec_info(codec, "cs_8409_boot_setup_real headphone sense 2 0x%x %s\n", retval, ((retval & 0x80)?"plugged in":"not plugged in"));
 
 
                 //cs42l83_headphone_sense3(codec);
                 retval = cs42l83_headphone_sense(codec);
-                mycodec_info(codec, "cs_8409_boot_setup_real headphone sense 3 0x%x\n", retval);
+                mycodec_info(codec, "cs_8409_boot_setup_real headphone sense 3 0x%x %s\n", retval, ((retval & 0x80)?"plugged in":"not plugged in"));
 
                 //setup_intmike_nid1(codec);
                 //cs_8409_intmike_format_setup_format_nouse(codec);
@@ -2936,7 +2936,13 @@ static int cs_8409_boot_setup_real(struct hda_codec *codec)
 static void cs_8409_play_real(struct hda_codec *codec)
 {
         int retval;
-        //struct cs8409_apple_spec *spec = codec->spec;
+        struct cs8409_apple_spec *spec = codec->spec;
+
+
+        // so I have seen an UNSOL response in cs_8409_playstop_real
+        // which suggests need to block responses here
+        spec->block_unsol = 1;
+
 
         //cs_8409_play_data(codec);
 
@@ -2959,6 +2965,13 @@ static void cs_8409_play_real(struct hda_codec *codec)
 
 
         play_sync_converters_on(codec);
+
+
+
+        cs_8409_perform_external_device_unsolicited_responses(codec);
+
+        spec->block_unsol = 0;
+
 
         mycodec_info(codec, "command cs_8409_play_real end");
 
@@ -2995,7 +3008,13 @@ static void cs_8409_amps_disable_streaming(struct hda_codec *codec)
 static void cs_8409_playstop_real(struct hda_codec *codec)
 {
         //int retval;
-        //struct cs8409_apple_spec *spec = codec->spec;
+        struct cs8409_apple_spec *spec = codec->spec;
+
+
+        // so I have seen an UNSOL response in cs_8409_playstop_real
+        // which suggests need to block responses here
+        spec->block_unsol = 1;
+
 
         mycodec_info(codec, "command cs_8409_playstop_real start");
 
@@ -3011,6 +3030,11 @@ static void cs_8409_playstop_real(struct hda_codec *codec)
         cs_8409_inputs_power_nids_off(codec);
 
 
+        cs_8409_perform_external_device_unsolicited_responses(codec);
+
+        spec->block_unsol = 0;
+
+
         mycodec_info(codec, "command cs_8409_playstop_real end");
 }
 
@@ -3019,7 +3043,13 @@ static void cs_8409_playstop_real(struct hda_codec *codec)
 static void cs_8409_capture_real(struct hda_codec *codec)
 {
         int retval;
-        //struct cs8409_apple_spec *spec = codec->spec;
+        struct cs8409_apple_spec *spec = codec->spec;
+
+
+        // so I have seen an UNSOL response in cs_8409_playstop_real
+        // which suggests need to block responses here
+        spec->block_unsol = 1;
+
 
         //cs_8409_capture_data(codec);
 
@@ -3054,6 +3084,11 @@ static void cs_8409_capture_real(struct hda_codec *codec)
         // - which to do with??
         //cs_8409_intmike_volume_setup - (no change)
         //cs_8409_linein_volume_setup - (no change)
+
+
+        cs_8409_perform_external_device_unsolicited_responses(codec);
+
+        spec->block_unsol = 0;
 
 
         mycodec_info(codec, "command cs_8409_capture_real end");
@@ -3104,6 +3139,12 @@ static void cs_8409_capturestop_real(struct hda_codec *codec)
 {
         //int retval;
         struct cs8409_apple_spec *spec = codec->spec;
+
+
+        // so I have seen an UNSOL response in cs_8409_playstop_real
+        // which suggests need to block responses here
+        spec->block_unsol = 1;
+
 
         mycodec_info(codec, "command cs_8409_capturestop_real start");
 
@@ -3158,6 +3199,11 @@ static void cs_8409_capturestop_real(struct hda_codec *codec)
         //cs_8409_disable_amps34
 
 
+        cs_8409_perform_external_device_unsolicited_responses(codec);
+
+        spec->block_unsol = 0;
+
+
         mycodec_info(codec, "command cs_8409_capturestop_real end");
 }
 
@@ -3189,41 +3235,46 @@ static void cs_8409_external_device_unsolicited_response(struct hda_codec *codec
 
         mycodec_info(codec, "cs_8409_external_device_unsolicited_response - interrupt set\n");
 
-        // so retval_int 
+        // so retval_int is a bit shifted combination of a number of primary interrupt status registers
 
         retval_int = cs_8409_read_status_and_clear_interrupt(codec);
+
+        // and ret_disambig is the same bit shifted combination of a number of primary interrupt mask registers
 
         ret_disambig = cs42l83_disambiguate_ur_from_int(codec);
 
         // move prints to after so not spaced by other prints
 
-        mycodec_info(codec, "cs_8409_external_device_unsolicited_response - UNSOL interrupt 0x%08x\n",retval_int);
+        codec_info(codec, "cs_8409_external_device_unsolicited_response - UNSOL interrupt 0x%08x\n",retval_int);
 
-        mycodec_info(codec, "cs_8409_external_device_unsolicited_response - UNSOL disambig  0x%08x\n",ret_disambig);
+        codec_info(codec, "cs_8409_external_device_unsolicited_response - UNSOL disambig  0x%08x\n",ret_disambig);
 
         // determine masked interrupts
 
         int_masked = (ret_disambig & retval_int);
 
-        mycodec_info(codec, "cs_8409_external_device_unsolicited_response - UNSOL masked    0x%08x\n",int_masked);
+        codec_info(codec, "cs_8409_external_device_unsolicited_response - UNSOL masked    0x%08x\n",int_masked);
 
         // determine unmasked interrupts
 
         int_response = ((~ret_disambig) & retval_int);
 
-        mycodec_info(codec, "cs_8409_external_device_unsolicited_response - UNSOL unmasked  0x%08x\n",int_response);
+        codec_info(codec, "cs_8409_external_device_unsolicited_response - UNSOL unmasked  0x%08x\n",int_response);
 
         intcnt = hweight_long(int_response);
 
-        mycodec_info(codec, "cs_8409_interrupt_action - number interrupt actions %d\n", intcnt);
+        codec_info(codec, "cs_8409_external_device_unsolicited_response - UNSOL number interrupt actions %d\n", intcnt);
 
 
         // do we call a mapping function here??
 
-        if (int_response != 0)
+        if (int_response != 0) {
+
                 cs_8409_interrupt_action(codec, int_response);
+
+        }
         else
-                mycodec_info(codec, "cs_8409_external_device_unsolicited_response - UNSOL NO unmasked interrupt\n");
+                codec_info(codec, "cs_8409_external_device_unsolicited_response - UNSOL NO unmasked interrupt\n");
 
 
         return;
@@ -3239,6 +3290,8 @@ static int cs_8409_read_status_and_clear_interrupt(struct hda_codec *codec)
         int last_retint = 0;
         int loopmax = 11;
         int loopcnt = 0;
+
+        // AppleHDAFunctionGroupCS8409::readStatusAndClearInterrupt
 
         mycodec_info(codec, "cs_8409_read_status_and_clear_interrupt start\n");
 
@@ -3260,7 +3313,7 @@ static int cs_8409_read_status_and_clear_interrupt(struct hda_codec *codec)
 
                 retint = cs42l83_read_status_and_clear_interrupt(codec);
 
-                mycodec_info(codec, "cs_8409_read_status_and_clear_interrupt - UNSOL status 0x%08x\n",retint);
+                codec_info(codec, "cs_8409_read_status_and_clear_interrupt - UNSOL status 0x%08x\n",retint);
 
                 retval = read_gpio_status_check(codec);
 
@@ -3274,19 +3327,21 @@ static int cs_8409_read_status_and_clear_interrupt(struct hda_codec *codec)
 
                 if ((retval & 0x01) == 0x01)
                 {
-                        mycodec_info(codec, "cs_8409_read_status_and_clear_interrupt - interrupt %d clear\n",loopcnt);
+                        codec_info(codec, "cs_8409_read_status_and_clear_interrupt - interrupt %d clear\n",loopcnt);
                         break;
                 }
 
                 last_retint = retint;
 
+                // so this code definitely has a 10 IOSleep sleep call ie 10 ms
+                // but from the logs it is much closer to 50 ms
                 // IOSleep(10);
-                //usleeprange(8000,12000);
+                //usleeprange(10000,12000);
                 msleep(10);
 
         }
 
-        mycodec_info(codec, "cs_8409_read_status_and_clear_interrupt 0x%08x end\n",retint);
+        codec_info(codec, "cs_8409_read_status_and_clear_interrupt 0x%08x end\n",retint);
 
         return retint;
 }
@@ -3324,7 +3379,7 @@ static int cs42l83_read_status_and_clear_interrupt(struct hda_codec *codec)
 
         // finally know what ASP refers to in lot of Cirrus docs - Audio Serial Port
 
-        // register 0x1b7b - this is undocumented for 42l42 but labelled in fig 4-45 as Interrupt
+        // register 0x1b7b - this is undocumented for 42l42 but labelled in fig 4-45 as Detect Interrupt 1 Status
         //                   Detect Interrupt 1 Status
         //                   value 0x40 (TIP_SENSE_PLUG interrupt from 0xa0 TIP_SENSE_PLUG unmasked)
         // register 0x1b7c - this is undocumented for 42l42 (reserved)
@@ -3650,7 +3705,7 @@ static void cs43l83_headset_amp_format_setup(struct hda_codec *codec, int set_st
                 //snd_hda_codec_write(codec, 0x0a, 0, AC_VERB_SET_CHANNEL_STREAMID, 0x00000010); // 0x00a70610
         //      snd_hda:     conv stream channel map 10 [('CHAN', 0), ('STREAMID', 1)]
 
-                // using the stored stream parameters update nid 0x1a stream parameters
+                // using the stored stream parameters update nid 0x0a stream parameters
                 // we have limited the allowed formats so should only have working formats here
                 cs_8409_really_update_stream_format(codec, 0x0a, 1, 2, 0);
         } else {
@@ -4111,7 +4166,7 @@ static void cs_8409_linein_stream_on_nid(struct hda_codec *codec)
 
         //new_coef82 = (reg_coef82 | 0x2);
         new_coef82 = (reg_coef82 | spec->reg82_linein_dmic_scl);
-        myprintk_dbg("snd_hda_intel: masked cs_8409_linein_stream_on_nid coef 0x82 update 0x%04x 0x%04x \n", reg_coef82, new_coef82);
+        myprintk_dbg("snd_hda_intel: masked cs_8409_linein_stream_on_nid coef 0x0082 update 0x%04x 0x%04x \n", reg_coef82, new_coef82);
 
         //snd_hda_coef_item(codec, 1, CS8409_VENDOR_NID, 0x0082, 0x5403, 0x00000000, 10588 ); //   coef write 10588
         snd_hda_coef_item(codec, 1, CS8409_VENDOR_NID, 0x0082, new_coef82, 0x00000000, 10588 ); //   coef write 10588
@@ -4267,7 +4322,8 @@ static void cs_8409_intmike_linein_resetup(struct hda_codec *codec)
 // actual button presses are 0x01, 0x02 and button release 0x10
 // for 0x1b7c 0x02 is a short release for buttons, 0x08 is reserved
 // the mask bits for 0x1b7a seem to be 0xe7 for buttons defining 0x08 as the button detect interrupt
-// (0x1b79 is mask, 0x1b7b status; 0x1b7a is mask, 0x1b7c is presumed status, 0x131b is mask, 0x1308 status)
+// (0x1b79 is mask, 0x1b7b status; 0x1b7a is mask, 0x1b7c is presumed status, 0x131b is mask, 0x1308 status
+//  0x1320 is mask, 0x130f status)
 #define TIP_SENSE_PLUG 0x400000
 #define TIP_SENSE_UNPLUG 0x200000
 #define BUTTON_DOWN_PRESS 0x10000
@@ -4277,7 +4333,9 @@ static void cs_8409_intmike_linein_resetup(struct hda_codec *codec)
 #define BUTTON_TOGGLE_DOWN_PRESS 0x100
 #define BUTTON_TOGGLE_UP_PRESS 0x200
 #define BUTTON_DETECT_MAIN 0x1800  // we only see 0x800 but the mask allows for these 2 bits
-#define BUTTON_DETECT 0x40
+#define BUTTON_DETECT_MASK 0x60
+#define BUTTON_DETECT1 0x40
+#define BUTTON_DETECT2 0x20
 #define MIKE_CONNECT 0x02
 #define BUTTONS (BUTTON_UP_PRESS | BUTTON_DOWN_PRESS | BUTTON_TOGGLE_UP_PRESS | BUTTON_TOGGLE_DOWN_PRESS)
 #define HSDET_AUTO_DONE 0x02
@@ -4297,7 +4355,15 @@ static void cs_8409_interrupt_action(struct hda_codec *codec, int int_response)
 {
         int retval;
         int headset_state;
+        int update_jacks = 0;
         struct cs8409_apple_spec *spec = codec->spec;
+
+        // so if Im analyzing the Dell code correctly
+        // I think we should only do the snd_hda_jack_report_sync after all jack detection
+        // plus all nid mute/unmute and widget output/input enable
+        // because the Dell code first does tip sense, then (if wanted) jack type detection
+        // then runs snd_hda_jack_unsol_event which does any callbacks
+        // and finally the snd_hda_jack_report_sync
 
         if ((int_response & TIP_SENSE_PLUG) == TIP_SENSE_PLUG)
         {
@@ -4307,7 +4373,15 @@ static void cs_8409_interrupt_action(struct hda_codec *codec, int int_response)
         else if ((int_response & TIP_SENSE_UNPLUG) == TIP_SENSE_UNPLUG)
         {
                 dev_info(hda_codec_dev(codec), "cs_8409_interrupt_action - unplug\n");
+                cs_8409_cs42l83_mark_jack(codec);
                 cs_8409_headset_unplug_event(codec);
+                // so although this more consistent with linux way (all automute etc callbacks done before report sync)
+                // it seems we need to update the linux user side before doing the amp reset when playing
+                // with cs_8409_cs42l83_jack_report_sync here there is a few 10s milliseconds period where get anomalous volume
+                // because we start playing through the amps while linux user side still says its headphone output
+                // - this may be because updating the linux user side takes a little while
+                //dev_info(hda_codec_dev(codec), "cs_8409_interrupt_action - unplug jack_report_sync\n");
+                //cs_8409_cs42l83_jack_report_sync(codec);
         }
         else if ((int_response & HSDET_AUTO_DONE) == HSDET_AUTO_DONE)
         {
@@ -4318,9 +4392,11 @@ static void cs_8409_interrupt_action(struct hda_codec *codec, int int_response)
                 // and this is where life gets really complicated
                 // if we have a mike we do a button detect - but that leads to an unsolicited response
                 // so we only continue here I think if we dont have a mike
-                if (!(spec->have_mike))
-                {
+                if (!(spec->have_mike)) {
+                        cs_8409_cs42l83_mark_jack(codec);
                         cs_8409_plugin_event_continued(codec);
+                        dev_info(hda_codec_dev(codec), "cs_8409_interrupt_action - headset detect no mike jack_report_sync\n");
+                        cs_8409_cs42l83_jack_report_sync(codec);
                 }
         }
         // not clear what test is here - but this should check what we see - one button interrupt seems to be activated
@@ -4332,6 +4408,13 @@ static void cs_8409_interrupt_action(struct hda_codec *codec, int int_response)
                 dev_info(hda_codec_dev(codec), "cs_8409_interrupt_action - buttons detected\n");
                 cs_8409_headset_button_detect_event(codec);
 
+                cs_8409_cs42l83_mark_jack(codec);
+
+                cs_8409_plugin_event_continued(codec);
+
+                dev_info(hda_codec_dev(codec), "cs_8409_interrupt_action - button detect jack_report_sync\n");
+                cs_8409_cs42l83_jack_report_sync(codec);
+
         }
         else if (((int_response & BUTTON_UP_PRESS) == BUTTON_UP_PRESS) ||
                  ((int_response & BUTTON_DOWN_PRESS) == BUTTON_DOWN_PRESS) ||
@@ -4340,12 +4423,15 @@ static void cs_8409_interrupt_action(struct hda_codec *codec, int int_response)
         {
                 dev_info(hda_codec_dev(codec), "cs_8409_interrupt_action - button event on \n");
                 cs_8409_headset_button_event(codec, int_response);
+                update_jacks = 1;
 
         }
         else if (((int_response & BUTTON_RELEASE) == BUTTON_RELEASE))
         {
                 dev_info(hda_codec_dev(codec), "cs_8409_interrupt_action - button event off \n");
+                //cs_8409_cs42l83_mark_jack(codec);
                 cs_8409_headset_button_event(codec, int_response);
+                update_jacks = 1;
 
         }
         else if ((int_response & PDN_DONE) == PDN_DONE)
@@ -4357,6 +4443,7 @@ static void cs_8409_interrupt_action(struct hda_codec *codec, int int_response)
                 dev_info(hda_codec_dev(codec), "cs_8409_interrupt_action - UNKNOWN INTERRUPT 0x%08x\n", int_response);
         }
 
+        return;
 }
 
 
@@ -4400,6 +4487,7 @@ static void cs_8409_plugin_event_continued(struct hda_codec *codec)
                         // power on audio output
                         //cs42l83_set_power_state_on(codec, 0);
                         //cs42l83_headset_enable_on(codec);
+
 
                         // so OSX now does another one of its enable off/enable on - ignoring
 
@@ -4445,9 +4533,9 @@ static void cs_8409_plugin_event_continued(struct hda_codec *codec)
 
                 // this event now gets called if boot with headset plugged in
                 // but from this point the boot phase setup is different
-		// -  now a headset_phase of 1 indicates booted with headset plugged in
+                // -  now a headset_phase of 1 indicates booted with headset plugged in
                 // - headset phase of 2 or more means post boot headset plugin
-		if (spec->headset_phase >= 2)
+                if (spec->headset_phase >= 2)
                 {
 
                         // ensure the intmike/linein nids are powered off
@@ -4460,14 +4548,14 @@ static void cs_8409_plugin_event_continued(struct hda_codec *codec)
 
                         if (!(retval & 0x80))
                         {
-                                dev_info(hda_codec_dev(codec), "cs_8409_plugin_event_continued JACK DISCONNECT NOT IMPLEMENTED!!\n");
+                                dev_info(hda_codec_dev(codec), "cs_8409_plugin_event_continued JACK DISCONNECT UNIMPLEMENTED!!\n");
                         }
 
                         if (spec->have_mike)
                         {
                                 if (spec->capturing)
                                 {
-                                        dev_info(hda_codec_dev(codec), "cs_8409_plugin_event_continued PLUGIN WHILE CAPTURING NOT IMPLEMENTED!!\n");
+                                        dev_info(hda_codec_dev(codec), "cs_8409_plugin_event_continued PLUGIN WHILE CAPTURING UNIMPLEMENTED!!\n");
                                 }
 
                                 // this is just calling this routine
@@ -4509,6 +4597,7 @@ static void cs_8409_plugin_event_continued(struct hda_codec *codec)
         mycodec_info(codec, "cs_8409_plugin_event_continued end\n");
 }
 
+static void cs_8409_plugin_handle_detect(struct hda_codec *codec);
 static void cs_8409_plugin_complete_detect(struct hda_codec *codec);
 
 
@@ -4530,8 +4619,13 @@ static void cs_8409_headset_plugin_event(struct hda_codec *codec)
         // this seems to be here but no idea where coming from
         retval = read_gpio_status_check(codec);
 
+
+        // following code likely from AppleHDAMikeyInternalCS8409::handleJackDetectUR
+        // moved from cs_8409_plugin_handle_detect
+
         // then call setTimer to initiate function after a time period
 
+        // this is NOT a debug sleep - it occurs on all plugin events on OSX for some reason
         msleep(1800);
 
         //retval = snd_hda_codec_read_check(codec, codec->core.afg, 0, AC_VERB_GET_POWER_STATE, 0x00000000, 0x00000000, 1069); // 0x001f0500
@@ -4555,6 +4649,15 @@ static void cs_8409_plugin_handle_detect(struct hda_codec *codec)
 
         // now think this is AppleHDAMikeyInternalCS8409::handleJackDetectUR
 
+        // which calls:
+        // AppleHDAMikeyInternalCS8409::disableButtonDetection
+        // AppleHDAMikeyInternalCS8409::enableHPClamps
+
+        // AppleHDAMikeyInternalCS8409::enableHPClamps calls:
+        // AppleHDATDM_Codec::setHPOutClamp
+
+        mycodec_info(codec, "cs_8409_plugin_handle_detect start\n");
+
         // this is a pre-value - indicates we have had a jack detect
         // but set to 1 when have checked with cs42l83_headphone_sense for headset
         // at the moment not used
@@ -4566,6 +4669,8 @@ static void cs_8409_plugin_handle_detect(struct hda_codec *codec)
 
         // IOSleep(1) here
         msleep(1);
+
+        mycodec_info(codec, "cs_8409_plugin_handle_detect end\n");
 }
 
 static void cs_8409_plugin_complete_detect(struct hda_codec *codec)
@@ -4596,7 +4701,6 @@ static void cs_8409_plugin_complete_detect(struct hda_codec *codec)
                 mycodec_info(codec, "cs_8409_plugin_complete_detect headphone sensed\n");
 
                 spec->jack_present = 1;
-
                 spec->headset_enable = 1;
 
                 cs42l83_complete_jack_detect(codec);
@@ -4629,6 +4733,7 @@ static void cs_8409_plugin_complete_detect(struct hda_codec *codec)
                 // AppleHDAMikeyInternalCS8409::handleJackDisconnectUR
 
                 dev_info(hda_codec_dev(codec), "cs_8409_plugin_complete_detect no headphone UNIMPLEMENTED!!\n");
+
         }
 
         mycodec_info(codec, "cs_8409_plugin_complete_detect end\n");
@@ -4764,7 +4869,8 @@ static void cs_8409_headset_type_detect_event(struct hda_codec *codec)
 
                 cs42l83_enable_hsbias_auto_clamp_on(codec);
 
-                cs42l83_enable_hsbias_auto_clamp_off(codec);
+                //cs42l83_enable_hsbias_auto_clamp_off(codec);
+                cs42l83_enable_hsbias_auto_clamp_off0(codec);
 
                 // I dont see a difference in these 2 functions
                 //cs42l83_power_hs_bias_off1(codec);
@@ -4837,7 +4943,7 @@ static int cs_8409_set_power_state(struct hda_codec *codec, int power_state)
                 if ((retval & 0x80))
                 {
                         // AppleHDAMikeyInternalCS8409::handleJackDetectUR
-                        dev_info(hda_codec_dev(codec), "cs_8409_set_power_state JACK DETECT NOT IMPLEMENTED!!\n");
+                        dev_info(hda_codec_dev(codec), "cs_8409_set_power_state JACK DETECT UNIMPLEMENTED!!\n");
                 }
 
                 retstate = 0;
@@ -4854,7 +4960,7 @@ static int cs_8409_set_power_state(struct hda_codec *codec, int power_state)
                         if (!(retval & 0x80))
                         {
                                 // AppleHDAMikeyInternalCS8409::handleJackDisconnectUR
-                                dev_info(hda_codec_dev(codec), "cs_8409_headset_type_detect JACK DISCONNECT NOT IMPLEMENTED!!\n");
+                                dev_info(hda_codec_dev(codec), "cs_8409_set_power_state JACK DISCONNECT UNIMPLEMENTED!!\n");
                                 retstate = 0;
                         }
                         else
@@ -4881,14 +4987,17 @@ static void cs_8409_headset_button_detect_event(struct hda_codec *codec)
 
         mycodec_info(codec, "cs_8409_headset_button_detect_event button data 0x%08x\n", ret_button);
 
-        if ((ret_button & BUTTON_DETECT) == BUTTON_DETECT)
+        // so now seen on imacs we have a button detect of 0x20 rather than 0x40 previously seen
+        // - this maybe an Apple headset/non-Apple headset issue rather than imac issue (the headset was non-Apple)
+        //if ((ret_button & BUTTON_DETECT) == BUTTON_DETECT)
+        if (ret_button & BUTTON_DETECT_MASK)
         {
                 mycodec_info(codec, "cs_8409_headset_button_detect_event HAVE BUTTON\n");
                 spec->have_buttons = 1;
         }
 
         // this is a read from same register 0x1b78 - which seems to contain both senses
-        // button sense 0x40 (assumed) and mike sense 0x02 - known but undocumented
+        // - button sense 0x40/0x20 (assumed) and mike sense 0x02 - known but undocumented
         // do we do anything with this??
         // we have aleady set have_mike prior to this
         // could log an error here
@@ -4898,10 +5007,6 @@ static void cs_8409_headset_button_detect_event(struct hda_codec *codec)
 
         if ((ret_mike & MIKE_CONNECT) != MIKE_CONNECT)
                 dev_err(hda_codec_dev(codec), "ERROR - has mike but mike not connected - not analyzed!!\n");
-
-
-        // this continues the plugin event
-        cs_8409_plugin_event_continued(codec);
 
 
         mycodec_info(codec, "cs_8409_headset_button_detect_event end\n");
@@ -4981,11 +5086,15 @@ static void cs_8409_headset_mike_streaming_preplay(struct hda_codec *codec, int 
 static void cs_8409_headset_mike_buttons_enable(struct hda_codec *codec)
 {
 
+        // part of AppleHDAMikeyInternalCS8409::handleButtonDetectUR
+
         cs42l83_configure_headset_button_interrupts(codec);
 
         cs42l83_enable_hsbias_auto_clamp_off2(codec);
 
-        cs42l83_enable_hsbias_auto_clamp_on3(codec);
+        // following coded explicitly in handleButtonDetectUR
+
+        cs42l83_hsbias_sense_on(codec);
 
 }
 
@@ -5047,7 +5156,7 @@ static void cs_8409_headset_unplug_event(struct hda_codec *codec)
 
         if ((retval & 0x80))
         {
-                dev_info(hda_codec_dev(codec), "cs_8409_headset_unplug_event headphone still sensed - NOT HANDLED!!!\n");
+                dev_info(hda_codec_dev(codec), "cs_8409_headset_unplug_event headphone still sensed - NOT HANDLED - UNIMPLEMENTED!!!\n");
         }
         else
         {
@@ -5090,11 +5199,24 @@ static void cs_8409_unplug_handle_disconnect(struct hda_codec *codec)
 
         if ((retval & 0x80))
         {
-                dev_err(hda_codec_dev(codec), "cs_8409_unplug_handle_disconnect headphone still sensed - NOT HANDLED!!!\n");
+                dev_err(hda_codec_dev(codec), "cs_8409_unplug_handle_disconnect headphone still sensed - NOT HANDLED - UNIMPLEMENTED!!!\n");
         }
         else
         {
                 mycodec_info(codec, "cs_8409_unplug_handle_disconnect headphone not sensed - OK\n");
+
+                // even here this still has audio glitch
+                // - but with 100 ms wait later seems to fix it
+
+                // silly me - we must update this here so jack_detect_update in jack_report_sync will determine the headset has been unplugged
+                spec->jack_present = 0;
+
+                // try setting ALL jacks dirty - likely not needed
+                //snd_hda_jack_set_dirty_all(codec);
+
+                dev_info(hda_codec_dev(codec), "cs_8409_interrupt_action - unplug jack_report_sync\n");
+                cs_8409_cs42l83_jack_report_sync(codec);
+
 
                 if (spec->playing)
                 {
@@ -5125,6 +5247,25 @@ static void cs_8409_unplug_handle_disconnect(struct hda_codec *codec)
                         mycodec_info(codec, "cs_8409_unplug_handle_disconnect playing 1 end\n");
                 }
 
+                // so we have determined the volume/glitch issues are after this
+                //mycodec_info(codec, "cs_8409_unplug_handle_disconnect sleep 1\n");
+                //msleep(10000);
+                //mycodec_info(codec, "cs_8409_unplug_handle_disconnect sleep 1 end\n");
+
+                // with previous jack_report_sync and this wait dont have a glitch
+                msleep(100);
+
+                // silly me - we must update this here so jack_detect_update in jack_report_sync will determine the headset has been unplugged
+                //spec->jack_present = 0;
+
+                //dev_info(hda_codec_dev(codec), "cs_8409_interrupt_action - unplug jack_report_sync\n");
+                //cs_8409_cs42l83_jack_report_sync(codec);
+
+
+                // add a wait for user side update - still get a small glitch
+                //msleep(100);
+
+
                 // this is done if playing or not??
                 // - changing - only setup amps if still playing
 
@@ -5152,6 +5293,25 @@ static void cs_8409_unplug_handle_disconnect(struct hda_codec *codec)
                         //unplug23_sync_converters_on(struct hda_codec *codec)
 
                         play_sync_converters_on(codec);
+
+
+                        // so here linux user side reports still headphone output (because originally had not yet done
+                        // jack_report_sync) which leads to audio glitch with output now through speakers
+                        // so we need to update linux user side after headphone output disable above
+                        // (the volume mismatch previously heard was due to incorrect handling of nid 0x03 update for stereo (ie 2 channel) source)
+                        // can only think its delay from jack_report_sync till linux user side updated
+                        // (we dont really have a massive lot of commands from here till jack_report_sync
+                        // (here would be more consistent with linux way which does all power/automute/automic etc callbacks before jack_report_sync)
+                        //mycodec_info(codec, "cs_8409_unplug_handle_disconnect sleep 2\n");
+                        //msleep(10000);
+                        //mycodec_info(codec, "cs_8409_unplug_handle_disconnect sleep 2 end\n");
+
+
+                        // silly me - we must update this here so jack_detect_update in jack_report_sync will determine the headset has been unplugged
+                        //spec->jack_present = 0;
+
+                        //dev_info(hda_codec_dev(codec), "cs_8409_interrupt_action - unplug jack_report_sync\n");
+                        //cs_8409_cs42l83_jack_report_sync(codec);
 
                         mycodec_info(codec, "cs_8409_unplug_handle_disconnect playing 2 end\n");
                 }
@@ -5182,7 +5342,7 @@ static void cs_8409_unplug_handle_disconnect(struct hda_codec *codec)
 
                 if ((retval & 0x80))
                 {
-                        dev_err(hda_codec_dev(codec), "cs_8409_unplug_handle_disconnect headphone sensed again - NOT HANDLED!!!\n");
+                        dev_err(hda_codec_dev(codec), "cs_8409_unplug_handle_disconnect headphone sensed again - NOT HANDLED - UNIMPLEMENTED!!!\n");
                 }
                 else
                 {
