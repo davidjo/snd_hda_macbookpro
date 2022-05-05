@@ -1125,7 +1125,14 @@ static void cs_8409_setup_TDM_amps34(struct hda_codec *codec, int nullformat)
         {
                 // using the stored stream parameters update nid 0x3 stream parameters
                 // we have limited the allowed formats so should only have working formats here
-                cs_8409_really_update_stream_format(codec, 0x03, 1, 2, 2);
+                // now realised if we want to pass 2 channel streams to driver then we need to apply same
+                // fixup as in snd_hda_multi_out_analog_prepare ie set the channel id of the second nid
+                // to same as first nid for 2 channel inputs - rather than 2 if have a 4 channel stream
+                mydev_info(hda_codec_dev(codec), "cs_8409_setup_TDM_amps34: stream channels %d\n", spec->stream_channels);
+                if (spec->stream_channels == 2)
+                        cs_8409_really_update_stream_format(codec, 0x03, 1, 2, 0);
+                else
+                        cs_8409_really_update_stream_format(codec, 0x03, 1, 2, 2);
         }
 
         cs_8409_setup_TDM_proper_amps34(codec);
