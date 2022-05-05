@@ -1036,7 +1036,7 @@ static void cs_8409_setup_amps12(struct hda_codec *codec, int amps_enable)
                 //cs_8409_setup_amp_ssm3(codec, 0x28, 0x48, 0x00);
                 //cs_8409_setup_amp_ssm3(codec, 0x2a, 0x48, 0x01);
         }
-        else if (codec->core.subsystem_id == 0x106b1000) {
+        else if (codec->core.subsystem_id == 0x106b1000 || codec->core.subsystem_id == 0x106b0f00) {
                 // NOTE that the TAS57642 amps setup during boot seems to skip the actual speaker power on
                 //      hence the addition of the amps_enable parameter
                 // use reduced volume - from 0xcf to 0x9f - same reduction as for MAXs -24dB (0.5dB steps)
@@ -1180,7 +1180,7 @@ static void cs_8409_setup_amps34(struct hda_codec *codec, int amps_enable)
                 //cs_8409_setup_amp_ssm3(codec, 0x2c, 0x48, 0x02);
                 //cs_8409_setup_amp_ssm3(codec, 0x2e, 0x48, 0x03);
         }
-        else if (codec->core.subsystem_id == 0x106b1000) {
+        else if (codec->core.subsystem_id == 0x106b1000 || codec->core.subsystem_id == 0x106b0f00) {
                 // NOTE that the TAS57642 amps setup during boot seems to skip the actual speaker power on
                 //      hence the addition of the amps_enable parameter
                 // use reduced volume - from 0x48 to 0x80 - same reduction as for MAXs -24dB
@@ -1696,7 +1696,7 @@ static void cs_8409_disable_amps12(struct hda_codec *codec)
                 cs_8409_disable_amp_ssm3(codec, 0x28);
                 cs_8409_disable_amp_ssm3(codec, 0x2a);
         }
-        else if (codec->core.subsystem_id == 0x106b1000) {
+        else if (codec->core.subsystem_id == 0x106b1000 || codec->core.subsystem_id == 0x106b0f00) {
                 //cs_8409_disable_amp_tas576(codec, 0xd8);
                 //cs_8409_disable_amp_tas576(codec, 0xda);
                 cs_8409_disable_amp_tas576_amp0(codec);
@@ -1791,7 +1791,7 @@ static void cs_8409_disable_amps34(struct hda_codec *codec)
                 cs_8409_disable_amp_ssm3(codec, 0x2c);
                 cs_8409_disable_amp_ssm3(codec, 0x2e);
         }
-        else if (codec->core.subsystem_id == 0x106b1000) {
+        else if (codec->core.subsystem_id == 0x106b1000 || codec->core.subsystem_id == 0x106b0f00) {
                 //cs_8409_disable_amp_tas576(codec, 0xdc);
                 //cs_8409_disable_amp_tas576(codec, 0xde);
                 cs_8409_disable_amp_tas576_amp2(codec);
@@ -2092,7 +2092,7 @@ static int cs_8409_boot_setup_real(struct hda_codec *codec)
         else if (codec->core.subsystem_id == 0x106b3300 || codec->core.subsystem_id == 0x106b3600) {
                 enable_GPIforUR(codec, 0xd);
         }
-        else if (codec->core.subsystem_id == 0x106b1000) {
+        else if (codec->core.subsystem_id == 0x106b1000 || codec->core.subsystem_id == 0x106b0f00) {
                 enable_GPIforUR(codec, 0xd);
         }
         else {
@@ -2110,7 +2110,7 @@ static int cs_8409_boot_setup_real(struct hda_codec *codec)
         else if (codec->core.subsystem_id == 0x106b3300 || codec->core.subsystem_id == 0x106b3600) {
                 cs42l83_external_control_GPIO(codec, 0xf);
         }
-        else if (codec->core.subsystem_id == 0x106b1000) {
+        else if (codec->core.subsystem_id == 0x106b1000 || codec->core.subsystem_id == 0x106b0f00) {
                 cs42l83_external_control_GPIO(codec, 0xf);
         }
         else {
@@ -2130,7 +2130,7 @@ static int cs_8409_boot_setup_real(struct hda_codec *codec)
         else if (codec->core.subsystem_id == 0x106b3300 || codec->core.subsystem_id == 0x106b3600) {
                 cs42l83_external_control_GPIO(codec, 0xf);
         }
-        else if (codec->core.subsystem_id == 0x106b1000) {
+        else if (codec->core.subsystem_id == 0x106b1000 || codec->core.subsystem_id == 0x106b0f00) {
                 cs42l83_external_control_GPIO(codec, 0xf);
         }
         else {
@@ -2150,7 +2150,7 @@ static int cs_8409_boot_setup_real(struct hda_codec *codec)
                 //setup_amps_reset_i2c_ssm3
                 setup_amps_reset_i2c_ssm3(codec);
         }
-        else if (codec->core.subsystem_id == 0x106b1000) {
+        else if (codec->core.subsystem_id == 0x106b1000 || codec->core.subsystem_id == 0x106b0f00) {
                 //setup_amps_reset(codec);
                 setup_amps_reset_i2c_tas576(codec);
         }
@@ -2167,7 +2167,7 @@ static int cs_8409_boot_setup_real(struct hda_codec *codec)
         cs42l83_mic_detect(codec);
 
         // apparently the imacs use an inverted circuit for physical sensing of jack being plugged in
-        if (codec->core.subsystem_id == 0x106b1000)
+        if (codec->core.subsystem_id == 0x106b1000 || codec->core.subsystem_id == 0x106b0f00)
                 cs42l83_tip_sense(codec, 1);
         else
                 cs42l83_tip_sense(codec, 0);
