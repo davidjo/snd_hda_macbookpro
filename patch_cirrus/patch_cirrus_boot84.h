@@ -1753,7 +1753,7 @@ static void determine_speaker_id(struct hda_codec *codec)
 
         // this is call AppleHDAFunctionGroup::setGPIOEnable in determineSpeakerID
 
-        if (codec->core.subsystem_id == 0x106b1000 || codec->core.subsystem_id == 0x106b0f00)
+        if (codec->core.subsystem_id == 0x106b1000 || codec->core.subsystem_id == 0x106b0f00 || codec->core.subsystem_id == 0x106b0e00)
         {
                 //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_GPIO_MASK, 0x00000008); // 0x00171608
 //              snd_hda:     gpio enable 1 0x08

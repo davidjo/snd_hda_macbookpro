@@ -2543,8 +2543,8 @@ static int patch_cs8409_apple(struct hda_codec *codec)
                 // macbook pro 14,1?13,1, 14,2
                 fixup_found = 1;
         }
-        else if (codec->core.subsystem_id == 0x106b1000 || codec->core.subsystem_id == 0x106b0f00) {
-                // imac 18,3, 19,1, 18,2
+        else if (codec->core.subsystem_id == 0x106b1000 || codec->core.subsystem_id == 0x106b0f00 || codec->core.subsystem_id == 0x106b0e00) {
+                // imac 18,3, 19,1, 18,2, 18,1
                 fixup_found = 1;
         }
 
@@ -2570,7 +2570,7 @@ static int patch_cs8409_apple(struct hda_codec *codec)
         spec->exec_verb = codec->core.exec_verb;
         codec->core.exec_verb = cs8409_cs42l83_exec_verb;
 /*
-        if (codec->core.subsystem_id == 0x106b1000 || codec->core.subsystem_id == 0x106b0f00)
+        if (codec->core.subsystem_id == 0x106b1000 || codec->core.subsystem_id == 0x106b0f00 || codec->core.subsystem_id == 0x106b0e00)
         {
                 codec->core.exec_verb = cs8409_cs42l83_imac_exec_verb;
         }
@@ -2617,7 +2617,7 @@ static int patch_cs8409_apple(struct hda_codec *codec)
 	else if (codec->core.subsystem_id == 0x106b3300 || codec->core.subsystem_id == 0x106b3600) {
 		spec->gpio_mask = 0x0f;
 	}
-        else if (codec->core.subsystem_id == 0x106b1000 || codec->core.subsystem_id == 0x106b0f00) {
+        else if (codec->core.subsystem_id == 0x106b1000 || codec->core.subsystem_id == 0x106b0f00 || codec->core.subsystem_id == 0x106b0e00) {
 		spec->gpio_mask = 0x0f;
 	}
 	else {
@@ -2680,7 +2680,7 @@ static int patch_cs8409_apple(struct hda_codec *codec)
 	// we also need to setup the linein nid (why is there no lineout??)
 	// (note that the internal mike is permanent - on the other hand we do need to turn it off if headset with mike
 	//  is plugged in???)
-        if (codec->core.subsystem_id == 0x106b1000 || codec->core.subsystem_id == 0x106b0f00) {
+        if (codec->core.subsystem_id == 0x106b1000 || codec->core.subsystem_id == 0x106b0f00 || codec->core.subsystem_id == 0x106b0e00) {
 		cs8409_fix_caps(codec, CS8409_CS42L83_IMAC_LINEIN_PIN_NID);
 	} else {
 		cs8409_fix_caps(codec, CS8409_CS42L83_MACBOOK_LINEIN_PIN_NID);
@@ -2691,7 +2691,7 @@ static int patch_cs8409_apple(struct hda_codec *codec)
         //	myprintk("snd_hda_intel: print wcaps post 0x%02x 0x%08x\n", i, codec->wcaps[i]);
 
 
-        //if (codec->core.subsystem_id == 0x106b1000 || codec->core.subsystem_id == 0x106b0f00) {
+        //if (codec->core.subsystem_id == 0x106b1000 || codec->core.subsystem_id == 0x106b0f00 || codec->core.subsystem_id == 0x106b0e00) {
         //       snd_hda_apply_pincfgs(codec, imac_pincfgs);
         //else
         //       snd_hda_apply_pincfgs(codec, macbook_pro_pincfgs);
@@ -2788,7 +2788,7 @@ static int patch_cs8409_apple(struct hda_codec *codec)
 
         // setup the intmike and linein nids
         // these are swapped between macbook pros and imacs
-        if (codec->core.subsystem_id == 0x106b1000 || codec->core.subsystem_id == 0x106b0f00)
+        if (codec->core.subsystem_id == 0x106b1000 || codec->core.subsystem_id == 0x106b0f00 || codec->core.subsystem_id == 0x106b0e00)
         {
                 spec->intmike_nid = 0x45;
                 spec->intmike_adc_nid = 0x23;
@@ -2845,7 +2845,7 @@ static int patch_cs8409_apple(struct hda_codec *codec)
         //      OSX function setConnectionSelect
         //      macbook pro init        0x0013 -> 0x0033 ie 0x0020 bit set
         //             imac init        0x0013 -> 0x0093 ie 0x0080 bit set
-        if (codec->core.subsystem_id == 0x106b1000 || codec->core.subsystem_id == 0x106b0f00)
+        if (codec->core.subsystem_id == 0x106b1000 || codec->core.subsystem_id == 0x106b0f00 || codec->core.subsystem_id == 0x106b0e00)
         {
                 spec->reg9_intmike_dmic_mo = 0x0080;    // DMIC2_MO=10b
         }
@@ -2867,7 +2867,7 @@ static int patch_cs8409_apple(struct hda_codec *codec)
         //                   - 0x5400 : ASP1_xxx_EN = 1, ASP1/2_MCLK_EN = 0
 
         // vendor reg 0x0082 - we need to update the DMIC bit fields but not the ASP bit fields for macbook/imac switch
-        if (codec->core.subsystem_id == 0x106b1000 || codec->core.subsystem_id == 0x106b0f00)
+        if (codec->core.subsystem_id == 0x106b1000 || codec->core.subsystem_id == 0x106b0f00 || codec->core.subsystem_id == 0x106b0e00)
         {
                 spec->reg82_intmike_dmic_scl = 0x0002;   // DMIC2_SCL_EN
                 spec->reg82_linein_dmic_scl = 0x0001;    // DMIC1_SCL_EN
