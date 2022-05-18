@@ -950,6 +950,7 @@ static void cs42l83_configure_int_mclk(struct hda_codec *codec)
 
 static void cs42l83_headset_power_on_on_nouse(struct hda_codec *codec)
 {
+        // this function replaced by cs42l83_power_onoff
 
 	mycodec_i2c_local_info(codec, "cs42l83_headset_power_on_on_nouse\n");
 
@@ -1176,6 +1177,8 @@ static void cs42l83_setup_audio_output(struct hda_codec *codec)
 static void cs42l83_headset_rcv_enable_on(struct hda_codec *codec)
 {
         int retval;
+
+        // this function has been replaced by cs42l83_buffers_onoff
 
 	mycodec_i2c_local_info(codec, "cs42l83_headset_rcv_enable_on\n");
 
@@ -1584,6 +1587,7 @@ static void cs42l83_power_off_codec_input(struct hda_codec *codec)
 
 static void cs42l83_headset_rcv_enable_off(struct hda_codec *codec)
 {
+        // this function has been replaced by cs42l83_buffers_onoff
 
 	mycodec_i2c_local_info(codec, "cs42l83_headset_rcv_enable_off\n");
 
@@ -1603,6 +1607,7 @@ static void cs42l83_headset_rcv_enable_off(struct hda_codec *codec)
 
 static void cs42l83_headset_power_off(struct hda_codec *codec)
 {
+        // this function replaced by cs42l83_power_onoff
 
 	mycodec_i2c_local_info(codec, "cs42l83_headset_power_off\n");
 

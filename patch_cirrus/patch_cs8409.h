@@ -304,9 +304,17 @@ struct cs8409_cir_param {
 
 #ifdef APPLE_CODECS
 struct unsol_item {
-        struct list_head list;
-        unsigned int idx;
-        unsigned int res;
+	struct list_head list;
+	unsigned int idx;
+	unsigned int res;
+};
+struct hda_cvt_setup_apple {
+	hda_nid_t nid;
+	u8 stream_tag;
+	u8 channel_id;
+	u16 format_id;
+	unsigned char active;   /* cvt is currently used */
+	unsigned char dirty;    /* setups should be cleared */
 };
 #endif
 
@@ -398,6 +406,20 @@ struct cs8409_spec {
 	int reg9_linein_dmic_mo;
 	int reg82_intmike_dmic_scl;
 	int reg82_linein_dmic_scl;
+
+
+	// add explicit stream format store entries as per hda_codec using a local definition
+	// of hda_cvt_setup (which is local to hda_codec.c)
+	// also use explicit nid versions
+	// (except that means either need explicit functions for each nid or have to lookup
+	//  nid each time want to use in a generic function with nid argument)
+	struct hda_cvt_setup_apple nid_0x02;
+	struct hda_cvt_setup_apple nid_0x03;
+	struct hda_cvt_setup_apple nid_0x0a;
+	struct hda_cvt_setup_apple nid_0x22;
+	struct hda_cvt_setup_apple nid_0x23;
+	struct hda_cvt_setup_apple nid_0x1a;
+
 
 	// new item to deal with jack presence as Apple (and now Dell) seems to have barfed
 	// the HDA spec by using a separate headphone chip

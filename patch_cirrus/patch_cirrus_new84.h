@@ -612,6 +612,9 @@ struct hda_cvt_setup {
         unsigned char dirty;    /* setups should be cleared */
 };
 
+// we now setup our local cache data in the spec structure
+// - cvt_setups is an opaque pointer type so we can see it here
+// but we dont know how to access the data - except by re-defining hda_cvt_setup as above
 
 /* get or create a cache entry for the given audio converter NID */
 static struct hda_cvt_setup *
@@ -630,9 +633,40 @@ get_hda_cvt_setup_8409(struct hda_codec *codec, hda_nid_t nid)
         return p;
 }
 
+
+// so we actually need both versions - one using the hda_cvt_setup struct
+// and one using our local hda_cvt_setup_apple struct
+
+static struct hda_cvt_setup_apple *
+get_hda_cvt_setup_apple_8409(struct hda_codec *codec, hda_nid_t nid)
+{
+        struct cs8409_apple_spec *spec = codec->spec;
+
+	switch (nid)
+	{
+		case 0x02:
+			return &spec->nid_0x02;
+		case 0x03:
+			return &spec->nid_0x03;
+		case 0x0a:
+			return &spec->nid_0x0a;
+		case 0x22:
+			return &spec->nid_0x22;
+		case 0x23:
+			return &spec->nid_0x23;
+		case 0x1a:
+			return &spec->nid_0x1a;
+		default:
+	}
+
+	codec_err(codec, "get_hda_cvt_setup_apple_8409: UNKNOWN NID!! 0x%02x\n", nid);
+
+	return NULL;
+}
+
 static void cs_8409_dump_stream_format(struct hda_codec *codec, hda_nid_t nid)
 {
-        struct hda_cvt_setup *p = NULL;
+        struct hda_cvt_setup_apple *p = NULL;
         int i;
 
 	// use explicit search so we dont create one if doesnt exist
@@ -644,33 +678,44 @@ static void cs_8409_dump_stream_format(struct hda_codec *codec, hda_nid_t nid)
         }
 
         if (p != NULL)
-                mycodec_dbg(codec, "cs_8409_dump_stream_format: NID=0x%x, cached values: stream=0x%x, channel=%d, format=0x%x\n", nid, p->stream_tag, p->channel_id, p->format_id);
+                mycodec_dbg(codec, "cs_8409_dump_stream_format: NID=0x%x, codec cached values: stream=0x%x, channel=%d, format=0x%x\n", nid, p->stream_tag, p->channel_id, p->format_id);
         else
-                mycodec_dbg(codec, "cs_8409_dump_stream_format: NID=0x%x, cached values: NULL\n", nid);
+                mycodec_dbg(codec, "cs_8409_dump_stream_format: NID=0x%x, codec cached values: NULL\n", nid);
 }
 
 static void cs_8409_reset_stream_format(struct hda_codec *codec, hda_nid_t nid, int format, int doreset)
 {
+        // note that this routine is currently not used
 
         // this resets the cached stream format so that next
         // stream setup will actually rewrite the stream format and stream id
         // or if doreset set it will perform the stream update now
         // also allow for only updating the stream format and not stream id
 
-	// problem - the get_hda_cvt_setup function is local to hda_codec - so need our own copy above
+        // NOTE we now save the stream format in our local cache as the hda_codec cache
+        //      is cleared at end of the prepare stage and we want to store it more permanently
+        //      really only the stream id is variable
 
         struct hda_cvt_setup *p = NULL;
+        struct hda_cvt_setup_apple *papl = NULL;
         u32 stream_tag_sv;
         int channel_id_sv;
         int format_id_sv;
 
-        p = get_hda_cvt_setup_8409(codec, nid);
+        // problem - the get_hda_cvt_setup function is local to hda_codec - so need our own copy above
 
-        stream_tag_sv = p->stream_tag;
-        channel_id_sv = p->channel_id;
-        format_id_sv = p->format_id;
+        papl = get_hda_cvt_setup_apple_8409(codec, nid);
+
+        stream_tag_sv = papl->stream_tag;
+        channel_id_sv = papl->channel_id;
+        format_id_sv = papl->format_id;
 
 	mycodec_info(codec, "cs_8409_reset_stream_format RESET for nid 0x%02x: 0x%08x id 0x%08x chan 0x%08x\n", nid, format_id_sv, stream_tag_sv, channel_id_sv);
+
+        // snd_hda_codec_setup_stream uses a caching system so only sends verbs when a change occurs
+        // we want to force a send here so need to clear the cached data
+
+        p = get_hda_cvt_setup_8409(codec, nid);
 
         p->stream_tag = 0;
         p->channel_id = 0;
@@ -687,6 +732,21 @@ static void cs_8409_reset_stream_format(struct hda_codec *codec, hda_nid_t nid, 
 // - we want to remove the Apple specific stream format/channel setup
 // and just call snd_hda_setup_stream - but we need the actual stream format for this
 // - hopefully getting from the hda_cvt_setup struct
+// unfortunately this idea of storing in the hda_cvt_setup table turns out to be not useful
+// as at end of snd_hda_codec_prepare it clears out (ie zeros) all unused/inactive cache entries
+// so we have to store in a separate cache using our own copied definition for hda_cvt_setup
+// hda_cvt_setup_apple
+
+
+// the following 2 functions are used in the sync converter functions
+// where apple essentially disables streaming (set stream id to 0) updates some vendor nid parameters
+// then restores streaming
+// so we store the stream info in a local variable copy and set it to the unused stream id ie stream id of 0
+// then cs_8409_update_from_save_stream_format sets it back to what it was
+// note that the format is unchanged for these operations
+// the main reason for doing it this way is because of the caching used in snd_hda_codec_setup_stream
+// - if we just sent the hda verbs then the cached data in snd_hda_codec_setup_stream
+// would be inconsistent with the actual state of streaming on the nid
 
 static void cs_8409_save_and_clear_stream_format(struct hda_codec *codec, hda_nid_t nid, struct hda_cvt_setup *savep)
 {
@@ -731,28 +791,47 @@ static void cs_8409_update_from_save_stream_format(struct hda_codec *codec, hda_
         snd_hda_codec_setup_stream(codec, nid, savep->stream_tag, savep->channel_id, savep->format_id);
 }
 
+
+// so these are the crucial routines for setting our local cached copy of the stream info (in the spec structure)
+// we use a different struct definition (hda_cvt_setup_apple) to keep the re-definition of hda_cvt_setup more local
+// note that this stream info is only stored once per stream prepare function call
+//      and this routine always updates from that initial data
+
 static void cs_8409_really_update_stream_format(struct hda_codec *codec, hda_nid_t nid, int update_format_id, int update_stream_id, unsigned int new_channel_id)
 {
         struct hda_cvt_setup *p = NULL;
-        u32 stream_tag_sv;
-        int channel_id_sv;
-        int format_id_sv;
+        struct hda_cvt_setup_apple *papl = NULL;
+        u32 stream_tag_sv = 0;
+        int channel_id_sv = 0;
+        int format_id_sv = 0;
 
-        mycodec_dbg(codec, "cs_8409_really_update_stream_format nid 0x%02x updfmt %d updstrmid %d nchnlid %d\n", nid, update_format_id, update_format_id, new_channel_id);
+        mycodec_dbg(codec, "cs_8409_really_update_stream_format nid 0x%02x updfmt %d updstrmid %d nchnlid %d\n", nid, update_format_id, update_stream_id, new_channel_id);
+        //dump_stack();
 
-        cs_8409_dump_stream_format(codec, nid);
-
-        // so here we take the cached format and save locally, clear out the cached values
+        // so here we take our local cached format and save locally, clear out the cached values
         // then call snd_hda_codec_setup_stream with the cached values
         // this will ensure we update the HDA with the stream format
 
+        // maybe now we should just update from our local stored version??
+
+        papl = get_hda_cvt_setup_apple_8409(codec, nid);
+
+        if (papl != NULL)
+        {
+                stream_tag_sv = papl->stream_tag;
+                channel_id_sv = papl->channel_id;
+                format_id_sv = papl->format_id;
+        }
+        else
+        {
+                codec_err(codec, "cs_8409_really_update_stream_format bad nid 0x%02x FAIL!!\n", nid);
+                return;
+        }
+
+
         p = get_hda_cvt_setup_8409(codec, nid);
 
-        stream_tag_sv = p->stream_tag;
-        channel_id_sv = p->channel_id;
-        format_id_sv = p->format_id;
-
-        mycodec_info(codec, "cs_8409_really_update_stream_format cached    tag 0x%08x chnl 0x%08x fmt 0x%08x\n", p->stream_tag, p->channel_id, p->format_id);
+        mycodec_info(codec, "cs_8409_really_update_stream_format cached    tag 0x%08x chnl 0x%08x fmt 0x%08x\n", papl->stream_tag, papl->channel_id, papl->format_id);
 
         if (update_stream_id)
         {
@@ -769,15 +848,21 @@ static void cs_8409_really_update_stream_format(struct hda_codec *codec, hda_nid
         else
                 mycodec_info(codec, "cs_8409_really_update_stream_format new       tag 0x%08x chnl 0x%08x fmt 0x%08x\n", stream_tag_sv, channel_id_sv, format_id_sv);
 
+        cs_8409_dump_stream_format(codec, nid);
+
         if (update_stream_id == 2)
             snd_hda_codec_setup_stream(codec, nid, stream_tag_sv, new_channel_id, format_id_sv);
         else
             snd_hda_codec_setup_stream(codec, nid, stream_tag_sv, channel_id_sv, format_id_sv);
 }
 
+// remove function from compile so get error when building if use it
+#if 0
 static void cs_8409_setup_stream_format(struct hda_codec *codec, hda_nid_t nid, unsigned int stream_tag, unsigned int format)
 {
         struct hda_cvt_setup *p = NULL;
+
+        // NOTE - this function should no longer be used
 
         mycodec_dbg(codec, "cs_8409_setup_stream_format nid 0x%02x\n",nid);
 
@@ -795,6 +880,40 @@ static void cs_8409_setup_stream_format(struct hda_codec *codec, hda_nid_t nid, 
         p->channel_id = 0;
         p->format_id = format;
 
+        cs_8409_dump_stream_format(codec, nid);
+
+        mycodec_dbg(codec, "end cs_8409_setup_stream_format\n");
+}
+#endif
+
+static void cs_8409_store_stream_format(struct hda_codec *codec, hda_nid_t nid, unsigned int stream_tag, unsigned int format)
+{
+        struct hda_cvt_setup_apple *papl = NULL;
+
+        mycodec_dbg(codec, "cs_8409_store_stream_format nid 0x%02x\n",nid);
+
+        cs_8409_dump_stream_format(codec, nid);
+
+        // this functions sets up our local cached stream save store
+        // NOTA BENE we do not do the update here - we are relying that this will be done by a call to
+        // cs_8409_really_update_stream_format now we have set the format correctly
+
+        papl = get_hda_cvt_setup_apple_8409(codec, nid);
+
+        if (papl != NULL)
+        {
+                // NOTA BENE - we do not set the channel id here - this will be done by cs_8409_really_update_stream_format
+
+                papl->stream_tag = stream_tag;
+                papl->channel_id = 0;
+                papl->format_id = format;
+
+                mycodec_info(codec, "cs_8409_store_stream_format cached    tag 0x%08x chnl 0x%08x fmt 0x%08x\n", papl->stream_tag, papl->channel_id, papl->format_id);
+	}
+	else
+                codec_err(codec, "cs_8409_store_stream_format bad nid 0x%02x FAIL!!\n", nid);
+
+        mycodec_dbg(codec, "end cs_8409_store_stream_format\n");
 }
 
 
@@ -1368,7 +1487,7 @@ static void cs_8409_pcm_playback_pre_prepare_hook(struct hda_pcm_stream *hinfo, 
 #endif
 		myprintk("snd_hda_intel: command cs_8409_pcm_playback_pre_prepare_hook HOOK PREPARE init %d last %lld cur %lld",spec->play_init,spec->last_play_time.tv_sec,curtim.tv_sec);
 		if (1) {
-			struct hda_cvt_setup *p = NULL;
+			struct hda_cvt_setup_apple *p = NULL;
 			//int power_chk = 0;
 
 			// in the new way we set the stream up here using the passed data
@@ -1376,11 +1495,14 @@ static void cs_8409_pcm_playback_pre_prepare_hook(struct hda_pcm_stream *hinfo, 
 			// so the cs_8409_really_update_stream_format will cause the updates to occur
                         // note we explicitly set the channel id - dont see another way yet
 
-                        cs_8409_setup_stream_format(codec, 0x02, stream_tag, format);
+                        //cs_8409_setup_stream_format(codec, 0x02, stream_tag, format);
+                        cs_8409_store_stream_format(codec, 0x02, stream_tag, format);
 
-                        cs_8409_setup_stream_format(codec, 0x03, stream_tag, format);
+                        //cs_8409_setup_stream_format(codec, 0x03, stream_tag, format);
+                        cs_8409_store_stream_format(codec, 0x03, stream_tag, format);
 
-                        cs_8409_setup_stream_format(codec, 0x0a, stream_tag, format);
+                        //cs_8409_setup_stream_format(codec, 0x0a, stream_tag, format);
+                        cs_8409_store_stream_format(codec, 0x0a, stream_tag, format);
 
                         // save number of actual stream channels
                         spec->stream_channels = substream->runtime->channels;
@@ -1401,6 +1523,9 @@ static void cs_8409_pcm_playback_pre_prepare_hook(struct hda_pcm_stream *hinfo, 
 				// first on Linux and we dont know at that stage if we will be playing
 				if (spec->have_mike)
 				{
+					// actually we always need to do cs_8409_headplay_setup - here we are about to play
+					// - what this possibly would allow is the apple way of doing a pre-setup
+					// so here we would switch between doing a full setup or a partial setup
 					if (spec->headset_play_format_setup_needed)
 					{
 						cs_8409_headplay_setup(codec);
@@ -1478,7 +1603,7 @@ static void cs_8409_playback_pcm_hook(struct hda_pcm_stream *hinfo, struct hda_c
 
 
 	if (action == HDA_GEN_PCM_ACT_OPEN) {
-		//struct hda_cvt_setup *p = NULL;
+		//struct hda_cvt_setup_apple *p = NULL;
 		myprintk("snd_hda_intel: command cs_8409_playback_pcm_hook open");
 
 		myprintk("snd_hda_intel: command cs_8409_playback_pcm_hook open end");
@@ -1519,11 +1644,8 @@ static void cs_8409_playback_pcm_hook(struct hda_pcm_stream *hinfo, struct hda_c
 			// note that so far only the headphone chip seems to generate unsol responses usually
 			spec->block_unsol = 1;
 			// so dont think need to anything about capturing here
-			if (spec->headset_play_format_setup_needed == 0)
-			{
-				cs_8409_headplay_cleanup(codec);
-				spec->headset_play_format_setup_needed = 1;
-			}
+			cs_8409_headplay_cleanup(codec);
+			spec->headset_play_format_setup_needed = 1;
 		}
                 else
 		        cs_8409_play_cleanup(codec);
@@ -1571,7 +1693,8 @@ static void cs_8409_pcm_capture_pre_prepare_hook(struct hda_pcm_stream *hinfo, s
 
 
 		// I think this is the same for intmike or headset mike
-		cs_8409_setup_stream_format(codec, hinfo->nid, stream_tag, format);
+		//cs_8409_setup_stream_format(codec, hinfo->nid, stream_tag, format);
+		cs_8409_store_stream_format(codec, hinfo->nid, stream_tag, format);
 
 
 		// for the moment have junky test here
@@ -1650,7 +1773,7 @@ static void cs_8409_capture_pcm_hook(struct hda_pcm_stream *hinfo, struct hda_co
 	// - we do do cleanup for the CLEANUP action
 
 	if (action == HDA_GEN_PCM_ACT_OPEN) {
-		//struct hda_cvt_setup *p = NULL;
+		//struct hda_cvt_setup_apple *p = NULL;
 		myprintk("snd_hda_intel: command cs_8409_capture_pcm_hook open");
 
 		myprintk("snd_hda_intel: command cs_8409_capture_pcm_hook open end");

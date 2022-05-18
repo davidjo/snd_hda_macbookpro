@@ -123,6 +123,10 @@ static void cs_8409_intmike_format_setup_enable(struct hda_codec *codec, int hda
 
         //snd_hda_codec_write(codec, 0x22, 0, AC_VERB_SET_STREAM_FORMAT, hda_format); // 0x02224033
 
+
+        // now assuming have saved the stream info prior to calling this function
+
+
         //retval = snd_hda_codec_read_check(codec, 0x22, 0, AC_VERB_GET_POWER_STATE, 0x00000000, 0x00000033, 10515); // 0x022f0500
         //snd_hda_codec_write(codec, 0x22, 0, AC_VERB_SET_POWER_STATE, 0x00000000); // 0x02270500
         //retval = snd_hda_codec_read_check(codec, 0x22, 0, AC_VERB_GET_POWER_STATE, 0x00000000, 0x00000030, 10518); // 0x022f0500
@@ -2206,6 +2210,11 @@ static int cs_8409_boot_setup_real(struct hda_codec *codec)
                 headset_on_boot = 1;
         }
 
+        // cs_8409_intmike_format_setup_enable is done before we get a capture prepare
+        // so we need to store some dummy initial setup
+        // unlike OSX make it a stream id of 0
+        // (note this only updates our local cached data - need a cs_8409_really_update_stream_format to actually update nid)
+        cs_8409_store_stream_format(codec, spec->intmike_adc_nid, 0, 0x4031);
 
         //setup_intmike_nid(codec);
         //cs_8409_intmike_format_setup_format(codec);
@@ -2285,7 +2294,7 @@ static int cs_8409_boot_setup_real(struct hda_codec *codec)
 
                 cs42l83_setup_audio_output(codec);
 
-                               // headset_setup_SPDIf_output(codec); - presumably if is SPDIF setup
+                               // headset_setup_SPDIF_output(codec); - presumably if is SPDIF setup
 
                 //cs42l83_headset_rcv_enable_on(codec);
                 cs42l83_buffers_onoff(codec, 1);
@@ -2295,7 +2304,7 @@ static int cs_8409_boot_setup_real(struct hda_codec *codec)
                 // - Im thinking we need to store this response
 
 
-                // and now turn off
+                // and now turn off - this is now cs42l83_headset_disable
 
                 //#3698: cs42l83_buffers_onoff
                 //#3714: cs42l83_headset_power_off
@@ -2334,7 +2343,7 @@ static int cs_8409_boot_setup_real(struct hda_codec *codec)
 
                 cs42l83_setup_audio_output(codec);
 
-                               // headset_setup_SPDIf_output(codec); - presumably if is SPDIF setup
+                               // headset_setup_SPDIF_output(codec); - presumably if is SPDIF setup
 
                 //cs42l83_headset_rcv_enable_on(codec);
                 cs42l83_buffers_onoff(codec, 1);
@@ -3722,6 +3731,8 @@ static void cs43l83_headset_amp_format_setup(struct hda_codec *codec, int set_st
 {
         int retval;
 
+        mycodec_info(codec, "cs43l83_headset_amp_format_setup set_stream_id %d full %d\n", set_stream_id, full);
+
         //snd_hda_codec_write(codec, 0x0a, 0, AC_VERB_SET_STREAM_FORMAT, 0x00004031); // 0x00a24031
 //      snd_hda:     stream format 10 [('CHAN', 2), ('RATE', 44100), ('BITS', 24), ('RATE_MUL', 1), ('RATE_DIV', 1)]
 
@@ -3811,6 +3822,8 @@ static void cs_8409_headset_amp_disable_TDM_proper(struct hda_codec *codec, int 
 static void cs_8409_headset_amp_format_setup_disable(struct hda_codec *codec, int full)
 {
         int retval;
+
+        mycodec_info(codec, "cs_8409_headset_amp_format_setup_disable full %d\n", full);
 
         cs_8409_headset_amp_disable_TDM_proper(codec, full);
 
@@ -5469,7 +5482,7 @@ static void cs42l83_headset_play_setup_on(struct hda_codec *codec)
 
         cs42l83_setup_audio_output(codec);
 
-               // headset_setup_SPDIf_output(codec); - presumably if is SPDIF setup
+               // headset_setup_SPDIF_output(codec); - presumably if is SPDIF setup
 
         //cs42l83_headset_rcv_enable_on(codec);
         cs42l83_buffers_onoff(codec, 1);
@@ -5477,7 +5490,7 @@ static void cs42l83_headset_play_setup_on(struct hda_codec *codec)
 }
 
 
-static void cs42l83_headset_disable(struct hda_codec *codec, int full)
+static void cs42l83_headset_disable_nouse(struct hda_codec *codec, int full)
 {
         myprintk("snd_hda_intel: cs42l83_headset_disable start\n");
 
@@ -5491,6 +5504,8 @@ static void cs42l83_headset_disable(struct hda_codec *codec, int full)
 
         if (full)
         {
+#if 0
+                // so this is old style - why didnt I update it??
                 myprintk("snd_hda_intel: cs42l83_headset_rcv_enable_off start\n");
 
                 cs42l83_headset_rcv_enable_off(codec);
@@ -5501,7 +5516,40 @@ static void cs42l83_headset_disable(struct hda_codec *codec, int full)
                 cs42l83_headset_power_off(codec);
 
                 myprintk("snd_hda_intel: cs42l83_headset_power_off end\n");
+#endif
+                myprintk("snd_hda_intel: cs42l83_buffers_onoff start\n");
+
+                //cs42l83_headset_rcv_enable_off(codec);
+                cs42l83_buffers_onoff(codec, 0);
+
+                myprintk("snd_hda_intel: cs42l83_buffers_onoff end\n");
+                myprintk("snd_hda_intel: cs42l83_power_onoff start\n");
+
+                //cs42l83_headset_power_off(codec);
+                cs42l83_power_onoff(codec, 0);
+
+                myprintk("snd_hda_intel: cs42l83_power_onoff end\n");
         }
+
+        myprintk("snd_hda_intel: cs42l83_headset_disable end\n");
+}
+
+static void cs42l83_headset_disable(struct hda_codec *codec)
+{
+        myprintk("snd_hda_intel: cs42l83_headset_disable start\n");
+
+        myprintk("snd_hda_intel: cs42l83_buffers_onoff start\n");
+
+        //cs42l83_headset_rcv_enable_off(codec);
+        cs42l83_buffers_onoff(codec, 0);
+
+        myprintk("snd_hda_intel: cs42l83_buffers_onoff end\n");
+        myprintk("snd_hda_intel: cs42l83_power_onoff start\n");
+
+        //cs42l83_headset_power_off(codec);
+        cs42l83_power_onoff(codec, 0);
+
+        myprintk("snd_hda_intel: cs42l83_power_onoff end\n");
 
         myprintk("snd_hda_intel: cs42l83_headset_disable end\n");
 }
@@ -5602,12 +5650,34 @@ static void cs_8409_disable_headset_streaming(struct hda_codec *codec)
         // why do we do the headphone disable/poweroff codec output twice??
         // but we do - repeatedly seen in logs
 
-        cs42l83_headset_disable(codec, 1);
+        // this was cs42l83_headset_disable(codec, 1);
+
+        cs42l83_headset_enable_off(codec);
+
+        myprintk("snd_hda_intel: cs_8409_disable_headset_streaming cs42l83_power_off_codec_output start\n");
+
+        cs42l83_power_off_codec_output(codec);
+
+        myprintk("snd_hda_intel: cs_8409_disable_headset_streaming cs42l83_power_off_codec_output end\n");
+
+        cs42l83_headset_disable(codec);
+
 
         //playstop_headset_amp_format_setup_disable_headphone(codec);
         cs_8409_headset_amp_format_setup_disable(codec, 1);
 
-        cs42l83_headset_disable(codec, 0);
+
+        // this was cs42l83_headset_disable(codec, 0);
+
+        cs42l83_headset_enable_off(codec);
+
+        myprintk("snd_hda_intel: cs_8409_disable_headset_streaming 1 cs42l83_power_off_codec_output start\n");
+
+        cs42l83_power_off_codec_output(codec);
+
+        myprintk("snd_hda_intel: cs_8409_disable_headset_streaming 1 cs42l83_power_off_codec_output end\n");
+
+
 
         mycodec_info(codec, "snd_hda_intel: cs_8409_disable_headset_streaming end\n");
 }

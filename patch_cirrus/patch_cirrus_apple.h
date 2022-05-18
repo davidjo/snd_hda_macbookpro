@@ -416,6 +416,15 @@ struct unsol_item {
         unsigned int res;
 };
 
+struct hda_cvt_setup_apple {
+        hda_nid_t nid;
+        u8 stream_tag;
+        u8 channel_id;
+        u16 format_id;
+        unsigned char active;   /* cvt is currently used */
+        unsigned char dirty;    /* setups should be cleared */
+};
+
 struct cs8409_apple_spec {
 	struct hda_gen_spec gen;
 
@@ -465,6 +474,20 @@ struct cs8409_apple_spec {
 	int reg9_linein_dmic_mo;
 	int reg82_intmike_dmic_scl;
 	int reg82_linein_dmic_scl;
+
+
+        // add explicit stream format store entries as per hda_codec using a local definition
+        // of hda_cvt_setup (which is local to hda_codec.c)
+        // also use explicit nid versions
+        // (except that means either need explicit functions for each nid or have to lookup
+        //  nid each time want to use in a generic function with nid argument)
+        struct hda_cvt_setup_apple nid_0x02;
+        struct hda_cvt_setup_apple nid_0x03;
+        struct hda_cvt_setup_apple nid_0x0a;
+        struct hda_cvt_setup_apple nid_0x22;
+        struct hda_cvt_setup_apple nid_0x23;
+        struct hda_cvt_setup_apple nid_0x1a;
+
 
 	// new item to deal with jack presence as Apple seems to have barfed
 	// the HDA spec by using a separate headphone chip
@@ -684,8 +707,13 @@ static int cs_8409_playback_pcm_prepare(struct hda_pcm_stream *hinfo,
         cs_8409_pcm_playback_pre_prepare_hook(hinfo, codec, stream_tag, format, substream,
                                HDA_GEN_PCM_ACT_PREPARE);
 
-        err = snd_hda_multi_out_analog_prepare(codec, &spec->multiout,
-                                               stream_tag, format, substream);
+        // now dont think we need this - we now explicitly copy the 1st 2 channels to 2nd 2 channels
+        // if given 2 channel input
+        // plus all headset output is also explicitly being done
+        // well thats unexpected - if we comment this we loose headphone output
+        //err = snd_hda_multi_out_analog_prepare(codec, &spec->multiout,
+        //                                       stream_tag, format, substream);
+        err = 0;
 
 	// we cant call directly as call_pcm_playback_hook is local to hda_generic.c
         //if (!err)
@@ -2125,9 +2153,14 @@ static const struct hda_model_fixup cs8409_apple_models[] = {
        {}
 };
 
+
 static const struct snd_pci_quirk cs8409_apple_fixup_tbl[] = {
        SND_PCI_QUIRK(0x106b, 0x3300, "MacBookPro 13,1", CS8409_MBP131),
+       //SND_PCI_QUIRK(0x106b, 0x3600, "MacBookPro 14,2", CS8409_MBP143),
        SND_PCI_QUIRK(0x106b, 0x3900, "MacBookPro 14,3", CS8409_MBP143),
+       //SND_PCI_QUIRK(0x106b, 0x0f00, "Imac 18,2", CS8409_MBP143),
+       //SND_PCI_QUIRK(0x106b, 0x1000, "Imac 18,3", CS8409_MBP143),
+       //SND_PCI_QUIRK(0x106b, 0x1000, "Imac 19,1", CS8409_MBP143),
        {} /* terminator */
 };
 
@@ -2458,6 +2491,7 @@ static int patch_cs8409_apple(struct hda_codec *codec)
         int i;
         //hda_nid_t *dac_nids_ptr = NULL;
         const struct hda_pincfg *pin;
+        int fixup_found = 0;
 
         int explicit = 0;
 
@@ -2494,6 +2528,30 @@ static int patch_cs8409_apple(struct hda_codec *codec)
 
         //myprintk("cs8409 - 2\n");
         //snd_hda_apply_fixup(codec, HDA_FIXUP_ACT_PRE_PROBE);
+
+
+        // check if we have an implementation for the current machine
+        // probably should update the fixup tables and use those
+        // for the moment just replicate the ifs being used
+        // at the moment seem to get some crash if dont have a known subsystem id
+        fixup_found = 0;
+        if (codec->core.subsystem_id == 0x106b3900) {
+                // macbook pro 14,3
+                fixup_found = 1;
+        }
+        else if (codec->core.subsystem_id == 0x106b3300 || codec->core.subsystem_id == 0x106b3600) {
+                // macbook pro 14,1?13,1, 14,2
+                fixup_found = 1;
+        }
+        else if (codec->core.subsystem_id == 0x106b1000 || codec->core.subsystem_id == 0x106b0f00) {
+                // imac 18,3, 19,1, 18,2
+                fixup_found = 1;
+        }
+
+        if (!fixup_found) {
+		dev_err(hda_codec_dev(codec), "UNKNOWN subsystem id 0x%08x",codec->core.subsystem_id);
+                return -ENODEV;
+        }
 
 
 
@@ -2744,6 +2802,9 @@ static int patch_cs8409_apple(struct hda_codec *codec)
                 spec->linein_nid = 0x45;
                 spec->linein_amp_nid = 0x23;
         }
+
+        myprintk("snd_hda_intel: intmike_nid     is 0x%02x\n", spec->intmike_nid);
+        myprintk("snd_hda_intel: intmike_acc_nid is 0x%02x\n", spec->intmike_adc_nid);
 
 
         // ASP is Audio Serial Port
