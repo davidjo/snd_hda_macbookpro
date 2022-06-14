@@ -25,8 +25,10 @@ clean:
 
 install:
 ifdef PATCH_CIRRUS
-	cp snd-hda-codec-cirrus.ko $(KDIR)/updates
+	#cp snd-hda-codec-cirrus.ko $(KDIR)/updates
+	make INSTALL_MOD_DIR=updates -C $(KDIR)/build M=$(shell pwd) modules_install
 else
-	cp snd-hda-codec-cs8409.ko $(KDIR)/updates
+	#cp snd-hda-codec-cs8409.ko $(KDIR)/updates
+	make INSTALL_MOD_DIR=updates -C $(KDIR)/build M=$(shell pwd) modules_install
 endif
 	depmod -a

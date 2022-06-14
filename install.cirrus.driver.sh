@@ -12,15 +12,6 @@ revpart1=$(echo $revision | cut -d '-' -f1)
 revpart2=$(echo $revision | cut -d '-' -f2)
 revpart3=$(echo $revision | cut -d '-' -f3)
 
-build_dir='build'
-update_dir="/lib/modules/$(uname -r)/updates"
-patch_dir='patch_cirrus'
-hda_dir="$build_dir/hda-$kernel_version"
-
-[[ ! -d $update_dir ]] && mkdir $update_dir
-[[ ! -d $build_dir ]] && mkdir $build_dir
-[[ -d $hda_dir ]] && rm -rf $hda_dir
-
 
 if [ $major_version == '4' ]; then
 	echo "Kernel 4 versions no longer supported"
@@ -67,6 +58,19 @@ else
 	exit 1
 
 fi
+
+
+# note that the udpate_dir definition below relies on a symbolic of /lib to /usr/lib on Arch
+
+build_dir='build'
+update_dir="/lib/modules/$(uname -r)/updates"
+patch_dir='patch_cirrus'
+hda_dir="$build_dir/hda-$kernel_version"
+
+[[ ! -d $update_dir ]] && mkdir $update_dir
+[[ ! -d $build_dir ]] && mkdir $build_dir
+[[ -d $hda_dir ]] && rm -rf $hda_dir
+
 
 # we need to handle Ubuntu based distributions eg Mint here
 isubuntu=0
@@ -126,12 +130,18 @@ mv build/hda $hda_dir
 
 mv $hda_dir/Makefile $hda_dir/Makefile.orig
 if [ $major_version -eq 5 -a $minor_version -lt 13 ]; then
-	mv $hda_dir/patch_cirrus.c $hda_dir/patch_cirrus.c.orig
-	cp $patch_dir/Makefile $patch_dir/patch_cirrus.c $patch_dir/patch_cirrus_* $hda_dir/
+	#mv $hda_dir/patch_cirrus.c $hda_dir/patch_cirrus.c.orig
+	cd $hda_dir; patch -b -p2 <../../patch_patch_cirrus.c.diff
+	cd ../..
+	cp $patch_dir/Makefile $patch_dir/patch_cirrus_* $hda_dir/
 else
-	mv $hda_dir/patch_cs8409.c $hda_dir/patch_cs8409.c.orig
-	mv $hda_dir/patch_cs8409.h $hda_dir/patch_cs8409.h.orig
-	cp $patch_dir/Makefile $patch_dir/patch_cs8409* $patch_dir/patch_cirrus_* $hda_dir/
+	#mv $hda_dir/patch_cs8409.c $hda_dir/patch_cs8409.c.orig
+	#mv $hda_dir/patch_cs8409.h $hda_dir/patch_cs8409.h.orig
+	cd $hda_dir; patch -b -p2 <../../patch_patch_cs8409.c.diff
+	cd ../..
+	cd $hda_dir; patch -b -p2 <../../patch_patch_cs8409.h.diff
+	cd ../..
+	cp $patch_dir/Makefile $patch_dir/patch_cirrus_* $hda_dir/
 fi
 
 
