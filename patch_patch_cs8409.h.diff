@@ -420,14 +420,13 @@ index d0b725c..d8b5232 100644
  struct sub_codec {
  	struct hda_codec *codec;
  	unsigned int addr;
-@@ -305,5 +328,9 @@ struct sub_codec {
+@@ -305,5 +328,8 @@ struct sub_codec {
  
  	unsigned int hp_jack_in:1;
  	unsigned int mic_jack_in:1;
 +#ifdef APPLE_CODECS
 +	unsigned int linein_jack_in:1;
 +#endif
-+ 	unsigned int force_status_change:1;
  	unsigned int suspended:1;
  	unsigned int paged:1;
 @@ -337,6 +363,126 @@ struct cs8409_spec {
