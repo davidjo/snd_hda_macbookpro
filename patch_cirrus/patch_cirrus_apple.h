@@ -155,7 +155,6 @@ struct sub_codec cs8409_cs42l83_codec = {
         .hp_jack_in = 0,
         .mic_jack_in = 0,
         .linein_jack_in = 0,
-        .force_status_change = 1,
         .paged = 1,
         .suspended = 1,
         .no_type_dect = 0,
