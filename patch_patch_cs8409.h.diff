@@ -2,7 +2,7 @@ diff --git a/kernel_sources/patch_cs8409.h b/patch_cirrus/patch_cs8409.h
 index d0b725c..d8b5232 100644
 --- a/kernel_sources/patch_cs8409.h
 +++ b/patch_cirrus/patch_cs8409.h
-@@ -18,200 +18,206 @@
+@@ -19,200 +19,206 @@
  #include "hda_jack.h"
  #include "hda_generic.h"
  
@@ -396,7 +396,7 @@ index d0b725c..d8b5232 100644
  };
  
  /* CS42L42 Specific Definitions */
-@@ -295,6 +301,23 @@ struct cs8409_cir_param {
+@@ -296,6 +302,23 @@
  	unsigned int coeff;
  };
  
@@ -420,17 +420,17 @@ index d0b725c..d8b5232 100644
  struct sub_codec {
  	struct hda_codec *codec;
  	unsigned int addr;
-@@ -305,6 +328,9 @@ struct sub_codec {
+@@ -306,6 +329,9 @@
  
  	unsigned int hp_jack_in:1;
  	unsigned int mic_jack_in:1;
 +#ifdef APPLE_CODECS
 +	unsigned int linein_jack_in:1;
 +#endif
- 	unsigned int force_status_change:1;
  	unsigned int suspended:1;
  	unsigned int paged:1;
-@@ -337,6 +363,126 @@ struct cs8409_spec {
+ 	unsigned int last_page;
+@@ -339,6 +365,126 @@
  	unsigned int init_done:1;
  	unsigned int build_ctrl_done:1;
  

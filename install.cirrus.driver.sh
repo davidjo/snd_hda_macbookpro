@@ -2,6 +2,8 @@
 
 # NOTA BENE - this script should be run as root
 
+set -e
+
 kernel_version=$(uname -r | cut -d '-' -f1)  #ie 5.2.7
 major_version=$(echo $kernel_version | cut -d '.' -f1)
 minor_version=$(echo $kernel_version | cut -d '.' -f2)
@@ -60,17 +62,21 @@ else
 fi
 
 
-# note that the udpate_dir definition below relies on a symbolic of /lib to /usr/lib on Arch
+# note that the udpate_dir definition below relies on a symbolic link of /lib to /usr/lib on Arch
 
 build_dir='build'
 update_dir="/lib/modules/$(uname -r)/updates"
 patch_dir='patch_cirrus'
 hda_dir="$build_dir/hda-$kernel_version"
 
-[[ ! -d $update_dir ]] && mkdir $update_dir
 [[ ! -d $build_dir ]] && mkdir $build_dir
 [[ -d $hda_dir ]] && rm -rf $hda_dir
 
+# fedora doesnt seem to install patch by default so need to explicitly install it
+if [ $isfedora -ge 1 ]; then
+	echo Ensure the patch package is installed
+	echo dnf install wget make gcc kernel-devel patch
+fi
 
 # we need to handle Ubuntu based distributions eg Mint here
 isubuntu=0
@@ -106,6 +112,8 @@ else
 
 	# here we assume the distribution kernel source is essentially the mainline kernel source
 
+	set +e
+
 	# attempt to download linux-x.x.x.tar.xz kernel
 	wget -c https://cdn.kernel.org/pub/linux/kernel/v$major_version.x/linux-$kernel_version.tar.xz -P $build_dir
 
@@ -119,6 +127,8 @@ else
    		kernel_version=$major_version.$minor_version
    		wget -c https://cdn.kernel.org/pub/linux/kernel/v$major_version.x/linux-$kernel_version.tar.xz -P $build_dir
 	fi
+
+	set -e
 
 	[[ $? -ne 0 ]] && echo "kernel could not be downloaded...exiting" && exit
 
@@ -135,18 +145,56 @@ if [ $major_version -eq 5 -a $minor_version -lt 13 ]; then
 	cd ../..
 	cp $patch_dir/Makefile $patch_dir/patch_cirrus_* $hda_dir/
 else
-	#mv $hda_dir/patch_cs8409.c $hda_dir/patch_cs8409.c.orig
-	#mv $hda_dir/patch_cs8409.h $hda_dir/patch_cs8409.h.orig
-	cd $hda_dir; patch -b -p2 <../../patch_patch_cs8409.c.diff
-	cd ../..
-	cd $hda_dir; patch -b -p2 <../../patch_patch_cs8409.h.diff
-	cd ../..
-	cp $patch_dir/Makefile $patch_dir/patch_cirrus_* $hda_dir/
+	if [ $isubuntu -ge 1 ]; then
+
+		#mv $hda_dir/patch_cs8409.c $hda_dir/patch_cs8409.c.orig
+		#mv $hda_dir/patch_cs8409.h $hda_dir/patch_cs8409.h.orig
+		cd $hda_dir; patch -b -p2 <../../patch_patch_cs8409.c.diff
+		cd ../..
+
+		if [ $major_version -eq 5 -a $minor_version -ge 15 -a $revpart2 -ge 47 ]; then
+			cd $hda_dir; patch -b -p2 <../../patch_patch_cs8409.h.diff
+			cd ../..
+		else
+			cd $hda_dir; patch -b -p2 <../../patches/patch_patch_cs8409.h.ubuntu.pre51547.diff
+			cd ../..
+		fi
+
+		cp $patch_dir/Makefile $patch_dir/patch_cirrus_* $hda_dir/
+
+		if [ $major_version -eq 5 -a $minor_version -ge 15 -a $revpart2 -ge 47 ]; then
+			cd $hda_dir; patch -b -p2 <../../patch_patch_cirrus_apple.h.diff
+			cd ../..
+		fi
+
+	else
+		#mv $hda_dir/patch_cs8409.c $hda_dir/patch_cs8409.c.orig
+		#mv $hda_dir/patch_cs8409.h $hda_dir/patch_cs8409.h.orig
+		cd $hda_dir; patch -b -p2 <../../patch_patch_cs8409.c.diff
+		cd ../..
+
+		if [ $major_version -eq 5 -a $minor_version -ge 19 ]; then
+			cd $hda_dir; patch -b -p2 <../../patch_patch_cs8409.h.diff
+			cd ../..
+		else
+			cd $hda_dir; patch -b -p2 <../../patches/patch_patch_cs8409.h.main.pre519.diff
+			cd ../..
+		fi
+
+		cp $patch_dir/Makefile $patch_dir/patch_cirrus_* $hda_dir/
+
+		if [ $major_version -eq 5 -a $minor_version -ge 19 ]; then
+			cd $hda_dir; patch -b -p2 <../../patch_patch_cirrus_apple.h.diff
+			cd ../..
+		fi
+
+	fi
 fi
 
 
 cd $hda_dir
 
+[[ ! -d $update_dir ]] && mkdir $update_dir
 
 if [ $major_version -eq 5 -a $minor_version -lt 13 ]; then
 
