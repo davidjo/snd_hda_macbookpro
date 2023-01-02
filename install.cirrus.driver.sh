@@ -139,6 +139,48 @@ fi
 mv build/hda $hda_dir
 
 mv $hda_dir/Makefile $hda_dir/Makefile.orig
+
+# define the ubuntu/mainline versions that work at the moment
+current_major=5
+current_minor=19
+current_minor_ubuntu=15
+current_rev_ubuntu=47
+
+echo major version $major_version
+echo minor version $minor_version
+echo rev version $revpart2
+
+iscurrent=0
+if [ $isubuntu -ge 1 ]; then
+	if [ $major_version -gt $current_major ]; then
+		iscurrent=1
+	elif [ $major_version -eq $current_major -a $minor_version -gt $current_minor_ubuntu ]; then
+		iscurrent=1
+	elif [ $major_version -eq $current_major -a $minor_version -eq $current_minor_ubuntu -a $revpart2 -gt $current_rev_ubuntu ]; then
+		iscurrent=1
+	elif [ $major_version -eq $current_major -a $minor_version -eq $current_minor_ubuntu -a $revpart2 -eq $current_rev_ubuntu ]; then
+		iscurrent=0
+	else
+		iscurrent=-1
+	fi
+else
+	if [ $major_version -gt $current_major ]; then
+		iscurrent=1
+	elif [ $major_version -eq $current_major -a $minor_version -gt $current_minor ]; then
+		iscurrent=1
+	elif [ $major_version -eq $current_major -a $minor_version -eq $current_minor ]; then
+		iscurrent=0
+	else
+		iscurrent=-1
+	fi
+fi
+
+if [ $iscurrent -ge 1 ]; then
+	echo "Kernel version later than implemented version - there may be build problems"
+fi
+
+echo iscurrent is $iscurrent
+
 if [ $major_version -eq 5 -a $minor_version -lt 13 ]; then
 	#mv $hda_dir/patch_cirrus.c $hda_dir/patch_cirrus.c.orig
 	cd $hda_dir; patch -b -p2 <../../patch_patch_cirrus.c.diff
@@ -152,7 +194,7 @@ else
 		cd $hda_dir; patch -b -p2 <../../patch_patch_cs8409.c.diff
 		cd ../..
 
-		if [ $major_version -eq 5 -a $minor_version -ge 15 -a $revpart2 -ge 47 ]; then
+		if [ $iscurrent -ge 0 ]; then
 			cd $hda_dir; patch -b -p2 <../../patch_patch_cs8409.h.diff
 			cd ../..
 		else
@@ -162,7 +204,7 @@ else
 
 		cp $patch_dir/Makefile $patch_dir/patch_cirrus_* $hda_dir/
 
-		if [ $major_version -eq 5 -a $minor_version -ge 15 -a $revpart2 -ge 47 ]; then
+		if [ $iscurrent -ge 0 ]; then
 			cd $hda_dir; patch -b -p2 <../../patch_patch_cirrus_apple.h.diff
 			cd ../..
 		fi
@@ -173,7 +215,7 @@ else
 		cd $hda_dir; patch -b -p2 <../../patch_patch_cs8409.c.diff
 		cd ../..
 
-		if [ $major_version -eq 5 -a $minor_version -ge 19 ]; then
+		if [ $iscurrent -ge 0 ]; then
 			cd $hda_dir; patch -b -p2 <../../patch_patch_cs8409.h.diff
 			cd ../..
 		else
@@ -183,7 +225,7 @@ else
 
 		cp $patch_dir/Makefile $patch_dir/patch_cirrus_* $hda_dir/
 
-		if [ $major_version -eq 5 -a $minor_version -ge 19 ]; then
+		if [ $iscurrent -ge 0 ]; then
 			cd $hda_dir; patch -b -p2 <../../patch_patch_cirrus_apple.h.diff
 			cd ../..
 		fi
