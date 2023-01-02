@@ -146,10 +146,6 @@ current_minor=19
 current_minor_ubuntu=15
 current_rev_ubuntu=47
 
-echo major version $major_version
-echo minor version $minor_version
-echo rev version $revpart2
-
 iscurrent=0
 if [ $isubuntu -ge 1 ]; then
 	if [ $major_version -gt $current_major ]; then
@@ -178,8 +174,6 @@ fi
 if [ $iscurrent -ge 1 ]; then
 	echo "Kernel version later than implemented version - there may be build problems"
 fi
-
-echo iscurrent is $iscurrent
 
 if [ $major_version -eq 5 -a $minor_version -lt 13 ]; then
 	#mv $hda_dir/patch_cirrus.c $hda_dir/patch_cirrus.c.orig
