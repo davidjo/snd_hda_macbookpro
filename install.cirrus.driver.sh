@@ -152,29 +152,31 @@ current_rev_ubuntu=47
 iscurrent=0
 if [ $isubuntu -ge 1 ]; then
 	if [ $major_version -gt $current_major ]; then
-		iscurrent=1
+		iscurrent=2
 	elif [ $major_version -eq $current_major -a $minor_version -gt $current_minor_ubuntu ]; then
-		iscurrent=1
+		iscurrent=2
+	elif [ $major_version -eq $current_major -a $minor_version -eq $current_minor_ubuntu -a $revpart2 -gt $latest_rev_ubuntu ]; then
+		iscurrent=2
 	elif [ $major_version -eq $current_major -a $minor_version -eq $current_minor_ubuntu -a $revpart2 -gt $current_rev_ubuntu ]; then
 		iscurrent=1
 	elif [ $major_version -eq $current_major -a $minor_version -eq $current_minor_ubuntu -a $revpart2 -eq $current_rev_ubuntu ]; then
-		iscurrent=0
+		iscurrent=1
 	else
 		iscurrent=-1
 	fi
 else
 	if [ $major_version -gt $current_major ]; then
-		iscurrent=1
+		iscurrent=2
 	elif [ $major_version -eq $current_major -a $minor_version -gt $current_minor ]; then
-		iscurrent=1
+		iscurrent=2
 	elif [ $major_version -eq $current_major -a $minor_version -eq $current_minor ]; then
-		iscurrent=0
+		iscurrent=1
 	else
 		iscurrent=-1
 	fi
 fi
 
-if [ $iscurrent -ge 1 ]; then
+if [ $iscurrent -gt 1 ]; then
 	echo "Kernel version later than implemented version - there may be build problems"
 fi
 
