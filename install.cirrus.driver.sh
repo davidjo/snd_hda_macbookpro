@@ -83,6 +83,9 @@ isubuntu=0
 if [ `grep '^NAME=' /etc/os-release | grep -c Ubuntu` -eq 1 ]; then
 	isubuntu=1
 fi
+if [  `grep '^NAME=' /etc/os-release | grep -c "Linux Mint"`  -eq 1 ]; then
+	isubuntu=1
+fi
 
 if [ $isubuntu -ge 1 ]; then
 
