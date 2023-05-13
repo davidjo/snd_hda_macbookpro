@@ -1396,17 +1396,6 @@ static int cs_8409_apple_init(struct hda_codec *codec)
 	return 0;
 }
 
-static int cs_8409_apple_resume(struct hda_codec *codec)
-{
-        myprintk("snd_hda_intel: cs_8409_apple_resume\n");
-        // code copied from default resume patch ops
-	if (codec->patch_ops.init)
-		codec->patch_ops.init(codec);
-	snd_hda_regmap_sync(codec);
-        myprintk("snd_hda_intel: end cs_8409_apple_resume\n");
-        return 0;
-}
-
 static int cs_8409_apple_suspend(struct hda_codec *codec)
 {
         myprintk("snd_hda_intel: cs_8409_apple_suspend\n");
@@ -1715,24 +1704,6 @@ void cs_8409_apple_free(struct hda_codec *codec)
 
 	snd_hda_gen_free(codec);
 }
-
-
-// note this must come after any function definitions used
-
-static const struct hda_codec_ops cs_8409_apple_patch_ops = {
-	.build_controls = cs_8409_apple_build_controls,
-	.build_pcms = cs_8409_apple_build_pcms,
-	.init = cs_8409_apple_init,
-	.free = cs_8409_apple_free,
-	.unsol_event = cs_8409_cs42l83_jack_unsol_event,
-#ifdef CONFIG_PM
-        .resume = cs_8409_apple_resume,
-        .suspend = cs_8409_apple_suspend,
-        .check_power_status = cs_8409_apple_check_power_status,
-#endif
-};
-
-
 
 //      jack handling analysis
 //      now it appears that unsolicited events are assumed to be due to jack plug/unplug events
@@ -2555,6 +2526,32 @@ static struct cs8409_apple_spec *cs8409_apple_alloc_spec(struct hda_codec *codec
 	return spec;
 }
 
+// for the moment split the new code into an include file
+
+#include "patch_cirrus_new84.h"
+
+static int cs_8409_apple_resume(struct hda_codec *codec)
+{
+        myprintk("snd_hda_intel: start cs_8409_apple_resume\n");
+        cs_8409_boot_setup_real(codec);
+        myprintk("snd_hda_intel: end cs_8409_apple_resume\n");
+        return 0;
+}
+
+// note this must come after any function definitions used
+
+static const struct hda_codec_ops cs_8409_apple_patch_ops = {
+	.build_controls = cs_8409_apple_build_controls,
+	.build_pcms = cs_8409_apple_build_pcms,
+	.init = cs_8409_apple_init,
+	.free = cs_8409_apple_free,
+	.unsol_event = cs_8409_cs42l83_jack_unsol_event,
+#ifdef CONFIG_PM
+        .resume = cs_8409_apple_resume,
+        .suspend = cs_8409_apple_suspend,
+        .check_power_status = cs_8409_apple_check_power_status,
+#endif
+};
 
 static int patch_cs8409_apple(struct hda_codec *codec)
 {
@@ -3090,12 +3087,6 @@ static int patch_cs8409_apple(struct hda_codec *codec)
        cs_8409_apple_free(codec);
        return err;
 }
-
-
-// for the moment split the new code into an include file
-
-#include "patch_cirrus_new84.h"
-
 
 // new function to use "vendor" defined commands to run
 // a specific code
