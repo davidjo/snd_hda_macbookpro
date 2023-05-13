@@ -144,10 +144,12 @@ mv build/hda $hda_dir
 mv $hda_dir/Makefile $hda_dir/Makefile.orig
 
 # define the ubuntu/mainline versions that work at the moment
+# for ubuntu allow a range of revisions that work
 current_major=5
 current_minor=19
 current_minor_ubuntu=15
 current_rev_ubuntu=47
+latest_rev_ubuntu=71
 
 iscurrent=0
 if [ $isubuntu -ge 1 ]; then
