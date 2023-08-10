@@ -32,4 +32,4 @@ else
 	#cp snd-hda-codec-cs8409.ko $(KDIR)/updates
 	make INSTALL_MOD_DIR=updates -C $(KDIR)/build M=$(shell pwd) CONFIG_MODULE_SIG_ALL=n modules_install
 endif
-	depmod -a
+	depmod -a $(KVER)
