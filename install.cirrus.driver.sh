@@ -4,12 +4,13 @@
 
 set -e
 
-kernel_version=$(uname -r | cut -d '-' -f1)  #ie 5.2.7
+UNAME=${1:-$(uname -r)}
+kernel_version=$(echo $UNAME | cut -d '-' -f1)  #ie 5.2.7
 major_version=$(echo $kernel_version | cut -d '.' -f1)
 minor_version=$(echo $kernel_version | cut -d '.' -f2)
 major_minor=${major_version}${minor_version}
 
-revision=$(uname -r | cut -d '.' -f3)
+revision=$(echo $UNAME | cut -d '.' -f3)
 revpart1=$(echo $revision | cut -d '-' -f1)
 revpart2=$(echo $revision | cut -d '-' -f2)
 revpart3=$(echo $revision | cut -d '-' -f3)
@@ -28,31 +29,31 @@ isdebian=0
 isfedora=0
 isarch=0
 isvoid=0
-if [ -d /usr/src/linux-headers-$(uname -r) ]; then
+if [ -d /usr/src/linux-headers-${UNAME} ]; then
 	# Debian Based Distro
 	isdebian=1
 	:
-elif [ -d /usr/src/kernels/$(uname -r) ]; then
+elif [ -d /usr/src/kernels/${UNAME} ]; then
 	# Fedora Based Distro
 	isfedora=1
 	:
-elif [ -d /usr/lib/modules/$(uname -r) ]; then
+elif [ -d /usr/lib/modules/${UNAME} ]; then
 	# Arch Based Distro
 	isarch=1
 	:
-elif [ -d /usr/src/kernel-headers-$(uname -r) ]; then
+elif [ -d /usr/src/kernel-headers-${UNAME} ]; then
 	# Void Linux
 	isvoid=1
 	:
 else
 	echo "linux kernel headers not found:"
-	echo "Debian (eg Ubuntu): /usr/src/linux-headers-$(uname -r)"
-	echo "Fedora: /usr/src/kernels/$(uname -r)"
-	echo "Arch: /usr/lib/modules/$(uname -r)"
-	echo "Void: /usr/src/kernel-headers-$(uname -r)"
+	echo "Debian (eg Ubuntu): /usr/src/linux-headers-${UNAME}"
+	echo "Fedora: /usr/src/kernels/${UNAME}"
+	echo "Arch: /usr/lib/modules/${UNAME}"
+	echo "Void: /usr/src/kernel-headers-${UNAME}"
 	echo "assuming the linux kernel headers package is not installed"
 	echo "please install the appropriate linux kernel headers package:"
-	echo "Debian/Ubuntu: sudo apt install linux-headers-$(uname -r)"
+	echo "Debian/Ubuntu: sudo apt install linux-headers-${UNAME}"
 	echo "Fedora: sudo dnf install kernel-headers"
 	echo "Arch (also Manjaro): Linux: sudo pacman -S linux-headers"
 	echo "Void Linux: xbps-install -S linux-headers"
@@ -65,7 +66,7 @@ fi
 # note that the udpate_dir definition below relies on a symbolic link of /lib to /usr/lib on Arch
 
 build_dir='build'
-update_dir="/lib/modules/$(uname -r)/updates"
+update_dir="/lib/modules/${UNAME}/updates"
 patch_dir='patch_cirrus'
 hda_dir="$build_dir/hda-$kernel_version"
 
@@ -247,9 +248,9 @@ if [ $major_version -eq 5 -a $minor_version -lt 13 ]; then
 
 else
 
-	make
+	make KVER=$UNAME
 
-	make install
+	make install KVER=$UNAME
 
 fi
 
