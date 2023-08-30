@@ -60,7 +60,7 @@ Compiling and installing driver:
 
 **fedora package install**
 ```
-dnf install wget make gcc kernel-devel
+dnf install wget make gcc kernel-devel patch
 ```
 **ubuntu package install**  
 ```
