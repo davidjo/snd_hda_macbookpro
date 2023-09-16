@@ -83,3 +83,13 @@ cd snd_hda_macbookpro/
 ./install.cirrus.driver.sh
 reboot
 ```
+
+**build driver with DKMS**  
+```
+git clone https://github.com/davidjo/snd_hda_macbookpro.git
+cd snd_hda_macbookpro/
+#run the following command as root or with sudo
+ln -s "$(pwd)" "/usr/src/snd_hda_macbookpro-0.1"
+dkms install -c ./dkms.conf -m snd_hda_macbookpro/0.1 --force
+reboot
+```
