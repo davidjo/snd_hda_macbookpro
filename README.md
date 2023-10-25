@@ -60,19 +60,19 @@ Compiling and installing driver:
 
 **fedora package install**
 ```
-dnf install wget make gcc kernel-devel
+dnf install gcc kernel-devel make patch wget
 ```
 **ubuntu package install**  
 ```
-apt install wget make gcc linux-headers-generic
+apt install gcc linux-headers-generic make wget
 ```
 **arch package install**
 ```
-pacman -S wget make gcc linux-headers
+pacman -S gcc linux-headers make patch wget
 ```
 **void package install**
 ```
-xbps-install -S wget make gcc linux-headers
+xbps-install -S gcc make linux-headers patch wget
 ```
 
 **build driver**  
