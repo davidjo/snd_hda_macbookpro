@@ -4,6 +4,19 @@
 
 set -e
 
+while [ $# -gt 0 ]
+do
+    case $1 in
+    -i|--install) dkms_action='install';;
+    -k|--kernel) UNAME=$2; [[ -z $UNAME ]] && echo '-k|--kernel must be followed by a kernel version' && exit 1;;
+    -r|--remove) dkms_action='remove';;
+    -u|--uninstall) dkms_action='remove';;
+    (-*) echo "$0: error - unrecognized option $1" 1>&2; exit 1;;
+    (*) break;;
+    esac
+    shift
+done
+
 UNAME=${1:-$(uname -r)}
 kernel_version=$(echo $UNAME | cut -d '-' -f1)  #ie 5.2.7
 major_version=$(echo $kernel_version | cut -d '.' -f1)
@@ -15,6 +28,20 @@ revpart1=$(echo $revision | cut -d '-' -f1)
 revpart2=$(echo $revision | cut -d '-' -f2)
 revpart3=$(echo $revision | cut -d '-' -f3)
 
+if [ $major_version -eq 5 -a $minor_version -lt 13 ]; then
+    sed -i 's/^BUILT_MODULE_NAME\[0\].*$/BUILT_MODULE_NAME[0]="snd-hda-codec-cirrus"/' dkms.conf
+    PATCH_CIRRUS=true
+else
+    sed -i 's/^BUILT_MODULE_NAME\[0\].*$/BUILT_MODULE_NAME[0]="snd-hda-codec-cs8409"/' dkms.conf
+fi
+
+if [[ $dkms_action == 'install' ]]; then
+    bash dkms.sh
+    exit
+elif [[ $dkms_action == 'remove' ]]; then
+    bash dkms.sh -r
+    exit
+fi
 
 if [ $major_version == '4' ]; then
 	echo "Kernel 4 versions no longer supported"
@@ -24,11 +51,11 @@ if [ $major_version -eq 5 -a $minor_version -lt 8 ]; then
 	echo "Kernel 5 versions less than 5.8 no longer supported"
 fi
 
-
 isdebian=0
 isfedora=0
 isarch=0
 isvoid=0
+
 if [ -d /usr/src/linux-headers-${UNAME} ]; then
 	# Debian Based Distro
 	isdebian=1
@@ -62,29 +89,28 @@ else
 
 fi
 
-
-# note that the udpate_dir definition below relies on a symbolic link of /lib to /usr/lib on Arch
-
+# note that the update_dir definition below relies on a symbolic link of /lib to /usr/lib on Arch
+cur_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd)
 build_dir='build'
+patch_dir="$cur_dir/patch_cirrus"
+hda_dir="$cur_dir/$build_dir/hda"
 update_dir="/lib/modules/${UNAME}/updates"
-patch_dir='patch_cirrus'
-hda_dir="$build_dir/hda-$kernel_version"
 
-[[ ! -d $build_dir ]] && mkdir $build_dir
 [[ -d $hda_dir ]] && rm -rf $hda_dir
+[[ ! -d $build_dir ]] && mkdir $build_dir
 
 # fedora doesnt seem to install patch by default so need to explicitly install it
 if [ $isfedora -ge 1 ]; then
-	echo Ensure the patch package is installed
-	echo dnf install wget make gcc kernel-devel patch
+	echo "Ensure the patch package is installed"
+	[[ ! $(command -v patch) ]] && dnf install -y patch
 fi
 
 # we need to handle Ubuntu based distributions eg Mint here
 isubuntu=0
-if [ `grep '^NAME=' /etc/os-release | grep -c Ubuntu` -eq 1 ]; then
+if [ $(grep '^NAME=' /etc/os-release | grep -c Ubuntu) -eq 1 ]; then
 	isubuntu=1
 fi
-if [  `grep '^NAME=' /etc/os-release | grep -c "Linux Mint"`  -eq 1 ]; then
+if [ $(grep '^NAME=' /etc/os-release | grep -c "Linux Mint") -eq 1 ]; then
 	isubuntu=1
 fi
 
@@ -113,7 +139,6 @@ if [ $isubuntu -ge 1 ]; then
 	tar --strip-components=3 -xvf /usr/src/linux-source-$kernel_version.tar.bz2 --directory=build/ linux-source-$kernel_version/sound/pci/hda
 
 else
-
 	# here we assume the distribution kernel source is essentially the mainline kernel source
 
 	set +e
@@ -140,10 +165,9 @@ else
 
 fi
 
-mv build/hda $hda_dir
-
 mv $hda_dir/Makefile $hda_dir/Makefile.orig
-
+cp $patch_dir/Makefile $patch_dir/patch_cirrus_* $hda_dir
+pushd $hda_dir > /dev/null
 # define the ubuntu/mainline versions that work at the moment
 # for ubuntu allow a range of revisions that work
 current_major=5
@@ -184,73 +208,51 @@ if [ $iscurrent -gt 1 ]; then
 fi
 
 if [ $major_version -eq 5 -a $minor_version -lt 13 ]; then
-	#mv $hda_dir/patch_cirrus.c $hda_dir/patch_cirrus.c.orig
-	cd $hda_dir; patch -b -p2 <../../patch_patch_cirrus.c.diff
-	cd ../..
-	cp $patch_dir/Makefile $patch_dir/patch_cirrus_* $hda_dir/
+	patch -b -p2 <../../patch_patch_cirrus.c.diff
 else
 	if [ $isubuntu -ge 1 ]; then
 
-		#mv $hda_dir/patch_cs8409.c $hda_dir/patch_cs8409.c.orig
-		#mv $hda_dir/patch_cs8409.h $hda_dir/patch_cs8409.h.orig
-		cd $hda_dir; patch -b -p2 <../../patch_patch_cs8409.c.diff
-		cd ../..
+		patch -b -p2 <../../patch_patch_cs8409.c.diff
 
 		if [ $iscurrent -ge 0 ]; then
-			cd $hda_dir; patch -b -p2 <../../patch_patch_cs8409.h.diff
-			cd ../..
+			patch -b -p2 <../../patch_patch_cs8409.h.diff
 		else
-			cd $hda_dir; patch -b -p2 <../../patches/patch_patch_cs8409.h.ubuntu.pre51547.diff
-			cd ../..
+			patch -b -p2 <../../patches/patch_patch_cs8409.h.ubuntu.pre51547.diff
 		fi
 
-		cp $patch_dir/Makefile $patch_dir/patch_cirrus_* $hda_dir/
-
 		if [ $iscurrent -ge 0 ]; then
-			cd $hda_dir; patch -b -p2 <../../patch_patch_cirrus_apple.h.diff
-			cd ../..
+			patch -b -p2 <../../patch_patch_cirrus_apple.h.diff
 		fi
 
 	else
-		#mv $hda_dir/patch_cs8409.c $hda_dir/patch_cs8409.c.orig
-		#mv $hda_dir/patch_cs8409.h $hda_dir/patch_cs8409.h.orig
-		cd $hda_dir; patch -b -p2 <../../patch_patch_cs8409.c.diff
-		cd ../..
+		patch -b -p2 <../../patch_patch_cs8409.c.diff
 
 		if [ $iscurrent -ge 0 ]; then
-			cd $hda_dir; patch -b -p2 <../../patch_patch_cs8409.h.diff
-			cd ../..
+			patch -b -p2 <../../patch_patch_cs8409.h.diff
 		else
-			cd $hda_dir; patch -b -p2 <../../patches/patch_patch_cs8409.h.main.pre519.diff
-			cd ../..
+			patch -b -p2 <../../patches/patch_patch_cs8409.h.main.pre519.diff
 		fi
 
 		cp $patch_dir/Makefile $patch_dir/patch_cirrus_* $hda_dir/
 
 		if [ $iscurrent -ge 0 ]; then
-			cd $hda_dir; patch -b -p2 <../../patch_patch_cirrus_apple.h.diff
-			cd ../..
+			patch -b -p2 <../../patch_patch_cirrus_apple.h.diff
 		fi
 
 	fi
 fi
 
+popd > /dev/null
 
-cd $hda_dir
+[[ ! $dkms_action == 'install' ]] && [[ ! -d $update_dir ]] && mkdir $update_dir
 
-[[ ! -d $update_dir ]] && mkdir $update_dir
-
-if [ $major_version -eq 5 -a $minor_version -lt 13 ]; then
-
+if [ $PATCH_CIRRUS = true ]; then
 	make PATCH_CIRRUS=1
-
 	make install PATCH_CIRRUS=1
 
 else
-
-	make KVER=$UNAME
-
-	make install KVER=$UNAME
+	make KERNELRELEASE=$UNAME
+	make install KERNELRELEASE=$UNAME
 
 fi
 
