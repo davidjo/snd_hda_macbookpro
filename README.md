@@ -64,7 +64,7 @@ dnf install gcc kernel-devel make patch wget
 ```
 **ubuntu package install**  
 ```
-apt install gcc linux-headers-generic make wget
+apt install gcc linux-headers-generic make patch wget
 ```
 **arch package install**
 ```
