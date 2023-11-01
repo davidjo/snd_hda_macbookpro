@@ -33,10 +33,18 @@ if [ $major_version -eq 5 -a $minor_version -lt 13 ]; then
     PATCH_CIRRUS=true
 else
     sed -i 's/^BUILT_MODULE_NAME\[0\].*$/BUILT_MODULE_NAME[0]="snd-hda-codec-cs8409"/' dkms.conf
+    PATCH_CIRRUS=false
 fi
 
 if [[ $dkms_action == 'install' ]]; then
     bash dkms.sh
+    # note that Ubuntu, Debian, Fedora and others (see dkms man page) install to updates/dkms
+    # and ignore DEST_MODULE_LOCATION
+    # we DO want updates so that the original module is not overwritten
+    # (although the original module should be copied to under /var/lib/dkms if needed for other distributions)
+    update_dir="/lib/modules/${UNAME}/updates"
+    echo -e "\ncontents of $update_dir/dkms"
+    ls -lA $update_dir/dkms
     exit
 elif [[ $dkms_action == 'remove' ]]; then
     bash dkms.sh -r
