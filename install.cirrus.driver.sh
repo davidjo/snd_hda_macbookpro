@@ -117,7 +117,7 @@ fi
 isubuntu=0
 if [ ($(grep '^NAME=' /etc/os-release | grep -c Ubuntu) -eq 1) || ($(grep '^NAME=' /etc/os-release | grep -c "Linux Mint") -eq 1) ]; then
 	# Check whether kernel in use is official or not. Official kernels have the word generic in them
-	if [[ $(uname -r | grep generic || true = "")
+	if [[ $(uname -r | grep generic || true) = "" ]]
 	then
 		isubuntu=0
 	else
