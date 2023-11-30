@@ -165,9 +165,9 @@ else
    		wget -c https://cdn.kernel.org/pub/linux/kernel/v$major_version.x/linux-$kernel_version.tar.xz -P $build_dir
 	fi
 
-	set -e
-
 	[[ $? -ne 0 ]] && echo "kernel could not be downloaded...exiting" && exit
+
+	set -e
 
 	tar --strip-components=3 -xvf $build_dir/linux-$kernel_version.tar.xz --directory=build/ linux-$kernel_version/sound/pci/hda
 
