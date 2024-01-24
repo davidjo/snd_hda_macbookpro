@@ -1168,7 +1168,8 @@ static void cs_8409_dump_paths(struct hda_codec *codec, const char *label_string
 static int cs_8409_apple_boot_init(struct hda_codec *codec)
 {
 	struct hda_pcm *info = NULL;
-	struct hda_pcm_stream *hinfo = NULL;
+	// originally made non-const for fixup attempts in old kernels - pre 5.13
+	const struct hda_pcm_stream *hinfo = NULL;
 	struct cs8409_apple_spec *spec = NULL;
 	//struct snd_kcontrol *kctl = NULL;
 	int pcmcnt = 0;
