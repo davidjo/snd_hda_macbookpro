@@ -163,11 +163,11 @@ else
    		# if first attempt fails, attempt to download linux-x.x.tar.xz kernel
    		kernel_version=$major_version.$minor_version
    		wget -c https://cdn.kernel.org/pub/linux/kernel/v$major_version.x/linux-$kernel_version.tar.xz -P $build_dir
+
+		[[ $? -ne 0 ]] && echo "kernel could not be downloaded...exiting" && exit
 	fi
 
 	set -e
-
-	[[ $? -ne 0 ]] && echo "kernel could not be downloaded...exiting" && exit
 
 	tar --strip-components=3 -xvf $build_dir/linux-$kernel_version.tar.xz --directory=build/ linux-$kernel_version/sound/pci/hda
 
