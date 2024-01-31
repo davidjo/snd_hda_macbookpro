@@ -946,6 +946,7 @@ static void cs42l83_configure_int_mclk(struct hda_codec *codec)
 
         cs_8409_vendor_i2cWrite(codec, 0x90, 0x1208, 0x0000, 1); // snd_hda
 
+	mycodec_i2c_local_info(codec, "cs42l83_configure_int_mclk end\n");
 }
 
 static void cs42l83_headset_power_on_on_nouse(struct hda_codec *codec)
@@ -1014,6 +1015,8 @@ static void cs42l83_power_onoff(struct hda_codec *codec, bool onflag)
                 cs_8409_vendor_i2cWrite(codec, 0x90, 0x1107, 0x0000, 1); // snd_hda
                 cs_8409_vendor_i2cWrite(codec, 0x90, 0x1501, 0x0000, 1); // snd_hda
         }
+
+	mycodec_i2c_local_info(codec, "cs42l83_power_onoff end\n");
 }
 
 static void cs42l83_configure_serial_port(struct hda_codec *codec)
@@ -1062,6 +1065,8 @@ static void cs42l83_configure_serial_port(struct hda_codec *codec)
         cs_8409_vendor_i2cRead(codec, 0x90, 0x1208, 1); // snd_hda
         cs_8409_vendor_i2cWrite(codec, 0x90, 0x1208, 0x0002, 1); // snd_hda
 
+
+	mycodec_i2c_local_info(codec, "cs42l83_configure_serial_port end\n");
 }
 
 static void cs42l83_output_set_input_sample_rate(struct hda_codec *codec)

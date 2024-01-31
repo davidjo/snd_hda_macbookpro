@@ -430,7 +430,7 @@ index d0b725c..d8b5232 100644
  	unsigned int suspended:1;
  	unsigned int paged:1;
  	unsigned int last_page;
-@@ -339,6 +365,126 @@
+@@ -339,6 +365,129 @@
  	unsigned int init_done:1;
  	unsigned int build_ctrl_done:1;
  
@@ -541,6 +541,9 @@ index d0b725c..d8b5232 100644
 +
 +	int play_init;
 +	int capture_init;
++
++	int play_init_count;
++	int capture_init_count;
 +
 +
 +	// new item to limit times we redo unmute/play

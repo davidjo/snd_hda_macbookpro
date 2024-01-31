@@ -541,6 +541,9 @@ struct cs8409_apple_spec {
 	int play_init;
 	int capture_init;
 
+        int play_init_count;
+        int capture_init_count;
+
 	// new item to limit times we redo unmute/play
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 8, 0)
 	struct timespec64 last_play_time;
@@ -701,9 +704,9 @@ static int cs_8409_playback_pcm_prepare(struct hda_pcm_stream *hinfo,
 {
         struct hda_gen_spec *spec = codec->spec;
         int err;
-        mycodec_dbg(codec, "cs_8409_playback_pcm_prepare\n");
+        mycodec_info(codec, "cs_8409_playback_pcm_prepare\n");
 
-        mycodec_dbg(codec, "cs_8409_playback_pcm_prepare: NID=0x%x, stream=0x%x, format=0x%x\n",
+        mycodec_info(codec, "cs_8409_playback_pcm_prepare: NID=0x%x, stream=0x%x, format=0x%x\n",
                   hinfo->nid, stream_tag, format);
 
         cs_8409_pcm_playback_pre_prepare_hook(hinfo, codec, stream_tag, format, substream,
@@ -727,6 +730,7 @@ static int cs_8409_playback_pcm_prepare(struct hda_pcm_stream *hinfo,
         if (!err)
                 if (spec->pcm_playback_hook)
                         spec->pcm_playback_hook(hinfo, codec, substream, HDA_GEN_PCM_ACT_PREPARE);
+        mycodec_info(codec, "cs_8409_playback_pcm_prepare end\n");
         return err;
 }
 
@@ -747,9 +751,9 @@ static int cs_8409_capture_pcm_prepare(struct hda_pcm_stream *hinfo,
 {
         struct cs8409_apple_spec *spec = codec->spec;
 
-        mycodec_dbg(codec, "cs_8409_capture_pcm_prepare\n");
+        mycodec_info(codec, "cs_8409_capture_pcm_prepare\n");
 
-        mycodec_dbg(codec, "cs_8409_capture_pcm_prepare: NID=0x%x, stream=0x%x, format=0x%x\n",
+        mycodec_info(codec, "cs_8409_capture_pcm_prepare: NID=0x%x, stream=0x%x, format=0x%x\n",
                   hinfo->nid, stream_tag, format);
 
 
@@ -802,6 +806,8 @@ static int cs_8409_capture_pcm_prepare(struct hda_pcm_stream *hinfo,
 	// note this hook if defined also needs to switch between the 2 versions of input!!
         if (spec->gen.pcm_capture_hook)
                 spec->gen.pcm_capture_hook(hinfo, codec, substream, HDA_GEN_PCM_ACT_PREPARE);
+
+        mycodec_info(codec, "cs_8409_capture_pcm_prepare end\n");
 
         return 0;
 }
@@ -3068,6 +3074,9 @@ static int patch_cs8409_apple(struct hda_codec *codec)
 
        spec->play_init = 0;
        spec->capture_init = 0;
+
+       spec->play_init_count = 0;
+       spec->capture_init_count = 0;
 
        // init the last play time
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 8, 0)

@@ -473,6 +473,9 @@ struct cs8409_spec {
 	int play_init;
 	int capture_init;
 
+	int play_init_count;
+	int capture_init_count;
+
 
 	// new item to limit times we redo unmute/play
 	struct timespec64 last_play_time;
