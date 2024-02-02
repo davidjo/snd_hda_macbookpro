@@ -1336,7 +1336,7 @@ static void cs_8409_cs42l83_unsolicited_response_finalize(struct hda_codec *code
 
 		// note the data version will only play thro the headphones for a single time
 		//cs_8409_external_device_unsolicited_response_data(codec, res);
-		cs_8409_external_device_unsolicited_response(codec);
+		cs_8409_external_device_unsolicited_response(codec, 0, 1);
 	}
 }
 

@@ -2048,15 +2048,25 @@ static void cs_8409_headset_amp_format_setup_disable(struct hda_codec *codec, in
 
 static void cs43l83_headset_amp_format_setup(struct hda_codec *codec, int set_stream_id, int full);
 
+static void cs_8409_external_device_unsolicited_response(struct hda_codec *codec, int skipcheck, int perform);
+
 static void cs_8409_perform_external_device_unsolicited_responses(struct hda_codec *codec);
 
-static void cs_8409_plugin_complete_detect(struct hda_codec *codec);
+//static void cs_8409_plugin_complete_detect(struct hda_codec *codec);
+static void cs_8409_plugin_complete_detect(struct hda_codec *codec, int unplug);
+
+static void cs_8409_intmike_linein_disable(struct hda_codec *codec);
 
 static void cs42l83_headset_play_setup_on(struct hda_codec *codec);
 
 static void cs42l83_headset_mike_format_setup_enable(struct hda_codec *codec, int nullformat, int full);
 
 static void cs_8409_headset_mike_buttons_enable(struct hda_codec *codec);
+
+
+static void cs_8409_check_status(struct hda_codec *codec, int msleeptim, int trycount);
+
+static int cs_8409_wait_for_interrupt(struct hda_codec *codec, int msleeptim, int trycount);
 
 
 static int cs_8409_boot_setup_real(struct hda_codec *codec)
@@ -2263,15 +2273,26 @@ static int cs_8409_boot_setup_real(struct hda_codec *codec)
                 // I suspect at some point the code for headset already plugged in
                 // switches to unsolicited response code
 
+		// now thinking we dont do any of the sound output setup here at all
+		// - that will be done by an open pcm call
+		// - we do need to detect the headset tho
+		// (also note that turning the power on/off seems to mess up unsol responses)
+
                 // so I think we need to enable unsol response at this stage and block it till end of this function
                 // - because we seem to get an UNSOL response in the middle of this code
-                spec->block_unsol = 1;
+                //spec->block_unsol = 1;
+
+		// so far we do not seem to get any UNSOL responses here if headset plugged in
+		// - only after unplug do they restart
+		// except after waiting manually for the headset detect interrupt
+		// then executing the cs_8409_external_device_unsolicited_response
+		// the UNSOL responses seem to be reactivated
 
                 // Im guessing the following code should be done explicitly
                 // because we have not seen a cs42l83_read_status_and_clear_interrupt/cs42l83_disambiguate_ur_from_int
 
                 // for some reason the stream id is set to 0 here
-                cs43l83_headset_amp_format_setup(codec, 0, 0);
+                //cs43l83_headset_amp_format_setup(codec, 0, 0);
 
                 //#2880: cs42l83_configure_int_mclk
                 //#3152: cs42l83_power_onoff
@@ -2282,26 +2303,33 @@ static int cs_8409_boot_setup_real(struct hda_codec *codec)
 
                 // this is essentially from cs42l83_headset_play_setup_on
 
-                cs42l83_configure_int_mclk(codec);
+                //cs42l83_configure_int_mclk(codec);
 
-                //cs42l83_headset_power_on_on_nouse(codec);
-                cs42l83_power_onoff(codec, 1);
+                // weird - we have confirmed that this function seems to prevent restoration of
+                // headphone plugin
+                // NOTA BENE - unplugging does not cause UNSOL event
+                //             unplugging followed by plugin if this function is commented does
+                //             cause a plugin event
+                ////cs42l83_headset_power_on_on_nouse(codec);
+                //cs42l83_power_onoff(codec, 1);
 
-                cs42l83_configure_serial_port(codec);
+                //cs42l83_configure_serial_port(codec);
 
 
-                cs42l83_output_set_input_sample_rate(codec);
+                //cs42l83_output_set_input_sample_rate(codec);
 
-                cs42l83_setup_audio_output(codec);
+                //cs42l83_setup_audio_output(codec);
 
                                // headset_setup_SPDIF_output(codec); - presumably if is SPDIF setup
 
                 //cs42l83_headset_rcv_enable_on(codec);
-                cs42l83_buffers_onoff(codec, 1);
+                //cs42l83_buffers_onoff(codec, 1);
 
 
                 // so we seem to get an UNSOL response at this point
                 // - Im thinking we need to store this response
+
+		// well Im not seeing this any more
 
 
                 // and now turn off - this is now cs42l83_headset_disable
@@ -2309,18 +2337,18 @@ static int cs_8409_boot_setup_real(struct hda_codec *codec)
                 //#3698: cs42l83_buffers_onoff
                 //#3714: cs42l83_headset_power_off
 
-                cs42l83_buffers_onoff(codec, 0);
+                //cs42l83_buffers_onoff(codec, 0);
 
-                cs42l83_power_onoff(codec, 0);
+                //cs42l83_power_onoff(codec, 0);
 
-                cs_8409_headset_amp_format_setup_disable(codec, 1);
+                //cs_8409_headset_amp_format_setup_disable(codec, 1);
 
 
                 // and back on again
                 // we dont set stream id, do full TDM setup and not enable the pin
                 // then set stream id, turn on pin but partial TDM setup
-                cs43l83_headset_amp_format_setup(codec, 0, 1);
-                cs43l83_headset_amp_format_setup(codec, 1, 0);
+                //cs43l83_headset_amp_format_setup(codec, 0, 1);
+                //cs43l83_headset_amp_format_setup(codec, 1, 0);
 
                 //#3920: cs42l83_configure_int_mclk
                 //#4192: cs42l83_power_onoff
@@ -2331,22 +2359,22 @@ static int cs_8409_boot_setup_real(struct hda_codec *codec)
 
                 // this is essentially from cs42l83_headset_play_setup_on
 
-                cs42l83_configure_int_mclk(codec);
+                //cs42l83_configure_int_mclk(codec);
 
-                //cs42l83_headset_power_on_on_nouse(codec);
-                cs42l83_power_onoff(codec, 1);
+                ////cs42l83_headset_power_on_on_nouse(codec);
+                //cs42l83_power_onoff(codec, 1);
 
-                cs42l83_configure_serial_port(codec);
+                //cs42l83_configure_serial_port(codec);
 
 
-                cs42l83_output_set_input_sample_rate(codec);
+                //cs42l83_output_set_input_sample_rate(codec);
 
-                cs42l83_setup_audio_output(codec);
+                //cs42l83_setup_audio_output(codec);
 
                                // headset_setup_SPDIF_output(codec); - presumably if is SPDIF setup
 
                 //cs42l83_headset_rcv_enable_on(codec);
-                cs42l83_buffers_onoff(codec, 1);
+                //cs42l83_buffers_onoff(codec, 1);
 
 
                 //#4738: cs42l83_headphone_sense
@@ -2360,21 +2388,31 @@ static int cs_8409_boot_setup_real(struct hda_codec *codec)
                 {
                         dev_info(hda_codec_dev(codec), "cs_8409_boot_setup_real headphone still plugged in!!\n");
 
-                        cs42l83_buffers_onoff(codec, 0);
+			//#4756: cs42l83_buffers_onoff
+			//#4772: cs42l83_headset_power_off
 
-                        cs42l83_power_onoff(codec, 0);
+                        //cs42l83_buffers_onoff(codec, 0);
 
-                        cs_8409_headset_amp_format_setup_disable(codec, 1);
+                        //cs42l83_power_onoff(codec, 0);
 
-                        cs_8409_intmike_volume_unmute_nouse(codec);
+			// there seems to be a delay here
+			//msleep(100);
+			cs_8409_check_status(codec, 10, 10);
 
-                        cs_8409_linein_volume_unmute_nouse(codec);
 
-                        cs_8409_intmike_volume_unmute_nouse(codec);
+			// these codes are not cs42l83 i2c calls but plain HDA verbs
 
-                        cs_8409_linein_volume_unmute_nouse(codec);
+                        //cs_8409_headset_amp_format_setup_disable(codec, 1);
 
-                        cs_8409_inputs_power_nids_off(codec);
+                        //cs_8409_intmike_volume_unmute_nouse(codec);
+
+                        //cs_8409_linein_volume_unmute_nouse(codec);
+
+                        //cs_8409_intmike_volume_unmute_nouse(codec);
+
+                        //cs_8409_linein_volume_unmute_nouse(codec);
+
+                        //cs_8409_inputs_power_nids_off(codec);
 
 
                         // so I think we need to try performing the unsol responses here
@@ -2387,14 +2425,16 @@ static int cs_8409_boot_setup_real(struct hda_codec *codec)
                         // we need to update headset_phase so we dont ignore headset unsol responses in the following call
                         spec->headset_phase = 1;
 
+			// Im now not seeing any UNSOL responses here
+
                         // I think we need to block here - because clearing the interrupts causes interrupts!!
                         // this is similar to cs_8409_cs42l83_unsolicited_response where we block
                         // before calling the perform function
-                        spec->block_unsol = 1;
+                        //spec->block_unsol = 1;
 
-                        cs_8409_perform_external_device_unsolicited_responses(codec);
+                        //cs_8409_perform_external_device_unsolicited_responses(codec);
 
-                        spec->block_unsol = 0;
+                        //spec->block_unsol = 0;
 
                 }
                 else
@@ -2402,6 +2442,16 @@ static int cs_8409_boot_setup_real(struct hda_codec *codec)
                         dev_info(hda_codec_dev(codec), "cs_8409_boot_setup_real boot headphone REMOVED - UNIMPLEMENTED!!\n");
                 }
 
+
+		//#4946: cs42l83_read_status_and_clear_interrupt
+		//#5164: cs42l83_disambiguate_ur_from_int
+
+		// this is pointless here because we have no interrupt
+		// - but this is what happens in the OSX log
+		cs_8409_external_device_unsolicited_response(codec, 1, 0);
+
+
+		//#5220: cs42l83_headphone_sense
 
                 // so now just going to continue with the logged boot code
                 // we get a lot of checks the headset is still plugged in
@@ -2419,19 +2469,25 @@ static int cs_8409_boot_setup_real(struct hda_codec *codec)
                         dev_info(hda_codec_dev(codec), "cs_8409_boot_setup_real boot headphone REMOVED 2 - UNIMPLEMENTED!!\n");
                 }
 
+
+		//#5238: cs42l83_headphone_sense
+
                 retval = cs42l83_headphone_sense(codec);
                 mycodec_info(codec, "cs_8409_boot_setup_real headphone sense 0x%x %s\n", retval, ((retval & 0x80)?"plugged in":"not plugged in"));
 
                 if ((retval & 0x80))
                 {
-                        cs_8409_intmike_volume_unmute(codec);
+                        //cs_8409_intmike_volume_unmute(codec);
 
-                        cs_8409_linein_volume_unmute(codec);
+                        //cs_8409_linein_volume_unmute(codec);
                 }
                 else
                 {
                         dev_info(hda_codec_dev(codec), "cs_8409_boot_setup_real boot headphone REMOVED 3 - UNIMPLEMENTED!!\n");
                 }
+
+
+		//#5310: cs42l83_headphone_sense
 
                 retval = cs42l83_headphone_sense(codec);
                 mycodec_info(codec, "cs_8409_boot_setup_real headphone sense 0x%x %s\n", retval, ((retval & 0x80)?"plugged in":"not plugged in"));
@@ -2450,6 +2506,9 @@ static int cs_8409_boot_setup_real(struct hda_codec *codec)
                         dev_info(hda_codec_dev(codec), "cs_8409_boot_setup_real boot headphone REMOVED 4 - UNIMPLEMENTED!!\n");
                 }
 
+
+		//#5424: cs42l83_headphone_sense
+
                 retval = cs42l83_headphone_sense(codec);
                 mycodec_info(codec, "cs_8409_boot_setup_real headphone sense 0x%x %s\n", retval, ((retval & 0x80)?"plugged in":"not plugged in"));
 
@@ -2466,24 +2525,24 @@ static int cs_8409_boot_setup_real(struct hda_codec *codec)
                         retval = read_gpio_status_check(codec);
 
                         // why - this just sets nid 0x22 format???
-                        cs_8409_intmike_format_setup_format_nouse(codec);
+                        //cs_8409_intmike_format_setup_format_nouse(codec);
                         //cs_8409_really_update_stream_format(codec, 0x22, 1, 0, 0);
 
                         //cs_8409_linein_volume_setup_new(codec, 0x27)
-                        cs_8409_linein_volume_setup(codec, 0x27);
+                        //cs_8409_linein_volume_setup(codec, 0x27);
 
 
-                        cs_8409_linein_format_setup_disable(codec);
+                        //cs_8409_linein_format_setup_disable(codec);
 
-                        cs_8409_intmike_stream_conn_off(codec);
+                        //cs_8409_intmike_stream_conn_off(codec);
 
-                        cs_8409_linein_stream_conn_off(codec);
+                        //cs_8409_linein_stream_conn_off(codec);
 
-                        cs_8409_intmike_stream_off_nid(codec);
-                        cs_8409_linein_stream_off_nid(codec);
+                        //cs_8409_intmike_stream_off_nid(codec);
+                        //cs_8409_linein_stream_off_nid(codec);
 
-                        cs_8409_intmike_volume_mute(codec);
-                        cs_8409_linein_volume_mute(codec);
+                        //cs_8409_intmike_volume_mute(codec);
+                        //cs_8409_linein_volume_mute(codec);
                 }
                 else
                 {
@@ -2493,7 +2552,10 @@ static int cs_8409_boot_setup_real(struct hda_codec *codec)
 		// we see a delay here - this is I think the equivalent of the 1800 msleep
 		// in cs_8409_headset_plugin_event
 		// should we just make it 1800??
-		msleep(1500); // what we actually see is 1470
+		//msleep(1500); // what we actually see is 1470
+
+		// so Im not seeing this delay now
+		// only delay Im seeing is at 4772
 
                 // the cs_8409_plugin_complete_detect function seems to encapsulate what happens next
                 // - this functions ends with initiating headset detection
@@ -2505,23 +2567,55 @@ static int cs_8409_boot_setup_real(struct hda_codec *codec)
                 //#5807: cs42l83_set_hpout_pulldown_off
                 //#5839: cs42l83_headset_detect_on
 
-                cs_8409_plugin_complete_detect(codec);
+                cs_8409_plugin_complete_detect(codec,1);
 
-                spec->block_unsol = 1;
+		if (0)
+		{
+
+			cs42l83_complete_jack_detect(codec);
+
+                        cs42l83_power_hs_bias_on(codec);
+
+                        // this seems to be setting an interrupt on 0x131b for headset detect
+                        // - but there doesnt seem to be a delay anywhere here
+                        // so it must be immediately triggered
+
+                        cs42l83_enable_hs_auto_int_on(codec);
+
+
+                        cs42l83_unplug_interrupt_setup(codec);
+
+
+                        cs42l83_set_hpout_pulldown_off(codec);
+
+		        // so this seems to be the function which stops jack unsol events
+                        //cs42l83_headset_detect_on(codec);
+                        //cs42l83_headset_detect_onoff(codec, 1);
+		}
+
+                //spec->block_unsol = 1;
 
                 // testing status checks to see if we get an interrupt
                 // so at this point the status is still 0x27 - no interrupt
                 // can we just use the msleep??
-                retval = read_gpio_status_check(codec);
+                //#5917: snd_hda_codec_read_check
+                //retval = read_gpio_status_check(codec);
 
-                msleep(1);
+                //msleep(1);
 
+                //#5919: snd_hda_codec_read_check
                 // but here the status is 0x26 ie interrupt
                 //retval = read_gpio_status_check(codec);
 
                 // I think we need to block here - because clearing the interrupts causes interrupts!!
                 // this is similar to cs_8409_cs42l83_unsolicited_response where we block
                 // before calling the perform function
+
+		// add debug check status for a while
+		//cs_8409_check_status(codec, 10, 10);
+
+		// use new function to wait for the interrupt
+		retval = cs_8409_wait_for_interrupt(codec, 1, 10);
 
                 // so next we should get some unsol responses
                 //#5923: cs42l83_read_status_and_clear_interrupt
@@ -2539,16 +2633,24 @@ static int cs_8409_boot_setup_real(struct hda_codec *codec)
                 //#6709: cs42l83_power_hs_bias_button_on
                 //#6805: cs42l83_enable_hsbias_auto_clamp_off1
 
-                cs_8409_perform_external_device_unsolicited_responses(codec);
+		if (retval)
+			cs_8409_external_device_unsolicited_response(codec, 1, 1);
+		else
+                        dev_info(hda_codec_dev(codec), "cs_8409_boot_setup_real boot - FAILED TO GET INTERRUPT!!\n");
 
 
-                retval = read_gpio_status_check(codec);
+		// cant figure where these came from
+		// and the delay doesnt seem to exist
 
-                // so the delay here seems to be around 130 ms
-                // with delay of 1 ms dont see any interrupts
-                msleep(130);
+                //#6851: snd_hda_codec_read_check
+                //retval = read_gpio_status_check(codec);
 
-                retval = read_gpio_status_check(codec);
+                //// so the delay here seems to be around 130 ms
+                //// with delay of 1 ms dont see any interrupts
+                ////msleep(130);
+
+                //#6853: snd_hda_codec_read_check
+                //retval = read_gpio_status_check(codec);
 
 
                 //#6857: cs42l83_read_status_and_clear_interrupt
@@ -2563,7 +2665,7 @@ static int cs_8409_boot_setup_real(struct hda_codec *codec)
                 // - at boot we drop back to here
                 // NOTA BENE - MUST set up the button interrupts here now - otherwise buttons wont work
 
-                cs_8409_perform_external_device_unsolicited_responses(codec);
+                //cs_8409_perform_external_device_unsolicited_responses(codec);
 
 
                 //#7553:  cs_8409_enable_headset_streaming
@@ -2576,24 +2678,24 @@ static int cs_8409_boot_setup_real(struct hda_codec *codec)
                 //#8041: cs42l83_setup_audio_output
                 //#8217: cs42l83_buffers_onoff
 
-                cs43l83_headset_amp_format_setup(codec, 1, 1);
-                cs42l83_headset_play_setup_on(codec);
+                //cs43l83_headset_amp_format_setup(codec, 1, 1);
+                //cs42l83_headset_play_setup_on(codec);
 
                 // and yet again turn off
                 //#8233: cs42l83_buffers_onoff
                 //#8249: cs42l83_power_onoff
                 //#8279: cs_8409_headset_amp_format_setup_disable
 
-                cs42l83_buffers_onoff(codec, 0);
-                cs42l83_power_onoff(codec, 0);
-                cs_8409_headset_amp_format_setup_disable(codec, 1);
+                //cs42l83_buffers_onoff(codec, 0);
+                //cs42l83_power_onoff(codec, 0);
+                //cs_8409_headset_amp_format_setup_disable(codec, 1);
 
 
                 // and back on again
                 // we dont set stream id, do full TDM setup and not enable the pin
                 // then set stream id, turn on pin but partial TDM setup
-                cs43l83_headset_amp_format_setup(codec, 0, 1);
-                cs43l83_headset_amp_format_setup(codec, 1, 0);
+                //cs43l83_headset_amp_format_setup(codec, 0, 1);
+                //cs43l83_headset_amp_format_setup(codec, 1, 0);
 
 
                 //#8455:  cs42l83_headset_play_setup_on
@@ -2604,7 +2706,7 @@ static int cs_8409_boot_setup_real(struct hda_codec *codec)
                 //#9079: cs42l83_setup_audio_output
                 //#9255: cs42l83_buffers_onoff
 
-                cs42l83_headset_play_setup_on(codec);
+                //cs42l83_headset_play_setup_on(codec);
 
 
                 //#9273: cs42l83_headphone_sense
@@ -2617,8 +2719,8 @@ static int cs_8409_boot_setup_real(struct hda_codec *codec)
                         //#9287: cs_8409_intmike_stream_conn_off_disable
                         //#9299: cs_8409_linein_stream_conn_off
 
-                        cs_8409_intmike_stream_conn_off(codec);
-                        cs_8409_linein_stream_conn_off(codec);
+                        //cs_8409_intmike_stream_conn_off(codec);
+                        //cs_8409_linein_stream_conn_off(codec);
 
                         //       snd_hda_codec_write(codec, 0x22, 0, AC_VERB_SET_CHANNEL_STREAMID, 0x00000000); // 0x02270600
                         //       snd_hda:     conv stream channel map 34 [('CHAN', 0), ('STREAMID', 0)]
@@ -2626,26 +2728,22 @@ static int cs_8409_boot_setup_real(struct hda_codec *codec)
                         //       snd_hda_codec_write(codec, 0x23, 0, AC_VERB_SET_CHANNEL_STREAMID, 0x00000000); // 0x02370600
                         //       snd_hda:     conv stream channel map 35 [('CHAN', 0), ('STREAMID', 0)]
 
-                        snd_hda_codec_write(codec, 0x22, 0, AC_VERB_SET_CHANNEL_STREAMID, 0x00000000); // 0x02270600
-                        snd_hda_codec_write(codec, 0x23, 0, AC_VERB_SET_CHANNEL_STREAMID, 0x00000000); // 0x02370600
+                        //snd_hda_codec_write(codec, 0x22, 0, AC_VERB_SET_CHANNEL_STREAMID, 0x00000000); // 0x02270600
+                        //snd_hda_codec_write(codec, 0x23, 0, AC_VERB_SET_CHANNEL_STREAMID, 0x00000000); // 0x02370600
 
 
                         //#9324:  cs_8409_intmike_volume_setup
                         //#9357: cs_8409_intmike_format_setup_disable
                         //#9324:  cs_8409_linein_volume_setup
                         //#9401: cs_8409_linein_format_setup_disable
-                        //#9412:  cs42l83_headset_mike_format_setup_enable
-                        //#9451: cs42l83_input_set_output_sample_rate
-                        //#9579: cs42l83_mike_setup_audio_input
-                        //#9643: cs42l83_mike_enable
 
-                        cs_8409_intmike_volume_setup(codec, 0x27);
+                        //cs_8409_intmike_volume_setup(codec, 0x27);
 
-                        cs_8409_intmike_format_setup_disable(codec);
+                        //cs_8409_intmike_format_setup_disable(codec);
 
-                        cs_8409_linein_volume_setup(codec, 0x27);
+                        //cs_8409_linein_volume_setup(codec, 0x27);
 
-                        cs_8409_linein_format_setup_disable(codec);
+                        //cs_8409_linein_format_setup_disable(codec);
 
 
                         // as the following relates to the headset mike
@@ -2655,6 +2753,17 @@ static int cs_8409_boot_setup_real(struct hda_codec *codec)
 
                         if (spec->have_mike)
                         {
+				// for the moment deciding to do this only if have mike in headset
+
+                                // this is just calling this routine
+                                //cs_8409_headset_mike_setup_nouse
+
+                                cs_8409_intmike_linein_disable(codec);
+
+                                //#9412:  cs42l83_headset_mike_format_setup_enable
+                                //#9451: cs42l83_input_set_output_sample_rate
+                                //#9579: cs42l83_mike_setup_audio_input
+                                //#9643: cs42l83_mike_enable
 
                                 // this is part of cs_8409_enable_headset_mike_streaming
 
@@ -2699,6 +2808,10 @@ static int cs_8409_boot_setup_real(struct hda_codec *codec)
 
                                 //cs42l83_mike_enable(codec);
 
+
+                                //#10032: snd_hda_codec_read_check
+                                //#10033: snd_hda_codec_read_check
+
                                 //// this doesnt make sense double read of nid 0x3c then double set??
                                 //retval = snd_hda_codec_read_check(codec, 0x3c, 0, AC_VERB_GET_PIN_WIDGET_CONTROL, 0x00000000, 0x00000020, 25649); // 0x03cf0700
                                 //retval = snd_hda_codec_read_check(codec, 0x3c, 0, AC_VERB_GET_PIN_WIDGET_CONTROL, 0x00000000, 0x00000020, 25650); // 0x03cf0700
@@ -2706,6 +2819,8 @@ static int cs_8409_boot_setup_real(struct hda_codec *codec)
                                 ////       snd_hda:     60 ['AC_PINCTL_IN_EN']
                                 //snd_hda_codec_write(codec, 0x3c, 0, AC_VERB_SET_PIN_WIDGET_CONTROL, 0x00000020); // 0x03c70720
                                 ////       snd_hda:     60 ['AC_PINCTL_IN_EN']
+
+				cs42l83_headset_mike_pin_enable(codec);
 
                                 // is this a good position to switch the inputs??
                                 // just before enable buttons is where we switch inputs on plugin
@@ -2721,6 +2836,14 @@ static int cs_8409_boot_setup_real(struct hda_codec *codec)
 
                                 cs_8409_headset_mike_buttons_enable(codec);
 
+                                //#10166: snd_hda_codec_read_check
+                                //#10168: snd_hda_codec_read_check
+
+                                //#10172: cs42l83_read_status_and_clear_interrupt
+                                //#10362: snd_hda_codec_read_check
+                                //#10366: cs42l83_read_status_and_clear_interrupt
+                                //#10556: snd_hda_codec_read_check
+                                //#10560: cs42l83_disambiguate_ur_from_int
 
 				// we get some calls to cs42l83_read_status_and_clear_interrupt/cs42l83_disambiguate_ur_from_int here
 				// clear out any stored unsol responses
@@ -3250,7 +3373,7 @@ static int cs_8409_read_status_and_clear_interrupt(struct hda_codec *codec);
 static int cs42l83_disambiguate_ur_from_int(struct hda_codec *codec);
 static void cs_8409_interrupt_action(struct hda_codec *codec, int int_response);
 
-static void cs_8409_external_device_unsolicited_response(struct hda_codec *codec)
+static void cs_8409_external_device_unsolicited_response(struct hda_codec *codec, int skipcheck, int perform)
 {
         int retval;
         int retval_int;
@@ -3259,15 +3382,20 @@ static void cs_8409_external_device_unsolicited_response(struct hda_codec *codec
         int int_masked;
         int intcnt = 0;
 
-        retval = read_gpio_status_check(codec);
+	if (!skipcheck)
+	{
 
-        if ((retval & 0x01) == 0x01)
-        {
-                mycodec_info(codec, "cs_8409_external_device_unsolicited_response - interrupt clear\n");
-                return;
-        }
+                retval = read_gpio_status_check(codec);
 
-        mycodec_info(codec, "cs_8409_external_device_unsolicited_response - interrupt set\n");
+                if ((retval & 0x01) == 0x01)
+                {
+                        mycodec_info(codec, "cs_8409_external_device_unsolicited_response - interrupt clear\n");
+                        return;
+                }
+
+                mycodec_info(codec, "cs_8409_external_device_unsolicited_response - interrupt set\n");
+
+	}
 
         // so retval_int is a bit shifted combination of a number of primary interrupt status registers
 
@@ -3304,7 +3432,8 @@ static void cs_8409_external_device_unsolicited_response(struct hda_codec *codec
 
         if (int_response != 0) {
 
-                cs_8409_interrupt_action(codec, int_response);
+		if (perform)
+                        cs_8409_interrupt_action(codec, int_response);
 
         }
         else
@@ -3314,6 +3443,60 @@ static void cs_8409_external_device_unsolicited_response(struct hda_codec *codec
         return;
 }
 
+
+// this is a function used when booting with headsets in
+// - it appears somehow UNSOL responses are disabled
+
+static void cs_8409_check_status(struct hda_codec *codec, int msleeptim, int trycount)
+{
+        int retval = 0;
+        int loopcnt = 0;
+
+        mycodec_info(codec, "cs_8409_check_status start\n");
+
+	while (loopcnt < trycount)
+	{
+                retval = read_gpio_status_check(codec);
+
+                codec_info(codec, "cs_8409_check_status - status 0x%08x\n",retval);
+
+		msleep(msleeptim);
+
+		loopcnt++;
+	}
+        mycodec_info(codec, "cs_8409_check_status end\n");
+
+}
+
+// another new function for booting with headset plugged in
+// for some reason UNSOL responses seem disabled at the point of boot_setup_real we need this
+static int cs_8409_wait_for_interrupt(struct hda_codec *codec, int msleeptim, int trycount)
+{
+        int retval = 0;
+        int loopcnt = 0;
+
+        mycodec_info(codec, "cs_8409_wait_for_interrupt start\n");
+
+	while (loopcnt < trycount)
+	{
+                retval = read_gpio_status_check(codec);
+
+                codec_info(codec, "cs_8409_wait_for_interrupt - status 0x%08x\n",retval);
+
+                if ((retval & 0x01) != 0x01)
+                {
+                        mycodec_info(codec, "cs_8409_wait_for_interrupt - interrupt %d set\n",loopcnt);
+                        return 1;
+                }
+
+		msleep(msleeptim);
+
+		loopcnt++;
+	}
+        mycodec_info(codec, "cs_8409_wait_for_interrupt end\n");
+
+	return 0;
+}
 
 static int cs42l83_read_status_and_clear_interrupt(struct hda_codec *codec);
 
@@ -4636,7 +4819,8 @@ static void cs_8409_plugin_event_continued(struct hda_codec *codec)
 }
 
 static void cs_8409_plugin_handle_detect(struct hda_codec *codec);
-static void cs_8409_plugin_complete_detect(struct hda_codec *codec);
+//static void cs_8409_plugin_complete_detect(struct hda_codec *codec);
+static void cs_8409_plugin_complete_detect(struct hda_codec *codec, int unplug);
 
 
 static void cs_8409_headset_plugin_event(struct hda_codec *codec)
@@ -4672,7 +4856,7 @@ static void cs_8409_headset_plugin_event(struct hda_codec *codec)
 
         mycodec_info(codec, "cs_8409_headset_plugin_event pre  plugin complete_detect\n");
 
-        cs_8409_plugin_complete_detect(codec);
+        cs_8409_plugin_complete_detect(codec,1);
 
         mycodec_info(codec, "cs_8409_headset_plugin_event post plugin complete_detect\n");
 
@@ -4711,7 +4895,7 @@ static void cs_8409_plugin_handle_detect(struct hda_codec *codec)
         mycodec_info(codec, "cs_8409_plugin_handle_detect end\n");
 }
 
-static void cs_8409_plugin_complete_detect(struct hda_codec *codec)
+static void cs_8409_plugin_complete_detect(struct hda_codec *codec, int unplug)
 {
         int retval;
         struct cs8409_apple_spec *spec = codec->spec;
@@ -4741,7 +4925,7 @@ static void cs_8409_plugin_complete_detect(struct hda_codec *codec)
                 spec->jack_present = 1;
                 spec->headset_enable = 1;
 
-                cs42l83_complete_jack_detect(codec);
+		cs42l83_complete_jack_detect(codec);
 
                 cs42l83_power_hs_bias_on(codec);
 
@@ -4752,7 +4936,8 @@ static void cs_8409_plugin_complete_detect(struct hda_codec *codec)
                 cs42l83_enable_hs_auto_int_on(codec);
 
 
-                cs42l83_unplug_interrupt_setup(codec);
+                if (unplug)
+                        cs42l83_unplug_interrupt_setup(codec);
 
 
                 cs42l83_set_hpout_pulldown_off(codec);
