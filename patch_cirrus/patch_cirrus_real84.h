@@ -2636,36 +2636,77 @@ static int cs_8409_boot_setup_real(struct hda_codec *codec)
 		if (retval)
 			cs_8409_external_device_unsolicited_response(codec, 1, 1);
 		else
-                        dev_info(hda_codec_dev(codec), "cs_8409_boot_setup_real boot - FAILED TO GET INTERRUPT!!\n");
+                        dev_info(hda_codec_dev(codec), "cs_8409_boot_setup_real boot - headset detect - FAILED TO GET INTERRUPT!!\n");
+
+		// it does appear we assume no buttons if no mike
+
+                if (spec->have_mike)
+		{
+
+                        dev_info(hda_codec_dev(codec), "cs_8409_boot_setup_real boot - end of headset detect - ready for button detect\n");
+
+			// and yet again no UNSOL response just need to wait for the interrupt
+
+			// so far only just hit the interrupt at the 9th count
+			// so sleep for 5 ms - although no delay in logged ops - except maybe 2 ms
+			// well 5 not long enough
+			// neither does 10 seem to make a difference
+			//msleep(10);
+
+			// use new function to wait for the interrupt
+			// try increased sleep time
+			// doesnt seem to change - always on 9th status read???
+			// so far either 9 attempts (1ms wait) or 8 attempts (4ms wait) seen
+			// so definitely seems require a number of reads
+			// - not enough to just sleep for a while
+			retval = cs_8409_wait_for_interrupt(codec, 4, 20);
+
+			if (retval)
+				cs_8409_external_device_unsolicited_response(codec, 1, 1);
+			else
+                                dev_info(hda_codec_dev(codec), "cs_8409_boot_setup_real boot - button detect - FAILED TO GET INTERRUPT!!\n");
+
+			// as long as we do the cs_8409_external_device_unsolicited_response then unplug
+			// seems to work
+			// - so it appears if setup for headset detect or button detect and dont check and clear
+			// the interrupts after then the unplug UNSOL response does not work
+
+                        dev_info(hda_codec_dev(codec), "cs_8409_boot_setup_real boot - end of button detect\n");
 
 
-		// cant figure where these came from
-		// and the delay doesnt seem to exist
+			// cant figure where these came from
+			// and the delay doesnt seem to exist
 
-                //#6851: snd_hda_codec_read_check
-                //retval = read_gpio_status_check(codec);
+                        //#6851: snd_hda_codec_read_check
+                        //retval = read_gpio_status_check(codec);
 
-                //// so the delay here seems to be around 130 ms
-                //// with delay of 1 ms dont see any interrupts
-                ////msleep(130);
+                        //// so the delay here seems to be around 130 ms
+                        //// with delay of 1 ms dont see any interrupts
+                        ////msleep(130);
 
-                //#6853: snd_hda_codec_read_check
-                //retval = read_gpio_status_check(codec);
+                        //#6853: snd_hda_codec_read_check
+                        //retval = read_gpio_status_check(codec);
 
 
-                //#6857: cs42l83_read_status_and_clear_interrupt
-                //#7051: cs42l83_disambiguate_ur_from_int
-                // cs_8409_headset_button_detect_event
-                //#7099: cs42l83_handle_button_detect
-                //#7243: cs42l83_mike_connected
+                        //#6857: cs42l83_read_status_and_clear_interrupt
+                        //#7051: cs42l83_disambiguate_ur_from_int
+                        // cs_8409_headset_button_detect_event
+                        //#7099: cs42l83_handle_button_detect
+                        //#7243: cs42l83_mike_connected
 
-                // cs_8409_perform_external_device_unsolicited_responses then calls cs_8409_plugin_event_continued
-                // - but here we have a divergence from plugin post-boot
-                // fixed up cs_8409_plugin_event_continued to only do things for plugin post-boot
-                // - at boot we drop back to here
-                // NOTA BENE - MUST set up the button interrupts here now - otherwise buttons wont work
+                        // cs_8409_perform_external_device_unsolicited_responses then calls cs_8409_plugin_event_continued
+                        // - but here we have a divergence from plugin post-boot
+                        // fixed up cs_8409_plugin_event_continued to only do things for plugin post-boot
+                        // - at boot we drop back to here
+                        // NOTA BENE - MUST set up the button interrupts here now - otherwise buttons wont work
 
-                //cs_8409_perform_external_device_unsolicited_responses(codec);
+                        //cs_8409_perform_external_device_unsolicited_responses(codec);
+
+		}
+                else
+		{
+                        dev_info(hda_codec_dev(codec), "cs_8409_boot_setup_real boot - end of headset detect - NO BUTTONS\n");
+		}
 
 
                 //#7553:  cs_8409_enable_headset_streaming
@@ -2844,6 +2885,26 @@ static int cs_8409_boot_setup_real(struct hda_codec *codec)
                                 //#10366: cs42l83_read_status_and_clear_interrupt
                                 //#10556: snd_hda_codec_read_check
                                 //#10560: cs42l83_disambiguate_ur_from_int
+
+
+				// so at the moment Im not seeing any interrupts here
+		                retval = cs_8409_wait_for_interrupt(codec, 1, 20);
+
+
+				// ah - the check for interrupts is for button handling
+				// actually I dont get any of this - I have checked and we have setup the
+				// unsol event handler by the time cs_8409_boot_setup_real is called
+				// so we shouldnt have to be manually waiting for interrupts???
+
+				if (retval)
+					cs_8409_external_device_unsolicited_response(codec, 1, 1);
+				else
+                                        dev_info(hda_codec_dev(codec), "cs_8409_boot_setup_real boot - button press response - no interrupts\n ");
+
+				// so a dump_stack at this shows we are under
+				// cs8409_driver_init
+				//   (... -> hda_codec_driver_probe -> patch_cs8409 -> cs_8409_real_config -> cs_8409_boot_setup_real)
+				// - maybe UNSOL responses not activated till out of the init routine??
 
 				// we get some calls to cs42l83_read_status_and_clear_interrupt/cs42l83_disambiguate_ur_from_int here
 				// clear out any stored unsol responses
