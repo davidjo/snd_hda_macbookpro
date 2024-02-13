@@ -68,6 +68,9 @@ apt install gcc linux-headers-generic make patch wget
 ```
 **arch package install**
 ```
+# Install from the AUR
+yay -S linux-headers snd-hda-macbookpro-dkms-git
+# Or install dependencies with pacman and build the driver as described below
 pacman -S gcc linux-headers make patch wget
 ```
 **void package install**
