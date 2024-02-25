@@ -11,6 +11,7 @@ do
     -k|--kernel) UNAME=$2; [[ -z $UNAME ]] && echo '-k|--kernel must be followed by a kernel version' && exit 1;;
     -r|--remove) dkms_action='remove';;
     -u|--uninstall) dkms_action='remove';;
+	-d|--dkms) dkms=true;;
     (-*) echo "$0: error - unrecognized option $1" 1>&2; exit 1;;
     (*) break;;
     esac
@@ -254,14 +255,18 @@ popd > /dev/null
 
 [[ ! $dkms_action == 'install' ]] && [[ ! -d $update_dir ]] && mkdir $update_dir
 
-if [ $PATCH_CIRRUS = true ]; then
-	make PATCH_CIRRUS=1
-	make install PATCH_CIRRUS=1
+# Skipping patch installation since dkms will do it
+if [[ $dkms = false ]]; then
 
-else
-	make KERNELRELEASE=$UNAME
-	make install KERNELRELEASE=$UNAME
+	if [ $PATCH_CIRRUS = true ]; then
+		make PATCH_CIRRUS=1
+		make install PATCH_CIRRUS=1
 
+	else
+		make KERNELRELEASE=$UNAME
+		make install KERNELRELEASE=$UNAME
+
+	fi
 fi
 
 echo -e "\ncontents of $update_dir"
