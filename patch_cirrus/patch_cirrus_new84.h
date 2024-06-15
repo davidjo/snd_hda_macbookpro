@@ -1,5 +1,38 @@
 
 
+// as of kernel 6.8 we need prototype definitions for non-static functions
+// (in addition to actual definitions)
+
+
+// definitions for patch_cirrus_new84.h
+
+
+void snd_hda_coef_item(struct hda_codec *codec, u16 write_flag, hda_nid_t nid, u32 idx, u32 param, u32 retdata, int srcidx);
+
+int snd_hda_coef_item_check(struct hda_codec *codec, u16 write_flag, hda_nid_t nid, u32 idx, u32 param, u32 retdata, int srcidx);
+
+void snd_hda_coef_item_masked(struct hda_codec *codec, u16 write_flag, hda_nid_t nid, u32 idx, u32 param, u32 mask, u32 retdata, u32 srcval, int srcidx);
+
+void snd_hda_double_reset(struct hda_codec *codec);
+
+void cs_8409_play_setup(struct hda_codec *codec);
+
+void cs_8409_play_cleanup(struct hda_codec *codec);
+
+void cs_8409_capture_setup(struct hda_codec *codec);
+
+void cs_8409_capture_cleanup(struct hda_codec *codec);
+
+void cs_8409_headplay_setup(struct hda_codec *codec);
+
+void cs_8409_headplay_cleanup(struct hda_codec *codec);
+
+void cs_8409_headcapture_setup(struct hda_codec *codec);
+
+void cs_8409_headcapture_cleanup(struct hda_codec *codec);
+
+
+
 // this sets the power state of the AFG node - ie node 0x1
 // this calls hda_sync_power_state
 //hda_set_power_state(codec, AC_PWRST_D0);
@@ -453,6 +486,10 @@ static const struct hda_coef cs8409_init_coef[] = {
         //{1, 0x01, idx, param, dmydata, 0}, write
         //{2, 0x01, idx, param, retdata, 0}, write mask
 };
+
+
+void snd_hda_coef_sequence(struct hda_codec *codec, const struct hda_coef *seq, char *prtstr);
+
 
 void snd_hda_coef_item(struct hda_codec *codec, u16 write_flag, hda_nid_t nid, u32 idx, u32 param, u32 retdata, int srcidx)
 {
