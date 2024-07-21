@@ -47,7 +47,7 @@ To create a more Apple-like sound requires creating eg an Alsa pseudo device to 
 and apply different digital filters to the tweeter and woofer channels.
 
 
-NOTE. My primary testing kernel is now Ubuntu LTS 22.04 5.15.
+NOTE. My primary testing kernel is now Ubuntu LTS 24.04 6.8.
 
 
 
