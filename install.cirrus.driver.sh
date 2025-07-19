@@ -256,7 +256,7 @@ popd > /dev/null
 [[ ! $dkms_action == 'install' ]] && [[ ! -d $update_dir ]] && mkdir $update_dir
 
 # Skipping patch installation since dkms will do it
-if [[ $dkms = false ]]; then
+if [[ ! $dkms = true ]]; then
 
 	if [ $PATCH_CIRRUS = true ]; then
 		make PATCH_CIRRUS=1
