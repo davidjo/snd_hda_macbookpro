@@ -267,7 +267,6 @@ if [[ $dkms = false ]]; then
 		make install KERNELRELEASE=$UNAME
 
 	fi
+	echo -e "\ncontents of $update_dir"
+	ls -lA $update_dir
 fi
-
-echo -e "\ncontents of $update_dir"
-ls -lA $update_dir
