@@ -43,12 +43,15 @@ if [[ $dkms_action == 'install' ]]; then
     # and ignore DEST_MODULE_LOCATION
     # we DO want updates so that the original module is not overwritten
     # (although the original module should be copied to under /var/lib/dkms if needed for other distributions)
-    update_dir="/lib/modules/${UNAME}/updates"
-    echo -e "\ncontents of $update_dir/dkms"
-    ls -lA $update_dir/dkms
+    update_dir="/lib/modules/${UNAME}/kernel/extra"
+    echo -e "\ncontents of $update_dir"
+    ls -lA $update_dir
     exit
 elif [[ $dkms_action == 'remove' ]]; then
     bash dkms.sh -r
+	# next line needed to properly clean up dkms module
+	update_dir="/lib/modules/${UNAME}/kernel/extra"
+	[[ -e $update_dir/snd-hda-codec-cs8409.ko ]] && rm $update_dir/snd-hda-codec-cs8409.ko && depmod -a
     exit
 fi
 
