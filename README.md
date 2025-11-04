@@ -97,7 +97,7 @@ cd snd_hda_macbookpro/
 reboot
 ```
 
-Dynamic Kernel Module Support (dkms):
+Dynamic Kernel Module Support (dkms) pre 6.17:
 -------------
 
 dkms is a framework which allows kernel modules to be dynamically built for each kernel on your system.
@@ -106,7 +106,7 @@ You will need to first install dkms on your system
 
 **install driver via dkms**
 ```
-sudo ./install.cirrus.driver.sh -i
+sudo ./install.cirrus.driver.pre617.sh -i
 ```
 
 **remove driver from dkms**
@@ -116,5 +116,5 @@ sudo dkms remove snd_hda_macbookpro/0.1
 ```
 Clean up
 ```
-sudo ./install.cirrus.driver.sh -r
+sudo ./install.cirrus.driver.pre617.sh -r
 ```
