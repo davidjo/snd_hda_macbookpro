@@ -28,20 +28,13 @@ revpart1=$(echo $revision | cut -d '-' -f1)
 revpart2=$(echo $revision | cut -d '-' -f2)
 revpart3=$(echo $revision | cut -d '-' -f3)
 
-if [ $major_version -lt 6 -o \( $major_version -eq 6 -a $minor_version -lt 17 \) ]; then
-
-	exec ./install.cirrus.driver.pre617.sh "${@}"
-
+if [ $major_version -eq 5 -a $minor_version -lt 13 ]; then
+    sed -i 's/^BUILT_MODULE_NAME\[0\].*$/BUILT_MODULE_NAME[0]="snd-hda-codec-cirrus"/' dkms.conf
+    PATCH_CIRRUS=true
+else
+    sed -i 's/^BUILT_MODULE_NAME\[0\].*$/BUILT_MODULE_NAME[0]="snd-hda-codec-cs8409"/' dkms.conf
+    PATCH_CIRRUS=false
 fi
-
-
-if [[ $dkms_action != '' ]]; then
-	echo "WARNING: dkms is untested for 6.17 and likely wont work!!!"
-	exit 1
-fi
-
-sed -i 's/^BUILT_MODULE_NAME\[0\].*$/BUILT_MODULE_NAME[0]="snd-hda-codec-cs8409"/' dkms.conf
-PATCH_CIRRUS=false
 
 if [[ $dkms_action == 'install' ]]; then
     bash dkms.sh
@@ -56,6 +49,14 @@ if [[ $dkms_action == 'install' ]]; then
 elif [[ $dkms_action == 'remove' ]]; then
     bash dkms.sh -r
     exit
+fi
+
+if [ $major_version == '4' ]; then
+	echo "Kernel 4 versions no longer supported"
+fi
+
+if [ $major_version -eq 5 -a $minor_version -lt 8 ]; then
+	echo "Kernel 5 versions less than 5.8 no longer supported"
 fi
 
 isdebian=0
@@ -100,7 +101,6 @@ fi
 cur_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd)
 build_dir='build'
 patch_dir="$cur_dir/patch_cirrus"
-makefiles_dir="$cur_dir/makefiles"
 hda_dir="$cur_dir/$build_dir/hda"
 update_dir="/lib/modules/${UNAME}/updates"
 
@@ -144,7 +144,7 @@ if [ $isubuntu -ge 1 ]; then
 
 	fi
 
-	tar --strip-components=2 -xvf /usr/src/linux-source-$kernel_version.tar.bz2 --directory=build/ linux-source-$kernel_version/sound/hda
+	tar --strip-components=3 -xvf /usr/src/linux-source-$kernel_version.tar.bz2 --directory=build/ linux-source-$kernel_version/sound/pci/hda
 
 else
 	# here we assume the distribution kernel source is essentially the mainline kernel source
@@ -169,39 +169,20 @@ else
 
 	set -e
 
-	tar --strip-components=2 -xvf $build_dir/linux-$kernel_version.tar.xz --directory=build/ linux-$kernel_version/sound/hda
+	tar --strip-components=3 -xvf $build_dir/linux-$kernel_version.tar.xz --directory=build/ linux-$kernel_version/sound/pci/hda
 
 fi
 
-
 mv $hda_dir/Makefile $hda_dir/Makefile.orig
-mv $hda_dir/common/Makefile $hda_dir/common//Makefile.orig
-mv $hda_dir/codecs/Makefile $hda_dir/codecs//Makefile.orig
-mv $hda_dir/codecs/cirrus/Makefile $hda_dir/codecs/cirrus//Makefile.orig
-
-cp $makefiles_dir/Makefile $hda_dir
-cp $makefiles_dir/Makefile_common $hda_dir/common/Makefile
-cp $makefiles_dir/Makefile_codecs $hda_dir/codecs/Makefile
-cp $makefiles_dir/Makefile_cirrus $hda_dir/codecs/cirrus/Makefile
-
-# going with explicit file names now
-
-cp $patch_dir/cirrus_apple.h $hda_dir/codecs/cirrus
-cp $patch_dir/patch_cirrus_boot84.h $hda_dir/codecs/cirrus
-cp $patch_dir/patch_cirrus_new84.h $hda_dir/codecs/cirrus
-cp $patch_dir/patch_cirrus_real84.h $hda_dir/codecs/cirrus
-cp $patch_dir/patch_cirrus_hda_generic_copy.h $hda_dir/codecs/cirrus
-cp $patch_dir/patch_cirrus_real84_i2c.h $hda_dir/codecs/cirrus
-
-
+cp $patch_dir/Makefile $patch_dir/patch_cirrus_* $hda_dir
 pushd $hda_dir > /dev/null
 # define the ubuntu/mainline versions that work at the moment
 # for ubuntu allow a range of revisions that work
-current_major=6
-current_minor=17
-current_minor_ubuntu=6
-current_rev_ubuntu=6
-latest_rev_ubuntu=6
+current_major=5
+current_minor=19
+current_minor_ubuntu=15
+current_rev_ubuntu=47
+latest_rev_ubuntu=71
 
 iscurrent=0
 if [ $isubuntu -ge 1 ]; then
@@ -234,30 +215,37 @@ if [ $iscurrent -gt 1 ]; then
 	echo "Kernel version later than implemented version - there may be build problems"
 fi
 
-if [ $major_version -eq 6 -a $minor_version -ge 17 ]; then
+if [ $major_version -eq 5 -a $minor_version -lt 13 ]; then
+	patch -b -p2 <../../patch_patch_cirrus.c.diff
+else
 	if [ $isubuntu -ge 1 ]; then
 
-		patch -b -p1 <../../patch_cs8409.c.diff
+		patch -b -p2 <../../patch_patch_cs8409.c.diff
 
 		if [ $iscurrent -ge 0 ]; then
-			patch -b -p1 <../../patch_cs8409.h.diff
+			patch -b -p2 <../../patch_patch_cs8409.h.diff
 		else
-			echo "Error: older version not implmented yet"
-                        exit 1
+			patch -b -p2 <../../patches/patch_patch_cs8409.h.ubuntu.pre51547.diff
+		fi
+
+		if [ $iscurrent -ge 0 ]; then
+			patch -b -p2 <../../patch_patch_cirrus_apple.h.diff
 		fi
 
 	else
-		patch -b -p1 <../../patch_cs8409.c.diff
+		patch -b -p2 <../../patch_patch_cs8409.c.diff
 
 		if [ $iscurrent -ge 0 ]; then
-			patch -b -p1 <../../patch_cs8409.h.diff
+			patch -b -p2 <../../patch_patch_cs8409.h.diff
 		else
-			echo "Error: older version not implmented yet"
-                        exit 1
+			patch -b -p2 <../../patches/patch_patch_cs8409.h.main.pre519.diff
 		fi
 
-                # this just redos the above copies - why was it in??
-		#cp $patch_dir/Makefile $patch_dir/patch_cirrus_* $hda_dir/
+		cp $patch_dir/Makefile $patch_dir/patch_cirrus_* $hda_dir/
+
+		if [ $iscurrent -ge 0 ]; then
+			patch -b -p2 <../../patch_patch_cirrus_apple.h.diff
+		fi
 
 	fi
 fi
@@ -266,9 +254,15 @@ popd > /dev/null
 
 [[ ! $dkms_action == 'install' ]] && [[ ! -d $update_dir ]] && mkdir $update_dir
 
-make KERNELRELEASE=$UNAME
-make install KERNELRELEASE=$UNAME
+if [ $PATCH_CIRRUS = true ]; then
+	make PATCH_CIRRUS=1
+	make install PATCH_CIRRUS=1
 
+else
+	make KERNELRELEASE=$UNAME
+	make install KERNELRELEASE=$UNAME
+
+fi
 
 echo -e "\ncontents of $update_dir"
 ls -lA $update_dir
