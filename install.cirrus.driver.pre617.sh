@@ -113,8 +113,8 @@ if [ $isfedora -ge 1 ]; then
 	[[ ! $(command -v patch) ]] && dnf install -y patch
 fi
 
-# we need to handle Ubuntu based distributions eg Mint here
 isubuntu=0
+# Check if we are dealing with Ubuntu
 if [ $(grep '^NAME=' /etc/os-release | grep -c Ubuntu) -eq 1 ]; then
 	isubuntu=1
 # For Unbuntu based distributions like Mint, ubuntu will be mentionned in ID_LIKE
