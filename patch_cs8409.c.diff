@@ -1,0 +1,44 @@
+--- a/codecs/cirrus/cs8409.c.orig	2025-09-15 12:53:58.000000000 +0100
++++ b/codecs/cirrus/cs8409.c	2025-11-02 09:40:20.609503547 +0000
+@@ -1435,6 +1435,8 @@
+ 	}
+ }
+ 
++static int cs8409_apple(struct hda_codec *codec);
++
+ static int cs8409_probe(struct hda_codec *codec, const struct hda_device_id *id)
+ {
+ 	int err;
+@@ -1442,8 +1444,19 @@
+ 	if (!cs8409_alloc_spec(codec))
+ 		return -ENOMEM;
+ 
++        printk("snd_hda_intel: Primary cs8409\n");
++
+ 	snd_hda_pick_fixup(codec, cs8409_models, cs8409_fixup_tbl, cs8409_fixups);
+ 
++        // this seems the easiest way to separate and jump into the code for handling Apple machines using the 8409
++        // note now freeing the just allocated spec - this undos the delayed work as not using mutex yet
++        if (codec->fixup_id == HDA_FIXUP_ID_NOT_SET) {
++                printk("snd_hda_intel: Primary patch_cs8409 NOT FOUND trying APPLE\n");
++                cs8409_remove(codec);
++                err = cs8409_apple(codec);
++                return err;
++        }
++
+ 	codec_dbg(codec, "Picked ID=%d, VID=%08x, DEV=%08x\n", codec->fixup_id,
+ 			 codec->bus->pci->subsystem_vendor,
+ 			 codec->bus->pci->subsystem_device);
+@@ -1471,6 +1484,12 @@
+ 	.stream_pm = snd_hda_gen_stream_pm,
+ };
+ 
++
++// for the moment split the new code into an include file
++
++#include "cirrus_apple.h"
++
++
+ static const struct hda_device_id snd_hda_id_cs8409[] = {
+ 	HDA_CODEC_ID(0x10138409, "CS8409"),
+ 	{} /* terminator */
