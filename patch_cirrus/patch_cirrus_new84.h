@@ -83,7 +83,7 @@ static unsigned int hda_set_node_power_state_dbg(struct hda_codec *codec, hda_ni
         unsigned int wcaps = get_wcaps(codec, nid);
         unsigned int state = power_state;
 	//unsigned int current_state;
-	if (dbgflg) mycodec_info(codec, "hda_set_node_power_state  nid 0x%02x power %d\n",nid,power_state);
+	if (dbgflg) { mycodec_info(codec, "hda_set_node_power_state  nid 0x%02x power %d\n",nid,power_state); }
         state = snd_hda_codec_read(codec, nid, 0, AC_VERB_GET_POWER_STATE, 0);
         if (!(state & AC_PWRST_ERROR)) {
 	        if (state != power_state) {
@@ -110,7 +110,7 @@ static unsigned int hda_set_node_power_state_dbg(struct hda_codec *codec, hda_ni
 	else {
 		dev_info(hda_codec_dev(codec), "hda_set_node_power_state ERROR!! nid 0x%02x 0x%04x\n",nid, state);
 	}
-	if (dbgflg) mycodec_info(codec, "hda_set_node_power_state end power %d\n",state);
+	if (dbgflg) { mycodec_info(codec, "hda_set_node_power_state end power %d\n",state); }
 
         return state;
 }
@@ -198,13 +198,15 @@ static inline unsigned int cs_8409_vendor_coef_set_mask(struct hda_codec *codec,
         if (srcval != 0)
         {
 		if (srcidx != 0 && mask_coef != srcval)
-			myprintk_dbg("snd_hda_intel: cs_8409_vendor_coef_set_mask 0x%04x 0x%04x: 0x%04x (0x%04x 0x%04x 0x%04x) 0x%04x != 0x%04x %d BAD",idx,coef,mask_coef,retval,coef,mask, mask_coef, srcval, srcidx);
+			{ myprintk_dbg("snd_hda_intel: cs_8409_vendor_coef_set_mask 0x%04x 0x%04x: 0x%04x (0x%04x 0x%04x 0x%04x) 0x%04x != 0x%04x %d BAD",idx,coef,mask_coef,retval,coef,mask, mask_coef, srcval, srcidx); }
 	        else
-                        myprintk_dbg("snd_hda_intel: cs_8409_vendor_coef_set_mask 0x%04x 0x%04x: 0x%04x (0x%04x 0x%04x 0x%04x) %d",idx,coef,mask_coef,retval,coef,mask,srcidx);
+                        { myprintk_dbg("snd_hda_intel: cs_8409_vendor_coef_set_mask 0x%04x 0x%04x: 0x%04x (0x%04x 0x%04x 0x%04x) %d",idx,coef,mask_coef,retval,coef,mask,srcidx); }
         }
 	else
+	{
                 //if (mask != 0xffff)
                 myprintk_dbg("snd_hda_intel: cs_8409_vendor_coef_set_mask 0x%04x 0x%04x: 0x%04x (0x%04x 0x%04x 0x%04x) %d",idx,coef,mask_coef,retval,coef,mask,srcidx);
+	}
         snd_hda_codec_write(codec, CS8409_VENDOR_NID, 0,
                             AC_VERB_SET_PROC_COEF, mask_coef);
         snd_hda_codec_write(codec, CS8409_VENDOR_NID, 0,
@@ -715,9 +717,9 @@ static void cs_8409_dump_stream_format(struct hda_codec *codec, hda_nid_t nid)
         }
 
         if (p != NULL)
-                mycodec_dbg(codec, "cs_8409_dump_stream_format: NID=0x%x, codec cached values: stream=0x%x, channel=%d, format=0x%x\n", nid, p->stream_tag, p->channel_id, p->format_id);
+                { mycodec_dbg(codec, "cs_8409_dump_stream_format: NID=0x%x, codec cached values: stream=0x%x, channel=%d, format=0x%x\n", nid, p->stream_tag, p->channel_id, p->format_id); }
         else
-                mycodec_dbg(codec, "cs_8409_dump_stream_format: NID=0x%x, codec cached values: NULL\n", nid);
+                { mycodec_dbg(codec, "cs_8409_dump_stream_format: NID=0x%x, codec cached values: NULL\n", nid); }
 }
 
 static void cs_8409_reset_stream_format(struct hda_codec *codec, hda_nid_t nid, int format, int doreset)
@@ -881,9 +883,9 @@ static void cs_8409_really_update_stream_format(struct hda_codec *codec, hda_nid
         mycodec_info(codec, "cs_8409_really_update_stream_format to update tag 0x%08x chnl 0x%08x fmt 0x%08x\n", p->stream_tag, p->channel_id, p->format_id);
 
         if (update_stream_id == 2)
-                mycodec_info(codec, "cs_8409_really_update_stream_format new       tag 0x%08x chnl 0x%08x fmt 0x%08x\n", stream_tag_sv, new_channel_id, format_id_sv);
+                { mycodec_info(codec, "cs_8409_really_update_stream_format new       tag 0x%08x chnl 0x%08x fmt 0x%08x\n", stream_tag_sv, new_channel_id, format_id_sv); }
         else
-                mycodec_info(codec, "cs_8409_really_update_stream_format new       tag 0x%08x chnl 0x%08x fmt 0x%08x\n", stream_tag_sv, channel_id_sv, format_id_sv);
+                { mycodec_info(codec, "cs_8409_really_update_stream_format new       tag 0x%08x chnl 0x%08x fmt 0x%08x\n", stream_tag_sv, channel_id_sv, format_id_sv); }
 
         cs_8409_dump_stream_format(codec, nid);
 
@@ -1851,7 +1853,9 @@ static void cs_8409_capture_pcm_hook(struct hda_pcm_stream *hinfo, struct hda_co
                 return;
         }
         else
+	{
                 myprintk_dbg("snd_hda_intel: command cs_8409_capture_pcm_hook HOOK init  - CODEC NOT NULL");
+	}
 
         //dump_stack();
 

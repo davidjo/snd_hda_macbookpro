@@ -50,6 +50,19 @@ and apply different digital filters to the tweeter and woofer channels.
 NOTE. My primary testing kernel is now Ubuntu LTS 24.04 6.8.
 
 
+NOTA BENE. As of linux kernel 6.17 the sound kernel source directory has been completely re-organized.
+           The installation script now works for 6.17 kernel versions (and later when they arrive).
+           The old installation script is now called install.cirrus.driver.pre617.sh.
+           The new version of the install.cirrus.driver.sh script will detect your kernel version and exec
+           the old installation script as needed.
+           For older kernel version you can just run the old installation script directly
+           ie install.cirrus.driver.pre617.sh.
+           Note that for kernel version 6.17 new files and directories have been added to the repo
+           rather than attempting to update the pre 6.17 versions (as the kernel source changes also
+           involved name changes and the new files are more consistent with the new kernel names).
+
+           DKMS for 6.17 is untested and highly likely wont work without changes.
+
 
 The following installation setup provided by leifliddy.
 
