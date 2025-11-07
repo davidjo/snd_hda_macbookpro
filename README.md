@@ -96,7 +96,7 @@ cd snd_hda_macbookpro/
 reboot
 ```
 
-Deleting driver:
+**Deleting driver**
 -------------
 ```
 # Check your kernel version
