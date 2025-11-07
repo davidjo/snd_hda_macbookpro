@@ -113,12 +113,15 @@ if [ $isfedora -ge 1 ]; then
 	[[ ! $(command -v patch) ]] && dnf install -y patch
 fi
 
-# we need to handle Ubuntu based distributions eg Mint here
 isubuntu=0
+# Check if we are dealing with Ubuntu
 if [ $(grep '^NAME=' /etc/os-release | grep -c Ubuntu) -eq 1 ]; then
 	isubuntu=1
-fi
-if [ $(grep '^NAME=' /etc/os-release | grep -c "Linux Mint") -eq 1 ]; then
+# For Unbuntu based distributions like Mint, ubuntu will be mentionned in ID_LIKE
+elif [ $(grep '^ID_LIKE=' /etc/os-release | grep -c "ubuntu") -eq 1 ]; then
+	isubuntu=1
+# In some other Unbuntu based distributions like Pop OS, we need to check ID
+elif [ $(grep '^ID=' /etc/os-release | grep -c "ubuntu") -eq 1 ]; then
 	isubuntu=1
 fi
 
@@ -138,6 +141,8 @@ if [ $isubuntu -ge 1 ]; then
 		echo "assuming the linux kernel source package is not installed"
 		echo "please install the linux kernel source package:"
 		echo "sudo apt install linux-source-$kernel_version"
+		echo "if the above doesn't work because some distros don't use LTS Kernel, download the linux-source-$kernel_version .deb file"
+		echo "using Archive Manager, Open data.tar.zst, extract /usr/src/linux-source-$kernel_version/linux-source-$kernel_version.tar.bz2"
 		echo "NOTE - This does not work for HWE kernels"
 
 		exit 1
