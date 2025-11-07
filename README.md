@@ -118,3 +118,11 @@ Clean up
 ```
 sudo ./install.cirrus.driver.pre617.sh -r
 ```
+You might also remove the ko file to completely cleanup
+```
+# Check your kernel version
+uname -a
+# delete the ko file
+sudo rm /lib/modules/{kernel version}/updates/snd-hda-codec-cs8409.ko
+sudo depmod -a
+```
