@@ -61,9 +61,6 @@ NOTA BENE. As of linux kernel 6.17 the sound kernel source directory has been co
            rather than attempting to update the pre 6.17 versions (as the kernel source changes also
            involved name changes and the new files are more consistent with the new kernel names).
 
-           DKMS for 6.17 is untested and highly likely wont work without changes.
-
-
 The following installation setup provided by leifliddy.
 
 
@@ -95,4 +92,26 @@ cd snd_hda_macbookpro/
 #run the following command as root or with sudo
 ./install.cirrus.driver.sh
 reboot
+```
+
+Dynamic Kernel Module Support (dkms):
+-------------
+
+dkms is a framework which allows kernel modules to be dynamically built for each kernel on your system.
+See here for more details: https://github.com/dell/dkms
+You will need to first install dkms on your system
+
+**install driver via dkms**
+```
+sudo ./install.cirrus.driver.sh -i
+```
+
+**remove driver from dkms**
+Delete driver from dkms:
+```
+sudo dkms remove snd_hda_macbookpro/0.1
+```
+Clean up
+```
+sudo ./install.cirrus.driver.sh -r
 ```
