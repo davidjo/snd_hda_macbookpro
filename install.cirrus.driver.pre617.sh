@@ -37,21 +37,25 @@ else
     PATCH_CIRRUS=false
 fi
 
+sed -i 's/^BUILT_MODULE_LOCATION\[0\].*$/BUILT_MODULE_LOCATION[0]="build\/hda"/' dkms.conf
+sed -i 's/^PRE_BUILD.*$/PRE_BUILD="install.cirrus.driver.pre617.sh -k $kernelver --dkms"/' dkms.conf
+
+
 if [[ $dkms_action == 'install' ]]; then
     bash dkms.sh
     # note that Ubuntu, Debian, Fedora and others (see dkms man page) install to updates/dkms
     # and ignore DEST_MODULE_LOCATION
     # we DO want updates so that the original module is not overwritten
     # (although the original module should be copied to under /var/lib/dkms if needed for other distributions)
-    update_dir="/lib/modules/${UNAME}/kernel/extra"
+    update_dir="/lib/modules/${UNAME}/updates"
     echo -e "\ncontents of $update_dir"
     ls -lA $update_dir
     exit
 elif [[ $dkms_action == 'remove' ]]; then
     bash dkms.sh -r
 	# next line needed to properly clean up dkms module
-	update_dir="/lib/modules/${UNAME}/kernel/extra"
-	[[ -e $update_dir/snd-hda-codec-cs8409.ko ]] && rm $update_dir/snd-hda-codec-cs8409.ko && depmod -a
+	update_dir="/lib/modules/${UNAME}/updates"
+	[[ -e $update_dir/snd-hda-codec-cs8409.ko ]] && rm $update_dir/snd-hda-codec-cs8409.ko && depmod -a && echo "removed $update_dir/snd-hda-codec-cs8409.ko"
     exit
 fi
 
