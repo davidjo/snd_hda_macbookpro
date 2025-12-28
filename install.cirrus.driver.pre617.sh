@@ -2,15 +2,18 @@
 
 # NOTA BENE - this script should be run as root
 
+#echo "SCRIPT ARGS ${@}"
+
 set -e
 
 while [ $# -gt 0 ]
 do
     case $1 in
     -i|--install) dkms_action='install';;
-    -k|--kernel) UNAME=$2; [[ -z $UNAME ]] && echo '-k|--kernel must be followed by a kernel version' && exit 1;;
+    -k|--kernel) UNAME=$2; [[ -z $UNAME ]] && echo '-k|--kernel must be followed by a kernel version' && exit 1; shift;;
     -r|--remove) dkms_action='remove';;
     -u|--uninstall) dkms_action='remove';;
+    -d|--dkms) dkms=true;;
     (-*) echo "$0: error - unrecognized option $1" 1>&2; exit 1;;
     (*) break;;
     esac
@@ -28,27 +31,66 @@ revpart1=$(echo $revision | cut -d '-' -f1)
 revpart2=$(echo $revision | cut -d '-' -f2)
 revpart3=$(echo $revision | cut -d '-' -f3)
 
+
 if [ $major_version -eq 5 -a $minor_version -lt 13 ]; then
-    sed -i 's/^BUILT_MODULE_NAME\[0\].*$/BUILT_MODULE_NAME[0]="snd-hda-codec-cirrus"/' dkms.conf
+    if [ -e dkms.conf.orig ]; then
+        sed -i 's/^BUILT_MODULE_NAME\[0\].*$/BUILT_MODULE_NAME[0]="snd-hda-codec-cirrus"/' dkms.conf
+    else
+        sed -i.orig 's/^BUILT_MODULE_NAME\[0\].*$/BUILT_MODULE_NAME[0]="snd-hda-codec-cirrus"/' dkms.conf
+    fi
     PATCH_CIRRUS=true
 else
-    sed -i 's/^BUILT_MODULE_NAME\[0\].*$/BUILT_MODULE_NAME[0]="snd-hda-codec-cs8409"/' dkms.conf
+    if [ -e dkms.conf.orig ]; then
+        sed -i 's/^BUILT_MODULE_NAME\[0\].*$/BUILT_MODULE_NAME[0]="snd-hda-codec-cs8409"/' dkms.conf
+    else
+        sed -i.orig 's/^BUILT_MODULE_NAME\[0\].*$/BUILT_MODULE_NAME[0]="snd-hda-codec-cs8409"/' dkms.conf
+    fi
     PATCH_CIRRUS=false
 fi
 
+sed -i 's/^BUILT_MODULE_LOCATION\[0\].*$/BUILT_MODULE_LOCATION[0]="build\/hda"/' dkms.conf
+sed -i 's/^PRE_BUILD.*$/PRE_BUILD="install.cirrus.driver.pre617.sh -k $kernelver --dkms"/' dkms.conf
+
+
 if [[ $dkms_action == 'install' ]]; then
+
+    # we remove any non-dkms module just in case
+    # we can only have one dkms module with same file name prefix under the whole /lib/modules/{kernel version} directory
+    update_dir="/lib/modules/${UNAME}/updates"
+    [[ -e $update_dir/snd-hda-codec-cs8409.ko ]] && rm $update_dir/snd-hda-codec-cs8409.ko && echo "removed $update_dir/snd-hda-co
+dec-cs8409.ko"
+
+    # run dkms install script
     bash dkms.sh
+
     # note that Ubuntu, Debian, Fedora and others (see dkms man page) install to updates/dkms
     # and ignore DEST_MODULE_LOCATION
     # we DO want updates so that the original module is not overwritten
     # (although the original module should be copied to under /var/lib/dkms if needed for other distributions)
     update_dir="/lib/modules/${UNAME}/updates"
-    echo -e "\ncontents of $update_dir/dkms"
-    ls -lA $update_dir/dkms
+    echo -e "\ncontents of $update_dir"
+    ls -lA $update_dir
     exit
+
 elif [[ $dkms_action == 'remove' ]]; then
-    bash dkms.sh -r
+
+    # under ubuntu 6.8 although the dkms manual entry says it archives original modules
+    # it doesnt appear to do this
+    # at 6.17 dkms DOES archive the original module (logged) and so MUST do dkms remove to re-install it
+    # dkms.sh updated to reflect this
+
+    # we MUST call dkms remove to ensure any archived base kernel module is restored
+    # and it also removes the whole dkms module subtree
+    bash dkms.sh -r 
+ 
+    # none of this is needed now dkms.sh calls dkms remove - including the depmod
+    # next line needed to properly clean up dkms module
+    # but not needed now we call dkms remove in dkms.sh
+    # (it may be immaterial as the original module wont be loaded in any case as the hardware wont match on Apple machine)
+    #update_dir="/lib/modules/${UNAME}/updates"
+    #[[ -e $update_dir/dkms/snd-hda-codec-cs8409.ko.zst ]] && rm $update_dir/dkms/snd-hda-codec-cs8409.ko.zst && depmod -a && echo "removed $update_dir/dkms/snd-hda-codec-cs8409.ko.zst"
     exit
+
 fi
 
 if [ $major_version == '4' ]; then
@@ -113,13 +155,16 @@ if [ $isfedora -ge 1 ]; then
 	[[ ! $(command -v patch) ]] && dnf install -y patch
 fi
 
-# we need to handle Ubuntu based distributions eg Mint here
 isubuntu=0
+# Check if we are dealing with Ubuntu
 if [ $(grep '^NAME=' /etc/os-release | grep -c Ubuntu) -eq 1 ]; then
-	isubuntu=1
-fi
-if [ $(grep '^NAME=' /etc/os-release | grep -c "Linux Mint") -eq 1 ]; then
-	isubuntu=1
+        isubuntu=1
+# For Unbuntu based distributions like Mint, ubuntu will be mentionned in ID_LIKE
+elif [ $(grep '^ID_LIKE=' /etc/os-release | grep -c "ubuntu") -eq 1 ]; then
+        isubuntu=1
+# In some other Unbuntu based distributions like Pop OS, we need to check ID
+elif [ $(grep '^ID=' /etc/os-release | grep -c "ubuntu") -eq 1 ]; then
+        isubuntu=1
 fi
 
 if [ $isubuntu -ge 1 ]; then
@@ -138,6 +183,8 @@ if [ $isubuntu -ge 1 ]; then
 		echo "assuming the linux kernel source package is not installed"
 		echo "please install the linux kernel source package:"
 		echo "sudo apt install linux-source-$kernel_version"
+		echo "if the above doesn't work because some distros don't use LTS Kernel, download the linux-source-$kernel_version .deb file"
+		echo "using Archive Manager, Open data.tar.zst, extract /usr/src/linux-source-$kernel_version/linux-source-$kernel_version.tar.bz2"
 		echo "NOTE - This does not work for HWE kernels"
 
 		exit 1
@@ -254,15 +301,22 @@ popd > /dev/null
 
 [[ ! $dkms_action == 'install' ]] && [[ ! -d $update_dir ]] && mkdir $update_dir
 
-if [ $PATCH_CIRRUS = true ]; then
-	make PATCH_CIRRUS=1
-	make install PATCH_CIRRUS=1
+#echo "DKMS VAR IS ${dkms}"
 
-else
-	make KERNELRELEASE=$UNAME
-	make install KERNELRELEASE=$UNAME
+# Skipping patch installation since dkms will do it
+if [[ ! $dkms = true ]]; then
 
+	echo "DKMS FALSE DONE"
+
+	if [ $PATCH_CIRRUS = true ]; then
+		make PATCH_CIRRUS=1
+		make install PATCH_CIRRUS=1
+
+	else
+		make KERNELRELEASE=$UNAME
+		make install KERNELRELEASE=$UNAME
+
+	fi
+	echo -e "\ncontents of $update_dir"
+	ls -lA $update_dir
 fi
-
-echo -e "\ncontents of $update_dir"
-ls -lA $update_dir

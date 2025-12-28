@@ -7,8 +7,7 @@ Sound input still needs work.
 
 It will play audio through Internal speakers or headphones.
 
-The primary audio should be set to  Analogue Stereo Output in the Settings Audio dialog.
-
+The primary audio should be set to Analogue Stereo Output in the Settings Audio dialog. Alternatively, if you want to use the internal microphone, set it to Analogue Stereo Duplex.
 
 Sound recording from internal mike and headset mike is not yet fully interfaced with Linux user side.
 
@@ -96,3 +95,30 @@ cd snd_hda_macbookpro/
 ./install.cirrus.driver.sh
 reboot
 ```
+
+**Deleting driver**
+```
+# Check your kernel version
+uname -a
+# delete the ko file
+sudo rm /lib/modules/{kernel version}/updates/snd-hda-codec-cs8409.ko
+sudo depmod -a
+```
+
+Dynamic Kernel Module Support (dkms):
+-------------
+
+dkms is a framework which allows kernel modules to be dynamically built for each kernel on your system.
+See here for more details: https://github.com/dell/dkms
+You will need to first install dkms on your system
+
+**install driver via dkms**
+```
+sudo ./install.cirrus.driver.sh -i
+```
+
+**remove driver from dkms**
+```
+sudo ./install.cirrus.driver.sh -r
+```
+
