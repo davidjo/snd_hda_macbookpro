@@ -65,16 +65,16 @@ The following installation setup provided by leifliddy.
 
 
 
-Compiling and installing driver:
+Compiling and installing driver (run the following commands as root or with sudo):
 -------------
 
 **fedora package install**
 ```
-dnf install gcc kernel-devel make patch wget
+dnf install gcc-12 kernel-devel make patch wget
 ```
 **ubuntu package install**  
 ```
-apt install gcc linux-headers-generic make patch wget
+apt install gcc-12 linux-headers-generic make patch wget
 ```
 **arch package install**
 ```
