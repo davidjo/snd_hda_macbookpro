@@ -60,8 +60,6 @@ NOTA BENE. As of linux kernel 6.17 the sound kernel source directory has been co
            rather than attempting to update the pre 6.17 versions (as the kernel source changes also
            involved name changes and the new files are more consistent with the new kernel names).
 
-           DKMS for 6.17 is untested and highly likely wont work without changes.
-
 
 The following installation setup provided by leifliddy.
 
