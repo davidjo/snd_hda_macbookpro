@@ -1803,11 +1803,12 @@ static void cs_8409_pcm_capture_pre_prepare_hook(struct hda_pcm_stream *hinfo, s
 						cs_8409_headcapture_setup(codec);
 						spec->headset_capture_format_setup_needed = 0;
 					}
+				} else {
+					// NOTE - still not fixed linein/lineout working - this may need
+					// changing here
+					// attempt to handle using internal mike if the headset does not have a mike
+					cs_8409_capture_setup(codec);
 				}
-				// I think this is impossible - this would say we tried to capture
-				// using a headset without mike
-				// NOTE - still not fixed linein/lineout working - this may need
-				// changing here
 			}
 			else
 				cs_8409_capture_setup(codec);

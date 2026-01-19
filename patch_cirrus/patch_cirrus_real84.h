@@ -3285,23 +3285,47 @@ static void cs_8409_capture_real(struct hda_codec *codec)
         //        unfortunately looks as tho linux tends to open the capture stream before the playback stream
         //        - so going to ignore this here
 
+        if (spec->jack_present && !(spec->have_mike)) {
 
-        cs_8409_inputs_power_nids_on(codec);
+                // attempt to handle using the internal mike with headphone (no mike)
+                // NO handling of linein at all (note that jack_present could mean either linein or headset)
 
-        //cs_8409_intmike_format_setup_format(codec);
-        cs_8409_intmike_format_setup_enable(codec, 0x4031, 0);
+                //cs_8409_inputs_power_nids_on(codec);
+                hda_set_node_power_state(codec, spec->intmike_adc_nid, AC_PWRST_D0);
 
-        cs_8409_intmike_volume_setup(codec, 0x27);
-        cs_8409_intmike_stream_on_nid(codec);
+                //cs_8409_intmike_format_setup_format(codec);
+                cs_8409_intmike_format_setup_enable(codec, 0x4031, 0);
 
-        cs_8409_intmike_volume_unmute(codec);
-        cs_8409_linein_volume_unmute(codec);
+                cs_8409_intmike_volume_setup(codec, 0x27);
+                cs_8409_intmike_stream_on_nid(codec);
 
-        // so here we get AMP_GAIN_MUTE setups but nothing changes
-        // - so either this is a volume update with no change or unmute with no change
-        // - which to do with??
-        //cs_8409_intmike_volume_setup - (no change)
-        //cs_8409_linein_volume_setup - (no change)
+                cs_8409_intmike_volume_unmute(codec);
+
+                // so here we get AMP_GAIN_MUTE setups but nothing changes
+                // - so either this is a volume update with no change or unmute with no change
+                // - which to do with??
+                //cs_8409_intmike_volume_setup - (no change)
+
+        } else {
+
+                cs_8409_inputs_power_nids_on(codec);
+
+                //cs_8409_intmike_format_setup_format(codec);
+                cs_8409_intmike_format_setup_enable(codec, 0x4031, 0);
+
+                cs_8409_intmike_volume_setup(codec, 0x27);
+                cs_8409_intmike_stream_on_nid(codec);
+
+                cs_8409_intmike_volume_unmute(codec);
+                cs_8409_linein_volume_unmute(codec);
+
+                // so here we get AMP_GAIN_MUTE setups but nothing changes
+                // - so either this is a volume update with no change or unmute with no change
+                // - which to do with??
+                //cs_8409_intmike_volume_setup - (no change)
+                //cs_8409_linein_volume_setup - (no change)
+
+         }
 
 
         cs_8409_perform_external_device_unsolicited_responses(codec);
