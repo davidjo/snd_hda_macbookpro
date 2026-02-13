@@ -159,9 +159,32 @@ if [ $isubuntu -ge 1 ]; then
         #           modified with extensive backports from later kernel versions
         #           (and in any case there is no linux-source-... package for hwe kernels)
 
-	if [ ! -e /usr/src/linux-source-$kernel_version.tar.bz2 ]; then
+	ubuntu_uname_base="${UNAME%-*}"
+	ubuntu_hwe_hda_dir="/usr/src/linux-hwe-${major_version}.${minor_version}-headers-${ubuntu_uname_base}/sound/hda"
+
+	if [ -d "$ubuntu_hwe_hda_dir" ]; then
+		cp -a "$ubuntu_hwe_hda_dir" "$hda_dir"
+		# Ubuntu HWE headers often omit cs8409 source files; fallback to mainline source tarball in that case.
+		if [ ! -f "$hda_dir/codecs/cirrus/cs8409.c" ]; then
+			echo "HWE header source tree missing cs8409.c, falling back to mainline linux-$kernel_version source"
+			rm -rf "$hda_dir"
+			set +e
+			wget -c https://cdn.kernel.org/pub/linux/kernel/v$major_version.x/linux-$kernel_version.tar.xz -P $build_dir
+			if [[ $? -ne 0 ]]; then
+				echo "Failed to download linux-$kernel_version.tar.xz"
+				echo "Trying base kernel version linux-$major_version.$minor_version.tar.xz"
+				kernel_version=$major_version.$minor_version
+				wget -c https://cdn.kernel.org/pub/linux/kernel/v$major_version.x/linux-$kernel_version.tar.xz -P $build_dir
+				[[ $? -ne 0 ]] && echo "kernel could not be downloaded...exiting" && exit
+			fi
+			set -e
+			tar --strip-components=2 -xvf $build_dir/linux-$kernel_version.tar.xz --directory=build/ linux-$kernel_version/sound/hda
+		fi
+	elif [ ! -e /usr/src/linux-source-$kernel_version.tar.bz2 ]; then
 
 		echo "Ubuntu linux kernel source not found in /usr/src: /usr/src/linux-source-$kernel_version.tar.bz2"
+		echo "Tried HWE headers source path:"
+		echo "$ubuntu_hwe_hda_dir"
 		echo "assuming the linux kernel source package is not installed"
 		echo "please install the linux kernel source package:"
 		echo "sudo apt install linux-source-$kernel_version"
@@ -171,9 +194,9 @@ if [ $isubuntu -ge 1 ]; then
 
 		exit 1
 
+	else
+		tar --strip-components=2 -xvf /usr/src/linux-source-$kernel_version.tar.bz2 --directory=build/ linux-source-$kernel_version/sound/hda
 	fi
-
-	tar --strip-components=2 -xvf /usr/src/linux-source-$kernel_version.tar.bz2 --directory=build/ linux-source-$kernel_version/sound/hda
 
 else
 	# here we assume the distribution kernel source is essentially the mainline kernel source
