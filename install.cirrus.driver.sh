@@ -263,7 +263,7 @@ if [ $iscurrent -gt 1 ]; then
 	echo "Kernel version later than implemented version - there may be build problems"
 fi
 
-if [ $major_version -eq 6 -a $minor_version -ge 17 ]; then
+if [[ ( $major_version -eq 6 && $minor_version -ge 17 ) || $major_version -ge 7 ]]; then
 	if [ $isubuntu -ge 1 ]; then
 
 		patch -b -p1 <../../patch_cs8409.c.diff
