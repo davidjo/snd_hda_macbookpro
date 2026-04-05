@@ -149,6 +149,8 @@ elif [ $(grep '^ID=' /etc/os-release | grep -c "ubuntu") -eq 1 ]; then
         isubuntu=1
 fi
 
+ubuntu_hwe=0
+
 if [ $isubuntu -ge 1 ]; then
 
 	# NOTE for Ubuntu we need to use the distribution kernel sources as they seem
@@ -161,21 +163,61 @@ if [ $isubuntu -ge 1 ]; then
 
 	if [ ! -e /usr/src/linux-source-$kernel_version.tar.bz2 ]; then
 
-		echo "Ubuntu linux kernel source not found in /usr/src: /usr/src/linux-source-$kernel_version.tar.bz2"
-		echo "assuming the linux kernel source package is not installed"
-		echo "please install the linux kernel source package:"
-		echo "sudo apt install linux-source-$kernel_version"
-		echo "if the above doesn't work because some distros don't use LTS Kernel, download the linux-source-$kernel_version .deb file"
-		echo "using Archive Manager, Open data.tar.zst, extract /usr/src/linux-source-$kernel_version/linux-source-$kernel_version.tar.bz2"
-		echo "NOTE - This does not work for HWE kernels"
+		if [ apt-cache show linux-source-$kernel_version &>/dev/null ]; then
+			ubuntu_hwe=1
+		fi
 
-		exit 1
+                if [ $ubuntu_hwe -eq 0 ]; then
+
+			echo "Ubuntu linux kernel source not found in /usr/src: /usr/src/linux-source-$kernel_version.tar.bz2"
+			echo "assuming the linux kernel source package is not installed"
+			echo "please install the linux kernel source package:"
+			echo "sudo apt install linux-source-$kernel_version"
+			echo "if the above doesn't work because some distros don't use LTS Kernel, download the linux-source-$kernel_version .deb file"
+			echo "using Archive Manager, Open data.tar.zst, extract /usr/src/linux-source-$kernel_version/linux-source-$kernel_version.tar.bz2"
+
+			exit 1
+
+                else
+
+			#echo "NOTE - This does not work for HWE kernels"
+			#exit 1
+
+			echo "No Ubuntu source package found - assuming HWE kernel"
+			echo "As a fallback will use the mainline kernel with the same version"
+			echo "WARNING: this has worked for some versions but it is unknown if this will work for all versions"
+			echo "At the moment its only known this path works for kernel version 6.17"
+
+		fi
 
 	fi
 
-	tar --strip-components=2 -xvf /usr/src/linux-source-$kernel_version.tar.bz2 --directory=build/ linux-source-$kernel_version/sound/hda
+	if [ $ubuntu_hwe -eq 0 ]; then
 
-else
+		tar --strip-components=2 -xvf /usr/src/linux-source-$kernel_version.tar.bz2 --directory=build/ linux-source-$kernel_version/sound/hda
+
+	else
+
+		# we need to download the plain major/minor version source as the ubuntu revision version will not exist
+		echo "Likely Ubuntu HWE - Trying to download base kernel version linux-$major_version.$minor_version.tar.xz"
+
+		set +e
+
+   		kernel_version=$major_version.$minor_version
+   		wget -c https://cdn.kernel.org/pub/linux/kernel/v$major_version.x/linux-$kernel_version.tar.xz -P $build_dir
+
+		[[ $? -ne 0 ]] && echo "kernel could not be downloaded...exiting" && exit
+
+		set -e
+
+		tar --strip-components=2 -xvf $build_dir/linux-$kernel_version.tar.xz --directory=build/ linux-$kernel_version/sound/hda
+
+	fi
+
+fi
+
+if [[ $isubuntu -eq 0 ]]; then
+
 	# here we assume the distribution kernel source is essentially the mainline kernel source
 
 	set +e
@@ -228,9 +270,9 @@ pushd $hda_dir > /dev/null
 # for ubuntu allow a range of revisions that work
 current_major=6
 current_minor=17
-current_minor_ubuntu=6
-current_rev_ubuntu=6
-latest_rev_ubuntu=6
+current_minor_ubuntu=17
+current_rev_ubuntu=17
+latest_rev_ubuntu=17
 
 iscurrent=0
 if [ $isubuntu -ge 1 ]; then
