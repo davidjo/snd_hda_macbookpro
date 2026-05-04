@@ -7,11 +7,14 @@ set -e
 # Storing the script arguments before processing them if needed for pre617 script
 script_arguments_pre617="${@}"
 
+# Initialize empty variable to store the -k flag input safely
+TARGET_UNAME=""
+
 while [ $# -gt 0 ]
 do
     case $1 in
     -i|--install) dkms_action='install';;
-    -k|--kernel) UNAME=$2; [[ -z $UNAME ]] && echo '-k|--kernel must be followed by a kernel version' && exit 1; shift;;
+    -k|--kernel) TARGET_UNAME=$2; [[ -z $TARGET_UNAME ]] && echo '-k|--kernel must be followed by a kernel version' && exit 1; shift;;
     -r|--remove) dkms_action='remove';;
     -u|--uninstall) dkms_action='remove';;
     -d|--dkms) dkms=true;;
@@ -21,7 +24,9 @@ do
     shift
 done
 
-UNAME=${1:-$(uname -r)}
+# Set UNAME prioritizing -k flag, then positional argument $1, and finally falling back to uname -r
+UNAME=${TARGET_UNAME:-${1:-$(uname -r)}}
+
 kernel_version=$(echo $UNAME | cut -d '-' -f1)  #ie 5.2.7
 major_version=$(echo $kernel_version | cut -d '.' -f1)
 minor_version=$(echo $kernel_version | cut -d '.' -f2)
