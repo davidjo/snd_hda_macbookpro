@@ -183,6 +183,26 @@ if [ $isubuntu -ge 1 ]; then
 else
 	# here we assume the distribution kernel source is essentially the mainline kernel source
 
+	# Prefer a locally installed kernel-source package before downloading from kernel.org.
+	# Debian ships it as /usr/src/linux-source-<MAJOR>.<MINOR>.tar.xz (e.g. linux-source-7.0.tar.xz):
+	#   - keyed by the X.Y base version, NOT the full uname (e.g. 7.0.10+deb14)
+	#   - it is .tar.xz, not .tar.bz2
+	#   - archive top-level dir is linux-source-<MAJOR>.<MINOR>/
+	# It needs no network and is the only workable source for an -rc kernel
+	# (kernel.org has no stable linux-<ver>.tar.xz for -rc releases).
+	src_ver=$major_version.$minor_version
+	local_src=""
+	for ext in tar.xz tar.bz2 tar.gz; do
+		[ -e "/usr/src/linux-source-$src_ver.$ext" ] && local_src="/usr/src/linux-source-$src_ver.$ext" && break
+	done
+
+	if [ -n "$local_src" ]; then
+		echo "Using local kernel source: $local_src"
+		# tar -xf auto-detects xz/bz2/gz
+		tar --strip-components=2 -xf "$local_src" --directory=build/ "linux-source-$src_ver/sound/hda"
+	else
+	# --- existing kernel.org download path, unchanged (now the fallback) ---
+
 	set +e
 
 	# attempt to download linux-x.x.x.tar.xz kernel
@@ -204,6 +224,8 @@ else
 	set -e
 
 	tar --strip-components=2 -xvf $build_dir/linux-$kernel_version.tar.xz --directory=build/ linux-$kernel_version/sound/hda
+
+	fi
 
 fi
 
