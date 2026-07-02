@@ -183,27 +183,56 @@ if [ $isubuntu -ge 1 ]; then
 else
 	# here we assume the distribution kernel source is essentially the mainline kernel source
 
-	set +e
+	# Persistent cache so we don't need to re-download a kernel tarball on every
+	# point-release bump (and so builds still work if kernel.org doesn't have this
+	# exact version, or the network is unavailable at DKMS build time).
+	cache_dir=${CS8409_SRC_CACHE:-/var/cache/cs8409-src}
+	mkdir -p "$cache_dir" 2>/dev/null
+	minor_series="$major_version.$minor_version"
 
-	# attempt to download linux-x.x.x.tar.xz kernel
-	wget -c https://cdn.kernel.org/pub/linux/kernel/v$major_version.x/linux-$kernel_version.tar.xz -P $build_dir
-
-	if [[ $? -ne 0 ]]; then
-		echo "Failed to download linux-$kernel_version.tar.xz"
-		echo "Trying to download base kernel version linux-$major_version.$minor_version.tar.xz"
-		echo "This may lead to build failures as too old"
-		echo "If this is an Ubuntu-based distribution this almost certainly will fail to build"
-		echo ""
-   		# if first attempt fails, attempt to download linux-x.x.tar.xz kernel
-   		kernel_version=$major_version.$minor_version
-   		wget -c https://cdn.kernel.org/pub/linux/kernel/v$major_version.x/linux-$kernel_version.tar.xz -P $build_dir
-
-		[[ $? -ne 0 ]] && echo "kernel could not be downloaded...exiting" && exit
+	tarball=""
+	if [ -e "$cache_dir/linux-$kernel_version.tar.xz" ]; then
+		tarball="$cache_dir/linux-$kernel_version.tar.xz"
+	elif [ -e "$cache_dir/linux-$minor_series.tar.xz" ]; then
+		# point releases within a minor series (e.g. 7.1.x) share the same
+		# sound/hda codec source, so a cached minor-series tarball is reused
+		kernel_version=$minor_series
+		tarball="$cache_dir/linux-$kernel_version.tar.xz"
 	fi
 
-	set -e
+	if [ -z "$tarball" ]; then
 
-	tar --strip-components=2 -xvf $build_dir/linux-$kernel_version.tar.xz --directory=build/ linux-$kernel_version/sound/hda
+		set +e
+
+		# attempt to download linux-x.x.x.tar.xz kernel straight into the cache
+		wget -c https://cdn.kernel.org/pub/linux/kernel/v$major_version.x/linux-$kernel_version.tar.xz -P "$cache_dir"
+
+		if [[ $? -ne 0 ]]; then
+			echo "Failed to download linux-$kernel_version.tar.xz"
+			echo "Trying to download base kernel version linux-$minor_series.tar.xz"
+			echo "This may lead to build failures as too old"
+			echo "If this is an Ubuntu-based distribution this almost certainly will fail to build"
+			echo ""
+	   		# if first attempt fails, attempt to download linux-x.x.tar.xz kernel
+	   		kernel_version=$minor_series
+	   		wget -c https://cdn.kernel.org/pub/linux/kernel/v$major_version.x/linux-$kernel_version.tar.xz -P "$cache_dir"
+
+			if [[ $? -ne 0 ]]; then
+				echo "ERROR: kernel source linux-$kernel_version.tar.xz could not be found in"
+				echo "cache ($cache_dir) or downloaded from kernel.org - kernel could not be downloaded...exiting"
+				echo "To fix: place a sound/hda-bearing linux-$kernel_version(.x).tar.xz at"
+				echo "$cache_dir/ (e.g. sourced from your distro kernel's git tree) and retry."
+				set -e
+				exit 1
+			fi
+		fi
+
+		set -e
+
+		tarball="$cache_dir/linux-$kernel_version.tar.xz"
+	fi
+
+	tar --strip-components=2 -xvf "$tarball" --directory=build/ linux-$kernel_version/sound/hda
 
 fi
 
