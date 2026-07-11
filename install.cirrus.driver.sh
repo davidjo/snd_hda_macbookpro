@@ -196,8 +196,17 @@ else
 	elif [ -e "$cache_dir/linux-$minor_series.tar.xz" ]; then
 		# point releases within a minor series (e.g. 7.1.x) share the same
 		# sound/hda codec source, so a cached minor-series tarball is reused
-		kernel_version=$minor_series
-		tarball="$cache_dir/linux-$kernel_version.tar.xz"
+		tarball="$cache_dir/linux-$minor_series.tar.xz"
+	else
+		# ANY previously-cached point release in the same minor series works
+		# too (7.1.2's sound/hda == 7.1.3's), so reuse the newest one we have
+		# before falling back to a network download. This is what keeps an
+		# offline kernel bump within a series (e.g. 7.1.2 -> 7.1.3 when the
+		# machine has no network mid-pacman-transaction) from killing audio:
+		# the previous bump's tarball is left in the cache under its full name.
+		for cand in $(ls -1 "$cache_dir"/linux-$minor_series.*.tar.xz 2>/dev/null | sort -V -r); do
+			[ -e "$cand" ] && tarball="$cand" && break
+		done
 	fi
 
 	if [ -z "$tarball" ]; then
@@ -232,7 +241,11 @@ else
 		tarball="$cache_dir/linux-$kernel_version.tar.xz"
 	fi
 
-	tar --strip-components=2 -xvf "$tarball" --directory=build/ linux-$kernel_version/sound/hda
+	# derive the tarball's actual top-level dir (e.g. linux-7.1.2) from the
+	# archive itself, so the extract works no matter which cached point-release
+	# we matched above rather than assuming it equals linux-$kernel_version.
+	src_top=$(tar tf "$tarball" 2>/dev/null | head -1 | cut -d/ -f1)
+	tar --strip-components=2 -xvf "$tarball" --directory=build/ "$src_top/sound/hda"
 
 fi
 
