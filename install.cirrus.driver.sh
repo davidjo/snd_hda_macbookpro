@@ -7,11 +7,14 @@ set -e
 # Storing the script arguments before processing them if needed for pre617 script
 script_arguments_pre617="${@}"
 
+# Initialize empty variable to store the -k flag input safely
+TARGET_UNAME=""
+
 while [ $# -gt 0 ]
 do
     case $1 in
     -i|--install) dkms_action='install';;
-    -k|--kernel) UNAME=$2; [[ -z $UNAME ]] && echo '-k|--kernel must be followed by a kernel version' && exit 1; shift;;
+    -k|--kernel) TARGET_UNAME=$2; [[ -z $TARGET_UNAME ]] && echo '-k|--kernel must be followed by a kernel version' && exit 1; shift;;
     -r|--remove) dkms_action='remove';;
     -u|--uninstall) dkms_action='remove';;
     -d|--dkms) dkms=true;;
@@ -21,7 +24,9 @@ do
     shift
 done
 
-UNAME=${1:-$(uname -r)}
+# Set UNAME prioritizing -k flag, then positional argument $1, and finally falling back to uname -r
+UNAME=${TARGET_UNAME:-${1:-$(uname -r)}}
+
 kernel_version=$(echo $UNAME | cut -d '-' -f1)  #ie 5.2.7
 major_version=$(echo $kernel_version | cut -d '.' -f1)
 minor_version=$(echo $kernel_version | cut -d '.' -f2)
@@ -42,7 +47,6 @@ if [ -e dkms.conf.orig ]; then
 else
     sed -i.orig 's/^BUILT_MODULE_NAME\[0\].*$/BUILT_MODULE_NAME[0]="snd-hda-codec-cs8409"/' dkms.conf
 fi
-sed -i 's/^BUILT_MODULE_LOCATION\[0\].*$/BUILT_MODULE_LOCATION[0]="build\/hda\/codecs\/cirrus"/' dkms.conf
 sed -i 's/^PRE_BUILD.*$/PRE_BUILD="install.cirrus.driver.sh -k $kernelver --dkms"/' dkms.conf
 
 PATCH_CIRRUS=false
@@ -163,8 +167,8 @@ if [ $isubuntu -ge 1 ]; then
 
 	if [ ! -e /usr/src/linux-source-$kernel_version.tar.bz2 ]; then
 
-		if [ apt-cache show linux-source-$kernel_version &>/dev/null ]; then
-			ubuntu_hwe=1
+		if ! apt-cache show linux-source-$kernel_version >/dev/null 2>&1; then
+    			ubuntu_hwe=1
 		fi
 
                 if [ $ubuntu_hwe -eq 0 ]; then
