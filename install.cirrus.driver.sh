@@ -168,8 +168,8 @@ if [ $isubuntu -ge 1 ]; then
 
 	if [ ! -e /usr/src/linux-source-$kernel_version.tar.bz2 ]; then
 
-		if [ apt-cache show linux-source-$kernel_version &>/dev/null ]; then
-			ubuntu_hwe=1
+		if ! apt-cache show linux-source-$kernel_version >/dev/null 2>&1; then
+    			ubuntu_hwe=1
 		fi
 
                 if [ $ubuntu_hwe -eq 0 ]; then
