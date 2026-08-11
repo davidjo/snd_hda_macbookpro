@@ -787,6 +787,30 @@ static int cs_8409_capture_pcm_prepare(struct hda_pcm_stream *hinfo,
         mycodec_info(codec, "cs_8409_capture_pcm_prepare: NID=0x%x, stream=0x%x, format=0x%x\n",
                   hinfo->nid, stream_tag, format);
 
+	/* Dynamic ADC switching: select the correct ADC NID based on the currently
+	 * chosen "Capture Source" (set by UCM / PipeWire when switching ports).
+	 * Without this, hinfo->nid stays at intmike_adc_nid (0x22) forever and the
+	 * headset mic path (NID 0x1a, fed by CS42L83 via pin 0x3c) is never used,
+	 * so cs_8409_store_stream_format caches the DMA stream tag for the wrong NID
+	 * and cs42l83_headset_mike_format_setup_enable's call to
+	 * cs_8409_really_update_stream_format(0x1a,...) finds an empty cache.
+	 */
+	if (spec->gen.dyn_adc_switch && spec->gen.num_adc_nids > 1) {
+		int mux_idx = spec->gen.cur_mux[substream->number];
+		if (mux_idx > 0 && mux_idx < (int)spec->gen.input_mux.num_items) {
+			int adc_idx = spec->gen.dyn_adc_idx[mux_idx];
+			if (adc_idx > 0 && adc_idx < spec->gen.num_adc_nids) {
+				hda_nid_t new_nid = spec->gen.adc_nids[adc_idx];
+				if (new_nid && hinfo->nid != new_nid) {
+					dev_info(hda_codec_dev(codec),
+					         "cs_8409_capture_pcm_prepare: dyn_adc_switch NID 0x%02x -> 0x%02x (mux=%d)\n",
+					         hinfo->nid, new_nid, mux_idx);
+					snd_hda_codec_cleanup_stream(codec, hinfo->nid);
+					hinfo->nid = new_nid;
+				}
+			}
+		}
+	}
 
         cs_8409_pcm_capture_pre_prepare_hook(hinfo, codec, stream_tag, format, substream,
                               HDA_GEN_PCM_ACT_PREPARE);

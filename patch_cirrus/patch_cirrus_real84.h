@@ -164,6 +164,8 @@ static void cs_8409_intmike_format_setup_enable(struct hda_codec *codec, int hda
 }
 
 
+#define CS8409_CAPTURE_INPUT_GAIN_DEFAULT 0x33
+
 static void cs_8409_volume_set(struct hda_codec *codec, hda_nid_t nid, int volume)
 {
         int retgain;
@@ -394,7 +396,7 @@ static void cs_8409_linein_volume_setup(struct hda_codec *codec, int volume)
 
         newgain = (retgain & 0x80) | (volume & 0x7f) | 0x6000;
 
-        snd_hda_codec_write(codec, spec->linein_amp_nid, 0, AC_VERB_SET_AMP_GAIN_MUTE, 0x000060a7); // 0x023360a7
+        snd_hda_codec_write(codec, spec->linein_amp_nid, 0, AC_VERB_SET_AMP_GAIN_MUTE, newgain); // 0x023360a7
 
         //snd_hda_codec_write(codec, 0x23, 0, AC_VERB_SET_AMP_GAIN_MUTE, 0x000060a7); // 0x023360a7
 //      snd_hda:     amp gain/mute 35 0x60a7 mute 1 gain 0x27 39 index 0x00 left 1 right 0 output 0 input 1 left   input
@@ -2229,7 +2231,7 @@ static int cs_8409_boot_setup_real(struct hda_codec *codec)
         //setup_intmike_nid(codec);
         //cs_8409_intmike_format_setup_format(codec);
         cs_8409_intmike_format_setup_enable(codec, 0x4031, 1);
-        cs_8409_intmike_volume_setup(codec, 0x27);
+        cs_8409_intmike_volume_setup(codec, CS8409_CAPTURE_INPUT_GAIN_DEFAULT);
         cs_8409_intmike_stream_on_nid(codec);
 
         //setup_intmike_format_resetup(codec);
@@ -2238,7 +2240,7 @@ static int cs_8409_boot_setup_real(struct hda_codec *codec)
         cs_8409_really_update_stream_format(codec, spec->intmike_adc_nid, 1, 0, 0);
 
         //setup_linein_nid(codec);
-        cs_8409_linein_volume_setup(codec, 0x27);
+        cs_8409_linein_volume_setup(codec, CS8409_CAPTURE_INPUT_GAIN_DEFAULT);
         cs_8409_linein_format_setup_disable(codec);
 
         //setup_intmike_stream_conn_off_nid(codec);
@@ -2529,7 +2531,7 @@ static int cs_8409_boot_setup_real(struct hda_codec *codec)
                         //cs_8409_really_update_stream_format(codec, 0x22, 1, 0, 0);
 
                         //cs_8409_linein_volume_setup_new(codec, 0x27)
-                        //cs_8409_linein_volume_setup(codec, 0x27);
+                        //cs_8409_linein_volume_setup(codec, CS8409_CAPTURE_INPUT_GAIN_DEFAULT);
 
 
                         //cs_8409_linein_format_setup_disable(codec);
@@ -2778,11 +2780,11 @@ static int cs_8409_boot_setup_real(struct hda_codec *codec)
                         //#9324:  cs_8409_linein_volume_setup
                         //#9401: cs_8409_linein_format_setup_disable
 
-                        //cs_8409_intmike_volume_setup(codec, 0x27);
+                        //cs_8409_intmike_volume_setup(codec, CS8409_CAPTURE_INPUT_GAIN_DEFAULT);
 
                         //cs_8409_intmike_format_setup_disable(codec);
 
-                        //cs_8409_linein_volume_setup(codec, 0x27);
+                        //cs_8409_linein_volume_setup(codec, CS8409_CAPTURE_INPUT_GAIN_DEFAULT);
 
                         //cs_8409_linein_format_setup_disable(codec);
 
@@ -3117,7 +3119,7 @@ static int cs_8409_boot_setup_real(struct hda_codec *codec)
                 cs_8409_really_update_stream_format(codec, spec->intmike_adc_nid, 1, 0, 0);
 
                 //setup_linein_vol7(codec);
-                cs_8409_linein_volume_setup(codec, 0x27);
+                cs_8409_linein_volume_setup(codec, CS8409_CAPTURE_INPUT_GAIN_DEFAULT);
 
                 //setup_linein_nid1(codec);
                 cs_8409_linein_format_setup_disable(codec);
@@ -3291,7 +3293,7 @@ static void cs_8409_capture_real(struct hda_codec *codec)
         //cs_8409_intmike_format_setup_format(codec);
         cs_8409_intmike_format_setup_enable(codec, 0x4031, 0);
 
-        cs_8409_intmike_volume_setup(codec, 0x27);
+        cs_8409_intmike_volume_setup(codec, CS8409_CAPTURE_INPUT_GAIN_DEFAULT);
         cs_8409_intmike_stream_on_nid(codec);
 
         cs_8409_intmike_volume_unmute(codec);
@@ -4545,13 +4547,13 @@ static void cs_8409_intmike_linein_resetup(struct hda_codec *codec)
 
         cs_8409_intmike_format_setup_enable(codec, 0x4033, 1);
 
-        cs_8409_intmike_volume_setup(codec, 0x27);
+        cs_8409_intmike_volume_setup(codec, CS8409_CAPTURE_INPUT_GAIN_DEFAULT);
 
         cs_8409_intmike_stream_on_nid(codec);
 
         cs_8409_linein_format_setup_enable(codec);
 
-        cs_8409_linein_volume_setup(codec, 0x27);
+        cs_8409_linein_volume_setup(codec, CS8409_CAPTURE_INPUT_GAIN_DEFAULT);
 
         cs_8409_linein_stream_on_nid(codec);
 
@@ -4569,7 +4571,7 @@ static void cs_8409_intmike_linein_resetup(struct hda_codec *codec)
         //cs_8409_really_update_stream_format(codec, 0x22, 1, 0, 0);
         cs_8409_really_update_stream_format(codec, spec->intmike_adc_nid, 1, 0, 0);
 
-        cs_8409_linein_volume_setup(codec, 0x27);
+        cs_8409_linein_volume_setup(codec, CS8409_CAPTURE_INPUT_GAIN_DEFAULT);
 
         cs_8409_linein_format_setup_disable(codec);
 
@@ -5313,11 +5315,11 @@ static void cs_8409_intmike_linein_disable(struct hda_codec *codec)
 
         cs_8409_linein_stream_off_nid(codec);
 
-        cs_8409_intmike_volume_setup(codec, 0x27);
+        cs_8409_intmike_volume_setup(codec, CS8409_CAPTURE_INPUT_GAIN_DEFAULT);
 
         cs_8409_intmike_format_setup_disable(codec);
 
-        cs_8409_linein_volume_setup(codec, 0x27);
+        cs_8409_linein_volume_setup(codec, CS8409_CAPTURE_INPUT_GAIN_DEFAULT);
 
         cs_8409_linein_format_setup_disable(codec);
 

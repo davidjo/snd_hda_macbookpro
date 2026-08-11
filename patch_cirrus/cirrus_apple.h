@@ -792,6 +792,23 @@ static int cs_8409_capture_pcm_prepare(struct hda_pcm_stream *hinfo,
         mycodec_info(codec, "cs_8409_capture_pcm_prepare: NID=0x%x, stream=0x%x, format=0x%x\n",
                   hinfo->nid, stream_tag, format);
 
+	/* When headset mic is active, switch hinfo->nid to the headset ADC (0x1a)
+	 * before calling the pre-hook so that:
+	 *  (a) cs_8409_store_stream_format caches the DMA stream tag for NID 0x1a,
+	 *      making cs_8409_really_update_stream_format(0x1a,...) inside
+	 *      cs_8409_headcapture_setup find a valid stream_tag; and
+	 *  (b) the if(hinfo->nid==intmike_adc_nid) branch below is skipped, so
+	 *      snd_hda_codec_setup_stream is NOT called for NID 0x22 on the same
+	 *      stream_tag — which would overwrite the 0x1a HDA DMA configuration
+	 *      and produce silence.
+	 */
+	if (spec->jack_present && spec->have_mike && hinfo->nid == spec->intmike_adc_nid) {
+		snd_hda_codec_cleanup_stream(codec, hinfo->nid);
+		hinfo->nid = 0x1a;
+		dev_info(hda_codec_dev(codec),
+		         "cs_8409_capture_pcm_prepare: headset mic active, NID 0x%02x -> 0x1a\n",
+		         spec->intmike_adc_nid);
+	}
 
         cs_8409_pcm_capture_pre_prepare_hook(hinfo, codec, stream_tag, format, substream,
                               HDA_GEN_PCM_ACT_PREPARE);
