@@ -154,6 +154,13 @@ elif [ $(grep '^ID=' /etc/os-release | grep -c "ubuntu") -eq 1 ]; then
         isubuntu=1
 fi
 
+# T2 custom kernels (e.g. AdityaGarg8/t2-ubuntu-repo) are mainline-based, not real
+# Ubuntu archive kernels with backports, and no linux-source-<ver> package is ever
+# published for them. Fall back to the mainline kernel.org download path instead.
+if [[ "$UNAME" == *-t2-* ]]; then
+        isubuntu=0
+fi
+
 if [ $isubuntu -ge 1 ]; then
 
 	# NOTE for Ubuntu we need to use the distribution kernel sources as they seem
