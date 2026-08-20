@@ -42,13 +42,15 @@ if [ $major_version -lt 6 -o \( $major_version -eq 6 -a $minor_version -lt 17 \)
 	exec ./install.cirrus.driver.pre617.sh $script_arguments_pre617
 fi
 
-if [ -e dkms.conf.orig ]; then
-    sed -i 's/^BUILT_MODULE_NAME\[0\].*$/BUILT_MODULE_NAME[0]="snd-hda-codec-cs8409"/' dkms.conf
-else
-    sed -i.orig 's/^BUILT_MODULE_NAME\[0\].*$/BUILT_MODULE_NAME[0]="snd-hda-codec-cs8409"/' dkms.conf
-fi
-sed -i 's/^BUILT_MODULE_LOCATION\[0\].*$/BUILT_MODULE_LOCATION[0]="build\/hda\/codecs\/cirrus"/' dkms.conf
-sed -i 's/^PRE_BUILD.*$/PRE_BUILD="install.cirrus.driver.sh -k $kernelver --dkms"/' dkms.conf
+# keeping this code around in case need it for older versions later on
+# the repo dkms.conf will now be the current version with no edits needed
+#if [ -e dkms.conf.orig ]; then
+#    sed -i 's/^BUILT_MODULE_NAME\[0\].*$/BUILT_MODULE_NAME[0]="snd-hda-codec-cs8409"/' dkms.conf
+#else
+#    sed -i.orig 's/^BUILT_MODULE_NAME\[0\].*$/BUILT_MODULE_NAME[0]="snd-hda-codec-cs8409"/' dkms.conf
+#fi
+#sed -i 's/^BUILT_MODULE_LOCATION\[0\].*$/BUILT_MODULE_LOCATION[0]="build\/hda\/codecs\/cirrus"/' dkms.conf
+#sed -i 's/^PRE_BUILD.*$/PRE_BUILD="install.cirrus.driver.sh -k $kernelver --dkms"/' dkms.conf
 
 PATCH_CIRRUS=false
 
