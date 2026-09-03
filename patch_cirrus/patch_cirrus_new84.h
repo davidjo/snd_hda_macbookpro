@@ -1804,8 +1804,15 @@ static void cs_8409_pcm_capture_pre_prepare_hook(struct hda_pcm_stream *hinfo, s
 						spec->headset_capture_format_setup_needed = 0;
 					}
 				}
-				// I think this is impossible - this would say we tried to capture
-				// using a headset without mike
+				else
+				{
+					// output-only headphones (no headset mike) plugged into the jack
+					// while capturing from the internal mike - eg voice dictation with
+					// headphones on. this is not impossible, it is the common case.
+					// without this branch no capture setup runs at all, the adc is
+					// never initialised and the pcm read returns -EIO.
+					cs_8409_capture_setup(codec);
+				}
 				// NOTE - still not fixed linein/lineout working - this may need
 				// changing here
 			}
