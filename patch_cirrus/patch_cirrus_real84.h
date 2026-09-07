@@ -4819,9 +4819,17 @@ static void cs_8409_plugin_event_continued(struct hda_codec *codec)
                 // - headset phase of 2 or more means post boot headset plugin
                 if (spec->headset_phase >= 2)
                 {
-
-                        // ensure the intmike/linein nids are powered off
-                        cs_8409_inputs_power_nids_off(codec);
+                        // if capturing is currently being done
+                        if (spec->capturing > 0)
+                        {
+                                // Turn off line in only for headphone without mike
+                                hda_set_node_power_state(codec, spec->linein_amp_nid, AC_PWRST_D3);
+                        }
+                        else
+                        {
+                                // ensure the intmike/linein nids are powered off for headphone with mike
+                                cs_8409_inputs_power_nids_off(codec);
+                        }
 
 
                         retval = cs42l83_headphone_sense(codec);
@@ -5615,9 +5623,15 @@ static void cs_8409_unplug_handle_disconnect(struct hda_codec *codec)
                 //unplug_sync_converters2_on(codec);
 
 
-                if (!(spec->have_mike))
+                if (spec->have_mike)
                 {
+                        // Turn off internal mic and line in for headphone with mike
                         cs_8409_inputs_power_nids_off(codec);
+                }
+                else
+                {
+                        // Turn off line in only for headphone without mike
+                        hda_set_node_power_state(codec, spec->linein_amp_nid, AC_PWRST_D3);
                 }
 
                 // and another headphone sense
@@ -5658,17 +5672,30 @@ static void cs_8409_unplug_handle_disconnect(struct hda_codec *codec)
 
                                 mycodec_info(codec, "cs_8409_unplug_handle_disconnect headset have mike end\n");
                         }
-
+                        // if audio is currently playing
                         if (spec->playing)
                         {
-                                if (!(spec->have_mike))
+                                if (spec->have_mike)
                                 {
+                                        // Turn off internal mic and line in for headphone with mike
                                         cs_8409_inputs_power_nids_off(codec);
+                                }
+                                else{
+                                        // Turn off line in only for headphone without mike
+                                        hda_set_node_power_state(codec, spec->linein_amp_nid, AC_PWRST_D3);
                                 }
                         }
 
                         if (spec->have_mike)
+                        {
+                                // Turn off internal mic and line in for headphone with mike
                                 cs_8409_inputs_power_nids_off(codec);
+                        }
+                        else
+                        {
+                                // Turn off line in only for headphone without mike
+                                hda_set_node_power_state(codec, spec->linein_amp_nid, AC_PWRST_D3);
+                        }
 
 
                         mycodec_info(codec, "cs_8409_unplug_handle_disconnect headset disable start\n");
