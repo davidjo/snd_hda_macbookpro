@@ -1445,12 +1445,38 @@ static int cs_8409_apple_init(struct hda_codec *codec)
 	return 0;
 }
 
+// forward declaration -- cs_8409_boot_setup() is defined further down this
+// file (it is also forward-declared there for its other callers).
+static int cs_8409_boot_setup(struct hda_codec *codec);
+
 static int cs_8409_apple_resume(struct hda_codec *codec)
 {
+        struct cs8409_apple_spec *spec = codec->spec;
         myprintk("snd_hda_intel: cs_8409_apple_resume\n");
         // code copied from default resume ops
-        snd_hda_codec_init(codec);       
+        snd_hda_codec_init(codec);
 	snd_hda_regmap_sync(codec);
+
+        // A real S3 (mem_sleep=deep) suspend fully powers off the CS8409 codec
+        // along with the attached MAX98706 amps and CS42L83. That wipes the
+        // vendor-node / I2C / PLL / TDM programming which is performed ONCE at
+        // probe time by cs_8409_boot_setup(). snd_hda_codec_init() +
+        // snd_hda_regmap_sync() above only restore standard HDA verbs and pin
+        // state -- they do NOT re-run that Apple-specific chip setup. Without
+        // it, the per-playback cs_8409_play_*() writes land on an unconfigured
+        // chip and the result is silence, even though ALSA and PipeWire both
+        // report the stream started successfully. Re-run the exact foundational
+        // init the probe path uses so the amps are programmed again.
+        cs_8409_boot_setup(codec);
+
+        // Reset the one-time play/capture setup flags too, so the next playback
+        // re-runs cs_8409_play_setup() / headset setup against the freshly
+        // reconfigured chip instead of assuming it was already done pre-suspend.
+        spec->play_init = 0;
+        spec->play_init_count = 0;
+        spec->headset_play_format_setup_needed = 1;
+        spec->headset_capture_format_setup_needed = 1;
+
         myprintk("snd_hda_intel: end cs_8409_apple_resume\n");
         return 0;
 }
