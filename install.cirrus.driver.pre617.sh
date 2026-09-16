@@ -29,7 +29,7 @@ UNAME=${TARGET_UNAME:-${1:-$(uname -r)}}
 kernel_version=$(echo $UNAME | cut -d '-' -f1)  #ie 5.2.7
 major_version=$(echo $kernel_version | cut -d '.' -f1)
 minor_version=$(echo $kernel_version | cut -d '.' -f2)
-major_minor=${major_version}${minor_version}
+major_minor=${major_version}.${minor_version}
 
 revision=$(echo $UNAME | cut -d '.' -f3)
 revpart1=$(echo $revision | cut -d '-' -f1)
@@ -176,7 +176,6 @@ if [ $isubuntu -ge 1 ]; then
 
 	# NOTE for Ubuntu we need to use the distribution kernel sources as they seem
 	# to be significantly modified from the mainline kernel sources generally with backports from later kernels
-	# (so far the actual debian kernels seem to be close to mainline kernels)
 
 	# NOTA BENE this will likely NOT work for Ubuntu hwe kernels which are even more highly
         #           modified with extensive backports from later kernel versions
@@ -197,6 +196,22 @@ if [ $isubuntu -ge 1 ]; then
 	fi
 
 	tar --strip-components=3 -xvf /usr/src/linux-source-$kernel_version.tar.bz2 --directory=build/ linux-source-$kernel_version/sound/pci/hda
+
+elif [ $isdebian -ge 1 ]; then
+
+	# NOTE for Debian we need to use the distribution kernel sources as they seem
+	# to be significantly modified from the mainline kernel sources generally with backports from later kernels
+
+	if [ ! -e /usr/src/linux-source-$major_minor.tar.xz ]; then
+
+		echo "Debian linux kernel source not found in /usr/src: /usr/src/linux-source-$major_minor.tar.xz"
+		echo "assuming the linux kernel source package is not installed"
+		echo "please install the linux kernel source package:"
+		echo "sudo apt install linux-source-$major_minor"
+		exit 1
+	fi
+
+	tar --strip-components=3 -xvf /usr/src/linux-source-$major_minor.tar.xz --directory=build/ linux-source-$major_minor/sound/pci/hda
 
 else
 	# here we assume the distribution kernel source is essentially the mainline kernel source
