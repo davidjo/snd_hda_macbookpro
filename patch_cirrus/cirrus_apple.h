@@ -1445,13 +1445,65 @@ static int cs_8409_apple_init(struct hda_codec *codec)
 	return 0;
 }
 
+// Declared here because the boot-time setup lives in patch_cirrus_boot84.h,
+// which this file only includes further down.
+static void init_for_node_vendor(struct hda_codec *codec);
+static void enable_i2c(struct hda_codec *codec);
+static void setup_amps_reset_i2c_tas576(struct hda_codec *codec);
+
 static int cs_8409_apple_resume(struct hda_codec *codec)
 {
-        myprintk("snd_hda_intel: cs_8409_apple_resume\n");
+        struct cs8409_apple_spec *spec = codec->spec;
+
+        myprintk("snd_hda_intel: cs_8409_apple_resume APPLE RESUME AMPS\n");
+
+        // Suspend leaves the external amplifiers unprogrammed. snd_hda_regmap_sync
+        // below restores this codec's own registers, but the four TAS5764 amps sit
+        // behind its I2C master, where regmap cannot reach them: they come back
+        // empty and the machine plays digital silence with nothing logged.
+        //
+        // Every mainline driver for this class of part re-drives the external
+        // devices on resume -- cs8409's own Dell path rewrites the CS42L42 init
+        // sequence, CS35L41 resets and reloads its DSP, TAS2781 voids its cached
+        // program state and reloads. Do the same for the amps.
+        //
+        // Only the amplifier half of the cold-boot sequence is replayed. Running
+        // all of cs_8409_boot_setup() here does not work: its CS42L83 stage polls
+        // an interrupt status that never settles on a codec that is already up,
+        // and three "read_status_and_clear_interrupt - max count exceeded"
+        // timeouts later the hardware is worse off than before. The headphone
+        // codec is not what goes quiet after a suspend; the speakers are.
+        //
+        // setup_amps_reset_i2c_tas576() starts with setup_gpio_set_10(), the line
+        // Apple's own layout data names as the amplifier reset, so the parts are
+        // taken through reset before they are programmed.
+        spec->play_init = 0;
+        spec->play_init_count = 0;
+        spec->headset_play_format_setup_needed = 1;
+
+        // iMac19,1 and the iMac18,x that share this amplifier set.
+        if (codec->core.subsystem_id == 0x106b1000 ||
+            codec->core.subsystem_id == 0x106b0f00 ||
+            codec->core.subsystem_id == 0x106b0e00) {
+                // The I2C master has to be brought up first: it lives behind the
+                // vendor widget's PROC_STATE and coefficients, which regmap does
+                // not cache and so does not restore. Programming the amplifiers
+                // without this writes into a disabled bus -- no error, no effect,
+                // which is exactly what the first attempt at this looked like.
+                // The vendor node carries the ASP clocking that feeds the
+                // amplifiers. Programming them while that is unset leaves the
+                // parts configured but with no data reaching them -- configured
+                // silence. This stage does no status polling, so unlike the
+                // CS42L83 stage it is safe to replay on a live codec.
+                init_for_node_vendor(codec);
+                enable_i2c(codec);
+                setup_amps_reset_i2c_tas576(codec);
+        }
+
         // code copied from default resume ops
         snd_hda_codec_init(codec);       
 	snd_hda_regmap_sync(codec);
-        myprintk("snd_hda_intel: end cs_8409_apple_resume\n");
+        myprintk("snd_hda_intel: end cs_8409_apple_resume APPLE RESUME AMPS\n");
         return 0;
 }
 
