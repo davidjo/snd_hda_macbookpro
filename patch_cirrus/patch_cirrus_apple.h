@@ -1,6 +1,7 @@
 //#include <linux/ctype.h>
 #include <linux/timer.h>
 #include <linux/bitops.h>
+#include <linux/dmi.h>
 
 #include <linux/version.h>
 
@@ -2317,6 +2318,16 @@ static const struct hda_pintbl macbook_pro_pincfgs[] = {
         { 0x45, 0x00800101 },
         { }
 };
+
+/* Pin defaults restored only after a live controller reset. */
+static const struct hda_pintbl mbp_live_reset_pincfgs[] = {
+	{ 0x24, 0x90100110 },
+	{ 0x25, 0x90100111 },
+	{ 0x2c, 0x002b4020 },
+	{ 0x3c, 0x00ab9030 },
+	{ 0x44, 0xa0a60100 },
+	{ }
+};
 static const struct hda_pintbl imac_pincfgs[] = {
         { 0x44, 0x00800101 },
         { }
@@ -2605,6 +2616,20 @@ static int patch_cs8409_apple(struct hda_codec *codec)
         int fixup_found = 0;
 
         int explicit = 0;
+	int live_hda_reset = codec->core.subsystem_id == 0x10138409 &&
+		dmi_match(DMI_PRODUCT_NAME, "MacBookPro13,1");
+
+	/*
+	 * A live reset of the Intel HDA controller on MacBookPro13,1 can
+	 * leave the CS8409 reporting its codec ID as the subsystem ID.
+	 * This machine normally reports 0x106b3300 at cold boot. Preserve
+	 * that known board identity so the Apple amplifier setup can run.
+	 */
+	if (live_hda_reset) {
+		dev_warn(hda_codec_dev(codec),
+			 "using MacBookPro13,1 subsystem after live HDA reset\n");
+		codec->core.subsystem_id = 0x106b3300;
+	}
 
         //struct hda_pcm *info = NULL;
         //struct hda_pcm_stream *hinfo = NULL;
@@ -3010,6 +3035,11 @@ static int patch_cs8409_apple(struct hda_codec *codec)
 
        if (!explicit)
        {
+	      if (live_hda_reset) {
+	              dev_warn(hda_codec_dev(codec),
+	                       "restoring MacBookPro13,1 pin configuration after live HDA reset\n");
+	              snd_hda_apply_pincfgs(codec, mbp_live_reset_pincfgs);
+	      }
 
               myprintk("snd_hda_intel: pre cs_8409_apple_parse_auto_config\n");
 
@@ -3194,5 +3224,3 @@ static void cs_8409_set_extended_codec_verb(void)
 	snd_hda_set_extended_codec_verb(cs_8409_extended_codec_verb);
 }
 #endif
-
-
