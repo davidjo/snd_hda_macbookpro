@@ -59,7 +59,7 @@ if [[ $dkms_action == 'install' ]]; then
     # we remove any non-dkms module just in case
     # we can only have one dkms module with same file name prefix under the whole /lib/modules/{kernel version} directory
     update_dir="/lib/modules/${UNAME}/updates/codecs/cirrus"
-    [[ -e $update_dir/snd-hda-codec-cs8409.ko ]] && rm $update_dir/snd-hda-codec-cs8409.ko && echo "removed $update_dir/snd-hda-codec-cs8409.ko"
+    rm -f $update_dir/snd-hda-codec-cs8409.ko* && echo "cleaned old modules in $update_dir"
 
     # run dkms install script
     bash dkms.sh
@@ -219,6 +219,11 @@ cp $makefiles_dir/Makefile $hda_dir
 cp $makefiles_dir/Makefile_common $hda_dir/common/Makefile
 cp $makefiles_dir/Makefile_codecs $hda_dir/codecs/Makefile
 cp $makefiles_dir/Makefile_cirrus $hda_dir/codecs/cirrus/Makefile
+
+# Ensure ABI layout of struct hda_multi_out matches Ubuntu 7.0 kernel (which added spdif_kctl)
+if ! grep -q "spdif_kctl" $hda_dir/common/hda_local.h; then
+	sed -i 's/u64 spdif_formats;/u64 spdif_formats;\n\tstruct snd_kcontrol *spdif_kctl;/' $hda_dir/common/hda_local.h
+fi
 
 # going with explicit file names now
 

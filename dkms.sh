@@ -37,8 +37,8 @@ pushd $cur_dir > /dev/null
 # create the symbolic link for source dkms seems to require
 [[ ! -e $src_dir ]] && ln -sfn $cur_dir $src_dir
 
-# note that this will store the original base kernel module under  /var/lib/dkms
-# and needs dkms remove to be called to restore that original module back to the base kernel modules
+# ensure clean rebuild if re-installing
+dkms remove $dkms_name -k $(uname -r) >/dev/null 2>&1 || true
 dkms install -c dkms.conf --force -m $dkms_name
 
 popd > /dev/null

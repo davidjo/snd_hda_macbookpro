@@ -692,7 +692,12 @@ void cs_8409_cs42l83_jack_report_hp_update(struct hda_codec *codec, int plugin);
 
 void cs_8409_cs42l83_jack_unsol_event(struct hda_codec *codec, unsigned int res);
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 17, 0)
+void cs_8409_apple_remove(struct hda_codec *codec);
+#define cs_8409_apple_free cs_8409_apple_remove
+#else
 void cs_8409_apple_free(struct hda_codec *codec);
+#endif
 
 
 
@@ -1437,9 +1442,13 @@ static int cs_8409_apple_init(struct hda_codec *codec)
 static int cs_8409_apple_resume(struct hda_codec *codec)
 {
         myprintk("snd_hda_intel: cs_8409_apple_resume\n");
-        // code copied from default resume patch ops
+        // code copied from default resume ops
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 17, 0)
+        snd_hda_codec_init(codec);
+#else
 	if (codec->patch_ops.init)
 		codec->patch_ops.init(codec);
+#endif
 	snd_hda_regmap_sync(codec);
         myprintk("snd_hda_intel: end cs_8409_apple_resume\n");
         return 0;
@@ -1739,6 +1748,12 @@ void cs_8409_cs42l83_jack_unsol_event(struct hda_codec *codec, unsigned int res)
 // cs_free is just a definition
 //#define cs_8409_apple_free		snd_hda_gen_free
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 17, 0)
+void cs_8409_apple_remove(struct hda_codec *codec)
+{
+	snd_hda_gen_remove(codec);
+}
+#else
 void cs_8409_apple_free(struct hda_codec *codec)
 {
 #if 0
@@ -1753,6 +1768,7 @@ void cs_8409_apple_free(struct hda_codec *codec)
 
 	snd_hda_gen_free(codec);
 }
+#endif
 
 
 // note this must come after any function definitions used
@@ -1761,7 +1777,11 @@ static const struct hda_codec_ops cs_8409_apple_patch_ops = {
 	.build_controls = cs_8409_apple_build_controls,
 	.build_pcms = cs_8409_apple_build_pcms,
 	.init = cs_8409_apple_init,
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 17, 0)
+	.remove = cs_8409_apple_remove,
+#else
 	.free = cs_8409_apple_free,
+#endif
 	.unsol_event = cs_8409_cs42l83_jack_unsol_event,
 #ifdef CONFIG_PM
         .resume = cs_8409_apple_resume,
@@ -2410,7 +2430,11 @@ static int patch_cs8409_apple_nouse(struct hda_codec *codec)
 
         err = cs8409_apple_parse_auto_config(codec);
         if (err < 0) {
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 17, 0)
+                cs8409_remove(codec);
+#else
                 cs8409_free(codec);
+#endif
                 return err;
         }
 
@@ -2597,6 +2621,7 @@ static struct cs8409_apple_spec *cs8409_apple_alloc_spec(struct hda_codec *codec
 static int patch_cs8409_apple(struct hda_codec *codec)
 {
         struct cs8409_apple_spec *spec;
+        struct hda_codec_driver *driver;
         int err;
         int itm;
         int i;
@@ -2703,7 +2728,14 @@ static int patch_cs8409_apple(struct hda_codec *codec)
                //codec->patch_ops = cs_8409_apple_patch_ops_explicit;
                }
         else
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 17, 0)
+        {
+               driver = hda_codec_to_driver(codec);
+               driver->ops = &cs_8409_apple_patch_ops;
+        }
+#else
                codec->patch_ops = cs_8409_apple_patch_ops;
+#endif
 
 
 	// not sure about these
@@ -2845,7 +2877,14 @@ static int patch_cs8409_apple(struct hda_codec *codec)
                //codec->patch_ops = cs_8409_apple_patch_ops_explicit;
                }
         else
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 17, 0)
+        {
+               driver = hda_codec_to_driver(codec);
+               driver->ops = &cs_8409_apple_patch_ops;
+        }
+#else
                codec->patch_ops = cs_8409_apple_patch_ops;
+#endif
 #endif
 
         // moved to post auto config
@@ -3128,7 +3167,11 @@ static int patch_cs8409_apple(struct hda_codec *codec)
        return 0;
 
  error:
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 17, 0)
+       cs_8409_apple_remove(codec);
+#else
        cs_8409_apple_free(codec);
+#endif
        return err;
 }
 
