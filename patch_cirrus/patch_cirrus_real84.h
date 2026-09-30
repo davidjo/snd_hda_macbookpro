@@ -3242,10 +3242,17 @@ static void cs_8409_playstop_real(struct hda_codec *codec)
 
 
         //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_POWER_STATE, 0x00000003); // 0x00170503
-        hda_set_node_power_state(codec, codec->core.afg, AC_PWRST_D3);
+        // not while capturing. Powering down the function group
+        // and the input nids here stops a running capture dead: no more frames reach
+        // the PCM (measured: a capture stalls when the speaker stream is closed).
+        // The capture cleanup powers the inputs down when it ends.
+        if (!spec->capturing)
+        {
+                hda_set_node_power_state(codec, codec->core.afg, AC_PWRST_D3);
 
-        // weird - why set the inputs to powered off when stop playing??
-        cs_8409_inputs_power_nids_off(codec);
+                // weird - why set the inputs to powered off when stop playing??
+                cs_8409_inputs_power_nids_off(codec);
+        }
 
 
         cs_8409_perform_external_device_unsolicited_responses(codec);
@@ -4821,7 +4828,9 @@ static void cs_8409_plugin_event_continued(struct hda_codec *codec)
                 {
 
                         // ensure the intmike/linein nids are powered off
-                        cs_8409_inputs_power_nids_off(codec);
+                        // unless a capture is running - that stalls it
+                        if (!spec->capturing)
+                                cs_8409_inputs_power_nids_off(codec);
 
 
                         retval = cs42l83_headphone_sense(codec);
@@ -5615,7 +5624,9 @@ static void cs_8409_unplug_handle_disconnect(struct hda_codec *codec)
                 //unplug_sync_converters2_on(codec);
 
 
-                if (!(spec->have_mike))
+                // not while capturing - unplugging output only
+                // headphones during a capture stalled it (the internal mike stays the source)
+                if (!(spec->have_mike) && !spec->capturing)
                 {
                         cs_8409_inputs_power_nids_off(codec);
                 }
@@ -5661,7 +5672,7 @@ static void cs_8409_unplug_handle_disconnect(struct hda_codec *codec)
 
                         if (spec->playing)
                         {
-                                if (!(spec->have_mike))
+                                if (!(spec->have_mike) && !spec->capturing)
                                 {
                                         cs_8409_inputs_power_nids_off(codec);
                                 }
