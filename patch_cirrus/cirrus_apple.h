@@ -558,6 +558,11 @@ struct cs8409_apple_spec {
 	struct timespec first_play_time;
 #endif
 
+	// set when the pre prepare hook set up the internal mike
+	// (cs_8409_capture_setup), so the cleanup stops what was set up rather than
+	// guessing from the jack state at cleanup time. Kept at the end of the struct:
+	// some code casts codec->spec to struct cs8409_spec.
+	int intmike_capture_setup;
 };
 #endif
 
@@ -1621,6 +1626,15 @@ void cs_8409_cs42l83_mark_jack(struct hda_codec *codec)
                 //snd_hda_jack_report_sync(codec);
         }
 
+        // the headset mike pin shares the jack - mark it as well.
+        // Otherwise snd_hda_jack_report_sync never re-reads it and the Mic Jack kcontrol
+        // only changes when the codec runtime resumes (snd_hda_jack_set_dirty_all), which
+        // happens before the jack event is handled - so userspace saw the previous state
+        // (Mic on with nothing plugged in, Mic off with a headset plugged in).
+        event = snd_hda_jack_tbl_get_mst(codec, CS8409_CS42L83_HP_MIC_PIN_NID, 0);
+        if (event)
+                event->jack_dirty = 1;
+
         // note that the Dell fixups do calls to snd_hda_jack_unsol_event for each jack nid
         // so we have multiple calls to snd_hda_jack_report_sync
         // so far looks as though this is OK as eventually snd_hda_jack_report_sync calls snd_kctl_jack_report
@@ -2556,8 +2570,13 @@ static int cs8409_cs42l83_exec_verb(struct hdac_device *dev, unsigned int cmd, u
 			//myprintk("snd_hda_intel: cs 8409 exec verb pin sense 0x%04x %d\n", nid, cs42l83->mic_jack_in);
                         //*res = (cs42l83->mic_jack_in) ? AC_PINSENSE_PRESENCE : 0;
                         // initially use my jack_present flag integer
-			myprintk("snd_hda_intel: cs 8409 exec verb pin sense 0x%04x %d\n", nid, spec->jack_present);
-                        *res = (spec->jack_present) ? AC_PINSENSE_PRESENCE : 0;
+			myprintk("snd_hda_intel: cs 8409 exec verb pin sense 0x%04x %d %d\n", nid, spec->jack_present, spec->have_mike);
+                        // the headset mike is present only when a plugged in
+                        // headset has been detected as having a mike - not whenever something is in
+                        // the jack. Reporting jack_present here made output-only headphones show up as a
+                        // headset mike, and during the ~2s type detection a headset was reported
+                        // before have_mike was known.
+                        *res = (spec->jack_present && spec->have_mike) ? AC_PINSENSE_PRESENCE : 0;
                         return 0;
                 }
         } else if (nid == spec->linein_nid) {
@@ -2929,6 +2948,7 @@ static int cs8409_apple(struct hda_codec *codec)
 
         spec->playing = 0;
         spec->capturing = 0;
+        spec->intmike_capture_setup = 0;
 
         spec->headset_play_format_setup_needed = 1;
         spec->headset_capture_format_setup_needed = 1;

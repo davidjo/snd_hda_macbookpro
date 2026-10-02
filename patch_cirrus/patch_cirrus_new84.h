@@ -1813,13 +1813,17 @@ static void cs_8409_pcm_capture_pre_prepare_hook(struct hda_pcm_stream *hinfo, s
                                         // so can capture from the internal mike
                                         // has been tested and seems to work but I have not verified this
 					cs_8409_capture_setup(codec);
+					spec->intmike_capture_setup = 1;
 #endif
 				}
 				// NOTE - still not fixed linein/lineout working - this may need
 				// changing here
 			}
 			else
+			{
 				cs_8409_capture_setup(codec);
+				spec->intmike_capture_setup = 1;
+			}
 		}
 
 		myprintk("snd_hda_intel: command cs_8409_capture_pcm_hook setup capture called");
@@ -1924,8 +1928,16 @@ static void cs_8409_capture_pcm_hook(struct hda_pcm_stream *hinfo, struct hda_co
 				}
 			}
 		}
-                else
-		        cs_8409_capture_cleanup(codec);
+		// stop the internal mike if it was set up for this
+		// stream - decided by what the pre prepare hook did, not by jack_present now.
+		// The jack may have changed during the capture: plugged in -> the internal
+		// mike was never stopped; unplugged -> the internal mike was stopped although
+		// it had not been set up.
+		if (spec->intmike_capture_setup)
+		{
+			cs_8409_capture_cleanup(codec);
+			spec->intmike_capture_setup = 0;
+		}
 		myprintk("snd_hda_intel: command cs_8409_capture_pcm_hook done capture down");
 		spec->block_unsol = 0;
 		if (!list_empty(&spec->unsol_list))
