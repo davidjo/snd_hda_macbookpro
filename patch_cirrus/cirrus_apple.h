@@ -1,6 +1,8 @@
 //#include <linux/ctype.h>
 #include <linux/timer.h>
 #include <linux/bitops.h>
+#include <linux/mutex.h>
+#include <linux/sched.h>
 
 #include <linux/version.h>
 
@@ -558,6 +560,9 @@ struct cs8409_apple_spec {
 	struct timespec first_play_time;
 #endif
 
+	// see cs_8409_apple_lock()
+	struct mutex apple_mutex;
+	struct task_struct *apple_mutex_owner;
 };
 #endif
 
@@ -702,6 +707,48 @@ void cs_8409_apple_remove(struct hda_codec *codec);
 
 
 
+/* One lock for the jack handler and the pcm prepare/cleanup paths.
+ *
+ * Every access to the CS42L83 and the amps goes through the CS8409 I2C engine, which is a
+ * sequence of vendor verbs on node 0x47: set the coefficient index, read or write the
+ * coefficient, and set the index back to 0 (cs_8409_vendor_coef_get/set).  Nothing serialised
+ * the threads that drive it: the unsolicited event handler runs in a workqueue, the pcm
+ * prepare and cleanup run in the thread that opened the stream.  When a stream started while
+ * the headphones were being unplugged, the two interleaved, and a coefficient write meant for
+ * the I2C address or data registers landed in coefficient 0 - the CS8409 control register
+ * (measured: 252 such collisions in one unplug, coefficient 0 left at 0x0000 instead of
+ * 0xb000).  The speakers then stayed silent and the jack interrupt stayed asserted, so later
+ * plug events were lost too.  block_unsol does not help: it is a flag any path sets to 0.
+ *
+ * The lock covers whole operations rather than single transactions, because the handler also
+ * reads spec->playing/capturing and expects them not to change half way through an unplug.
+ *
+ * It is not taken in the init/resume callbacks: they do not use the I2C engine, and the codec
+ * is runtime resumed by whichever thread first needs it, possibly while another one holds this
+ * lock and waits for that resume, so taking it there could deadlock.  Anything added to those
+ * callbacks that drives the I2C engine has to keep this in mind.
+ *
+ * The paths below do not call each other (the stored unsolicited responses are run through
+ * the _finalize function, not the event handler), so the lock is never taken recursively;
+ * the owner check is only a guard against a future change doing so.
+ */
+static bool cs_8409_apple_lock(struct cs8409_apple_spec *spec)
+{
+	if (WARN_ON_ONCE(READ_ONCE(spec->apple_mutex_owner) == current))
+		return false;
+	mutex_lock(&spec->apple_mutex);
+	WRITE_ONCE(spec->apple_mutex_owner, current);
+	return true;
+}
+
+static void cs_8409_apple_unlock(struct cs8409_apple_spec *spec, bool locked)
+{
+	if (!locked)
+		return;
+	WRITE_ONCE(spec->apple_mutex_owner, NULL);
+	mutex_unlock(&spec->apple_mutex);
+}
+
 static void cs_8409_pcm_playback_pre_prepare_hook(struct hda_pcm_stream *hinfo, struct hda_codec *codec, 
                                unsigned int stream_tag, unsigned int format, struct snd_pcm_substream *substream,
                                int action);
@@ -740,7 +787,11 @@ static int cs_8409_playback_pcm_prepare(struct hda_pcm_stream *hinfo,
 {
         struct hda_gen_spec *spec = codec->spec;
         int err;
+        bool locked;
         mycodec_info(codec, "cs_8409_playback_pcm_prepare\n");
+
+        // the setup and the PREPARE hook as one step, see cs_8409_apple_lock()
+        locked = cs_8409_apple_lock(codec->spec);
 
         mycodec_info(codec, "cs_8409_playback_pcm_prepare: NID=0x%x, stream=0x%x, format=0x%x\n",
                   hinfo->nid, stream_tag, format);
@@ -766,6 +817,7 @@ static int cs_8409_playback_pcm_prepare(struct hda_pcm_stream *hinfo,
         if (!err)
                 if (spec->pcm_playback_hook)
                         spec->pcm_playback_hook(hinfo, codec, substream, HDA_GEN_PCM_ACT_PREPARE);
+        cs_8409_apple_unlock(codec->spec, locked);
         mycodec_info(codec, "cs_8409_playback_pcm_prepare end\n");
         return err;
 }
@@ -786,8 +838,12 @@ static int cs_8409_capture_pcm_prepare(struct hda_pcm_stream *hinfo,
                                struct snd_pcm_substream *substream)
 {
         struct cs8409_apple_spec *spec = codec->spec;
+        bool locked;
 
         mycodec_info(codec, "cs_8409_capture_pcm_prepare\n");
+
+        // see cs_8409_apple_lock()
+        locked = cs_8409_apple_lock(spec);
 
         mycodec_info(codec, "cs_8409_capture_pcm_prepare: NID=0x%x, stream=0x%x, format=0x%x\n",
                   hinfo->nid, stream_tag, format);
@@ -842,6 +898,8 @@ static int cs_8409_capture_pcm_prepare(struct hda_pcm_stream *hinfo,
 	// note this hook if defined also needs to switch between the 2 versions of input!!
         if (spec->gen.pcm_capture_hook)
                 spec->gen.pcm_capture_hook(hinfo, codec, substream, HDA_GEN_PCM_ACT_PREPARE);
+
+        cs_8409_apple_unlock(spec, locked);
 
         mycodec_info(codec, "cs_8409_capture_pcm_prepare end\n");
 
@@ -1652,7 +1710,19 @@ static void cs_8409_cs42l83_unsol_event_handler(struct hda_codec *codec, unsigne
 // so I think this is what gets called for any unsolicited event - including jack plug events
 // so anything we do to switch amp/headphone should be done from here
 
+static void cs_8409_cs42l83_jack_unsol_event_locked(struct hda_codec *codec, unsigned int res);
+
+// the handler runs with the lock held, see cs_8409_apple_lock()
 void cs_8409_cs42l83_jack_unsol_event(struct hda_codec *codec, unsigned int res)
+{
+	struct cs8409_apple_spec *spec = codec->spec;
+	bool locked = cs_8409_apple_lock(spec);
+
+	cs_8409_cs42l83_jack_unsol_event_locked(codec, res);
+	cs_8409_apple_unlock(spec, locked);
+}
+
+static void cs_8409_cs42l83_jack_unsol_event_locked(struct hda_codec *codec, unsigned int res)
 {
         struct hda_jack_tbl *event;
         //int ret_unsol_enable = 0;
@@ -2400,6 +2470,32 @@ static void cs_8409_capture_pcm_hook(struct hda_pcm_stream *hinfo,
                                      struct snd_pcm_substream *substream,
                                      int action);
 
+/* the PREPARE action already runs under the lock taken by
+ * cs_8409_playback_pcm_prepare()/cs_8409_capture_pcm_prepare(); OPEN and CLOSE do not touch
+ * the codec (and OPEN is called with the generic pcm_mutex held), so only CLEANUP takes it here.
+ */
+static void cs_8409_playback_pcm_hook_cleanup_locked(struct hda_pcm_stream *hinfo,
+				struct hda_codec *codec, struct snd_pcm_substream *substream, int action)
+{
+	bool locked = false;
+
+	if (action == HDA_GEN_PCM_ACT_CLEANUP)
+		locked = cs_8409_apple_lock(codec->spec);
+	cs_8409_playback_pcm_hook(hinfo, codec, substream, action);
+	cs_8409_apple_unlock(codec->spec, locked);
+}
+
+static void cs_8409_capture_pcm_hook_cleanup_locked(struct hda_pcm_stream *hinfo,
+				struct hda_codec *codec, struct snd_pcm_substream *substream, int action)
+{
+	bool locked = false;
+
+	if (action == HDA_GEN_PCM_ACT_CLEANUP)
+		locked = cs_8409_apple_lock(codec->spec);
+	cs_8409_capture_pcm_hook(hinfo, codec, substream, action);
+	cs_8409_apple_unlock(codec->spec, locked);
+}
+
 // new attempt if we decide to use the existing fixup mechanism to handle setup
 
 #ifdef APPLE_FIXUPS
@@ -2912,6 +3008,10 @@ static int cs8409_apple(struct hda_codec *codec)
 
         INIT_LIST_HEAD(&spec->unsol_list);
 
+        // see cs_8409_apple_lock()
+        mutex_init(&spec->apple_mutex);
+        spec->apple_mutex_owner = NULL;
+
         for (itm=0; itm<10; itm++)
                 { spec->unsol_items_prealloc_used[itm] = 0; }
 
@@ -3101,9 +3201,10 @@ static int cs8409_apple(struct hda_codec *codec)
 	//spec->gen.stream_analog_capture = &cs42l83_apple_pcm_analog_capture;
 
 
-	spec->gen.pcm_playback_hook = cs_8409_playback_pcm_hook;
+	// the cleanup of a stream also drives the I2C engine
+	spec->gen.pcm_playback_hook = cs_8409_playback_pcm_hook_cleanup_locked;
 
-	spec->gen.pcm_capture_hook = cs_8409_capture_pcm_hook;
+	spec->gen.pcm_capture_hook = cs_8409_capture_pcm_hook_cleanup_locked;
 
 	spec->gen.automute_hook = cs_8409_automute;
 

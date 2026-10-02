@@ -425,7 +425,7 @@
  	unsigned int suspended:1;
  	unsigned int paged:1;
  	unsigned int last_page;
-@@ -342,6 +368,129 @@
+@@ -342,6 +368,133 @@
  	unsigned int init_done:1;
  	unsigned int build_ctrl_done:1;
  
@@ -547,6 +547,10 @@
 +       // some initial plays that I dont understand - so skip any setup
 +       // till sometime after the first play
 +       struct timespec64 first_play_time;
++       // serialises the jack handler with the pcm prepare/cleanup paths
++       // (they share the codec's I2C engine) - see cs_8409_apple_lock() in cirrus_apple.h
++       struct mutex apple_mutex;
++       struct task_struct *apple_mutex_owner;
 +
 +
 +#endif
