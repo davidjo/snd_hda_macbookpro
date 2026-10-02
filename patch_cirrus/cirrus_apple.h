@@ -1369,6 +1369,94 @@ static int cs_8409_apple_boot_init(struct hda_codec *codec)
 }
 
 
+static int cs_8409_boot_setup(struct hda_codec *codec);
+
+/* Has the codec lost the setup that cs_8409_boot_setup() programmed?
+ *
+ * Suspending cuts the power to the codec: it comes back with its GPIO
+ * mask/direction/data at 0, with the amps and the CS42L83 in reset and with the
+ * factory subsystem id.  snd_hda_regmap_sync() cannot bring that back: the GPIO
+ * verbs are written uncached (snd_hda_codec_write(), not
+ * snd_hda_codec_write_cache()), so they never enter the regmap cache, and the
+ * amps and the CS42L83 are programmed with i2c sequences through vendor verbs,
+ * which are a protocol rather than cached register state.
+ *
+ * Ask the hardware rather than the PM core: what matters is whether the codec
+ * lost power, not whether the system suspended.  Every board variant programs a
+ * non-zero GPIO mask (0x04, 0x05, 0x07, 0x08, 0x0c, 0x0d, 0x1f or 0x27), so a
+ * mask of 0 means the codec is back in its reset state.  This is true where the
+ * PM state is not: it does not fire when the codec only wakes from runtime power
+ * saving with its setup intact, and it does fire wherever the power was really
+ * cut (s2idle, deep, hibernation).  snd_hda_codec_read() reads the codec itself,
+ * not the regmap cache, and a codec that does not answer reads 0xffffffff, not
+ * 0, so a codec that is gone does not send us in circles.
+ */
+static bool cs_8409_apple_lost_setup(struct hda_codec *codec)
+{
+	return snd_hda_codec_read(codec, codec->core.afg, 0,
+				  AC_VERB_GET_GPIO_MASK, 0) == 0;
+}
+
+/* Program the codec again, the same way patch_cs8409_apple() does at probe.
+ *
+ * The chip comes back exactly as it was at power on, so the driver state that
+ * describes it has to be reset as well: switch_input_src() toggles the input
+ * paths instead of setting them, and the headset phase tells "booted with a
+ * headset in" (1) from "plugged in later" (>= 2).  Resetting only the hardware
+ * would leave the two out of step, and the internal mic or the amps can end up
+ * off.
+ *
+ * The pre-allocated unsol list is deliberately left alone.  Re-initialising it
+ * the way probe does would leak every slot in use, and a response stored before
+ * the suspend does no harm: the handler re-reads the codec instead of using the
+ * stored value.  During a system suspend or resume the core drops unsolicited
+ * responses anyway (hda_codec_unsol_event()), and cs_8409_boot_setup_real()
+ * manages block_unsol itself around the parts that need it; it is set here for
+ * the paths where the codec loses power outside a system suspend, and cleared at
+ * the end in case a variant leaves it set.
+ */
+static void cs_8409_apple_redo_boot_setup(struct hda_codec *codec)
+{
+	struct cs8409_apple_spec *spec = codec->spec;
+	int err;
+
+	spec->block_unsol = 1;
+
+	spec->jack_present = 0;
+	spec->headset_type = 0;
+	spec->have_mike = 0;
+	spec->have_buttons = 0;
+	spec->playing = 0;
+	spec->capturing = 0;
+	spec->headset_play_format_setup_needed = 1;
+	spec->headset_capture_format_setup_needed = 1;
+	spec->headset_presetup_done = 0;
+	spec->headset_phase = 0;
+	spec->headset_enable = 0;
+
+	err = cs_8409_boot_setup(codec);
+	if (err < 0)
+		codec_err(codec, "cs8409: programming the codec after resume failed: %d\n", err);
+
+	spec->headset_phase = 2;
+	spec->play_init = 0;
+	spec->capture_init = 0;
+	spec->play_init_count = 0;
+	spec->capture_init_count = 0;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 8, 0)
+	ktime_get_real_ts64(&(spec->last_play_time));
+	ktime_get_real_ts64(&(spec->first_play_time));
+#else
+	getnstimeofday(&(spec->last_play_time));
+	getnstimeofday(&(spec->first_play_time));
+#endif
+
+	spec->block_unsol = 0;
+
+	if (cs_8409_apple_lost_setup(codec))
+		codec_err(codec, "cs8409: the codec still reads as unprogrammed after the boot setup\n");
+}
+
 static int cs_8409_apple_init(struct hda_codec *codec)
 {
 	struct hda_pcm *info = NULL;
@@ -1439,6 +1527,19 @@ static int cs_8409_apple_init(struct hda_codec *codec)
 	//	init_digital_coef(codec);
 	//}
 
+
+	/* The core calls this at probe, from snd_hda_codec_build_controls(), and
+	 * again on every resume, from cs_8409_apple_resume() through
+	 * snd_hda_codec_init().  At probe patch_cs8409_apple() has just run the
+	 * boot setup, so the codec is programmed and nothing happens here; after a
+	 * suspend it comes back blank and has to be programmed again.  Without
+	 * this the machine resumes with the amps powered down and no sound at all.
+	 */
+	if (cs_8409_apple_lost_setup(codec)) {
+		codec_info(codec, "cs8409: the codec came back without its setup, programming it again\n");
+
+		cs_8409_apple_redo_boot_setup(codec);
+	}
 
 	myprintk("snd_hda_intel: end cs_8409_apple_init\n");
 
