@@ -226,6 +226,7 @@ cp $patch_dir/cirrus_apple.h $hda_dir/codecs/cirrus
 cp $patch_dir/patch_cirrus_boot84.h $hda_dir/codecs/cirrus
 cp $patch_dir/patch_cirrus_new84.h $hda_dir/codecs/cirrus
 cp $patch_dir/patch_cirrus_real84.h $hda_dir/codecs/cirrus
+cp $patch_dir/patch_cirrus_earpods.h $hda_dir/codecs/cirrus
 cp $patch_dir/patch_cirrus_hda_generic_copy.h $hda_dir/codecs/cirrus
 cp $patch_dir/patch_cirrus_real84_i2c.h $hda_dir/codecs/cirrus
 

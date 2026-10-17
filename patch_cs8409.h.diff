@@ -425,7 +425,7 @@
  	unsigned int suspended:1;
  	unsigned int paged:1;
  	unsigned int last_page;
-@@ -342,6 +368,129 @@
+@@ -342,6 +368,132 @@
  	unsigned int init_done:1;
  	unsigned int build_ctrl_done:1;
  
@@ -499,6 +499,9 @@
 +
 +       // if headphone has buttons or not
 +       int have_buttons;
++
++       struct snd_jack *earpods_jack;
++       unsigned int earpods_held;
 +
 +        // current stream channel count
 +        int stream_channels;

@@ -430,7 +430,7 @@ index d0b725c..d8b5232 100644
  	unsigned int force_status_change:1;
  	unsigned int suspended:1;
  	unsigned int paged:1;
-@@ -337,6 +363,126 @@ struct cs8409_spec {
+@@ -337,6 +363,129 @@ struct cs8409_spec {
  	unsigned int init_done:1;
  	unsigned int build_ctrl_done:1;
  
@@ -504,6 +504,9 @@ index d0b725c..d8b5232 100644
 +
 +	// if headphone has buttons or not
 +	int have_buttons;
++
++	struct snd_jack *earpods_jack;
++	unsigned int earpods_held;
 +
 +        // current stream channel count
 +        int stream_channels;

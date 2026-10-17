@@ -430,7 +430,7 @@ index d0b725c..d8b5232 100644
  	unsigned int suspended:1;
  	unsigned int paged:1;
  	unsigned int last_page;
-@@ -339,6 +365,129 @@
+@@ -339,6 +365,133 @@
  	unsigned int init_done:1;
  	unsigned int build_ctrl_done:1;
  
@@ -504,6 +504,10 @@ index d0b725c..d8b5232 100644
 +
 +	// if headphone has buttons or not
 +	int have_buttons;
++
++	/* Independent media-key endpoint; physical latch, never an input hold. */
++	struct snd_jack *earpods_jack;
++	unsigned int earpods_held;
 +
 +        // current stream channel count
 +        int stream_channels;

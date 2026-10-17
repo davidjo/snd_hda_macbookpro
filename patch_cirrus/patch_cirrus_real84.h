@@ -4640,6 +4640,8 @@ static void cs_8409_interrupt_action(struct hda_codec *codec, int int_response)
         int update_jacks = 0;
         struct cs8409_apple_spec *spec = codec->spec;
 
+        cs_8409_headset_button_event(codec, int_response);
+
         // so if Im analyzing the Dell code correctly
         // I think we should only do the snd_hda_jack_report_sync after all jack detection
         // plus all nid mute/unmute and widget output/input enable
@@ -4704,7 +4706,6 @@ static void cs_8409_interrupt_action(struct hda_codec *codec, int int_response)
                  ((int_response & BUTTON_TOGGLE_DOWN_PRESS) == BUTTON_TOGGLE_DOWN_PRESS))
         {
                 dev_info(hda_codec_dev(codec), "cs_8409_interrupt_action - button event on \n");
-                cs_8409_headset_button_event(codec, int_response);
                 update_jacks = 1;
 
         }
@@ -4712,7 +4713,6 @@ static void cs_8409_interrupt_action(struct hda_codec *codec, int int_response)
         {
                 dev_info(hda_codec_dev(codec), "cs_8409_interrupt_action - button event off \n");
                 //cs_8409_cs42l83_mark_jack(codec);
-                cs_8409_headset_button_event(codec, int_response);
                 update_jacks = 1;
 
         }
@@ -5298,7 +5298,24 @@ static void cs_8409_headset_button_detect_event(struct hda_codec *codec)
 
 static void cs_8409_headset_button_event(struct hda_codec *codec, int buttons)
 {
-        mycodec_info(codec, "cs_8409_headset_button_event  buttons 0x%08x\n", buttons);
+        struct cs8409_apple_spec *spec = codec->spec;
+        unsigned int action, report;
+
+        action = earpods_decode(&spec->earpods_held, buttons,
+                                spec->earpods_jack && spec->jack_present == 1 &&
+                                spec->have_buttons && spec->headset_phase >= 2);
+        switch (action) {
+        case EARPODS_VOLUMEUP: report = SND_JACK_BTN_0; break;
+        case EARPODS_VOLUMEDOWN: report = SND_JACK_BTN_1; break;
+        case EARPODS_PLAYPAUSE: report = SND_JACK_BTN_2; break;
+        default: return;
+        }
+        /* A complete input pulse prevents auto-repeat and stuck keys even if
+         * a physical release notification is lost. The physical latch remains
+         * set until a clean release, unplug, suspend or teardown.
+         */
+        snd_jack_report(spec->earpods_jack, report);
+        snd_jack_report(spec->earpods_jack, 0);
 }
 
 

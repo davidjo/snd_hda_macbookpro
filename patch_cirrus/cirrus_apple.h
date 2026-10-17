@@ -3,6 +3,9 @@
 #include <linux/bitops.h>
 
 #include <linux/version.h>
+#include <linux/input.h>
+#include <sound/jack.h>
+#include "patch_cirrus_earpods.h"
 
 //#include "hda_generic.h"
 
@@ -502,6 +505,8 @@ struct cs8409_apple_spec {
 
 	// if headphone has buttons or not
 	int have_buttons;
+	struct snd_jack *earpods_jack;
+	unsigned int earpods_held;
 
         // current stream channel count
         int stream_channels;
@@ -1455,9 +1460,12 @@ static int cs_8409_apple_resume(struct hda_codec *codec)
         return 0;
 }
 
+static void cs_8409_earpods_reset(struct hda_codec *codec);
+
 static int cs_8409_apple_suspend(struct hda_codec *codec)
 {
         myprintk("snd_hda_intel: cs_8409_apple_suspend\n");
+	cs_8409_earpods_reset(codec);
         // no additional code for this so just dummy it
         return 0;
 }
@@ -1469,6 +1477,53 @@ static int cs_8409_apple_check_power_status(struct hda_codec *codec, hda_nid_t n
         return 0;
 }
 
+
+static void cs_8409_earpods_reset(struct hda_codec *codec)
+{
+	struct cs8409_apple_spec *spec = codec->spec;
+
+	spec->earpods_held = EARPODS_NONE;
+	if (spec->earpods_jack)
+		snd_jack_report(spec->earpods_jack, 0);
+}
+
+/* ALSA card teardown may free jacks before the codec. */
+static void cs_8409_earpods_jack_free(struct snd_jack *jack)
+{
+	struct cs8409_apple_spec *spec = jack->private_data;
+
+	spec->earpods_jack = NULL;
+	spec->earpods_held = EARPODS_NONE;
+}
+
+static int cs_8409_earpods_create(struct hda_codec *codec)
+{
+	struct cs8409_apple_spec *spec = codec->spec;
+	struct snd_jack *jack;
+	int err;
+
+	if (spec->earpods_jack)
+		return 0;
+	err = snd_jack_new(codec->card, "EarPods Remote",
+			   SND_JACK_BTN_0 | SND_JACK_BTN_1 | SND_JACK_BTN_2,
+			   &jack, false, false);
+	if (err < 0)
+		return err;
+	err = snd_jack_set_key(jack, SND_JACK_BTN_0, KEY_VOLUMEUP);
+	if (!err)
+		err = snd_jack_set_key(jack, SND_JACK_BTN_1, KEY_VOLUMEDOWN);
+	if (!err)
+		err = snd_jack_set_key(jack, SND_JACK_BTN_2, KEY_PLAYPAUSE);
+	if (err < 0) {
+		snd_device_free(codec->card, jack);
+		return err;
+	}
+	jack->private_data = spec;
+	jack->private_free = cs_8409_earpods_jack_free;
+	spec->earpods_jack = jack;
+	cs_8409_earpods_reset(codec);
+	return 0;
+}
 
 static int cs_8409_apple_build_controls(struct hda_codec *codec)
 {
@@ -1501,7 +1556,7 @@ static int cs_8409_apple_build_controls(struct hda_codec *codec)
 	//cs_8409_add_chmap_ctls(codec);
 
 	myprintk("snd_hda_intel: end cs_8409_apple_build_controls\n");
-	return 0;
+	return cs_8409_earpods_create(codec);
 }
 
 int cs_8409_apple_build_pcms(struct hda_codec *codec)
@@ -1751,6 +1806,16 @@ void cs_8409_cs42l83_jack_unsol_event(struct hda_codec *codec, unsigned int res)
 
 void cs_8409_apple_remove(struct hda_codec *codec)
 {
+	struct cs8409_apple_spec *remote_spec = codec->spec;
+
+	if (!remote_spec)
+		return;
+	cs_8409_earpods_reset(codec);
+	if (remote_spec->earpods_jack) {
+		snd_device_free(codec->card, remote_spec->earpods_jack);
+		remote_spec->earpods_jack = NULL;
+	}
+
 #if 0
         struct cs8409_spec *spec = codec->spec;
 
