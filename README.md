@@ -120,3 +120,51 @@ sudo ./install.cirrus.driver.sh -i
 sudo ./install.cirrus.driver.sh -r
 ```
 
+
+
+### EarPods inline remote
+
+The Apple CS8409 path reports the directly connected 3.5 mm Apple EarPods remote
+through a separate ALSA/input endpoint named `EarPods Remote` (the input device
+name also includes the sound-card prefix). Volume up, volume down and center
+play/pause produce one key pulse per physical press. Holding a button does not
+repeat. Unknown/coalesced button combinations are ignored until a clean release;
+a lost release can conservatively suppress actions until release or reconnect.
+The headphone-presence endpoint and normal audio-routing routines are retained.
+Interrupt polling preserves status across clear reads. If an accumulated unplug
+coincides with button-detection completion while a valid hardware sense still
+confirms a connected headset, detection completes instead of abandoning setup.
+Real unplug events keep their original handling.
+
+Signals were correlated with three labeled presses per button on MacBookPro14,1
+running Ubuntu 6.8.0-134-generic: volume up `0x00020000`, volume down `0x00010000`,
+shared volume release `0x00100000`, center press `0x00000100`, center release
+`0x00000200`. These are complete unmasked handler inputs; the existing hardware
+mask removes the extra `0x1000` sometimes present in the raw center status.
+Other hardware/headsets may require additional measurements.
+
+Run the userspace decoder, reporting and lifetime tests without root or a driver
+reload (Python 3, GCC and Linux userspace input headers are required):
+
+```sh
+python3 tests/run-earpods.py
+```
+
+The tests compile the actual driver routines against ALSA stubs for both the
+pre-6.17 and reorganized source layouts, replay labeled button sequences, and
+exercise holds, duplicates, releases, rapid taps, ambiguous interrupts,
+unplug/reconnect, allocation failures and both jack/codec teardown orders.
+They do not replace a target-kernel build and live hardware tests.
+
+Recorded reconnect/status polling and dispatch sequences can also be tested:
+
+```sh
+python3 tests/replay-reconnect.py
+```
+
+This checks the actual collector and dispatcher against hardware stubs, including
+mixed detection/removal, real removal and invalid presence reads. On the tested
+MacBookPro14,1 local driver baseline, four complete reconnect/control/unplug/
+speaker cycles and button holds passed with the combined change. The updated
+upstream baseline was separately compilation-tested for kernel 134. The rare mixed-status branch did not fire
+during those cycles; direct coverage of that branch is from replay tests.
