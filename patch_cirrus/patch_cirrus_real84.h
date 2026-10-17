@@ -3565,7 +3565,7 @@ static int cs_8409_read_status_and_clear_interrupt(struct hda_codec *codec)
 {
         int retval = 0;
         int retint = 0;
-        int last_retint = 0;
+        int pending_int = 0;
         int loopmax = 11;
         int loopcnt = 0;
 
@@ -3590,6 +3590,14 @@ static int cs_8409_read_status_and_clear_interrupt(struct hda_codec *codec)
         {
 
                 retint = cs42l83_read_status_and_clear_interrupt(codec);
+                /*
+                 * A single GPIO unsolicited response can represent several
+                 * CS42L83 interrupt registers.  The status-clear routine may
+                 * therefore return useful bits on more than one iteration.
+                 * Returning only the final iteration loses the headset-type
+                 * interrupt when the final poll has already cleared to zero.
+                 */
+                pending_int |= retint;
 
                 codec_info(codec, "cs_8409_read_status_and_clear_interrupt - UNSOL status 0x%08x\n",retint);
 
@@ -3609,8 +3617,6 @@ static int cs_8409_read_status_and_clear_interrupt(struct hda_codec *codec)
                         break;
                 }
 
-                last_retint = retint;
-
                 // so this code definitely has a 10 IOSleep sleep call ie 10 ms
                 // but from the logs it is much closer to 50 ms
                 // IOSleep(10);
@@ -3619,9 +3625,9 @@ static int cs_8409_read_status_and_clear_interrupt(struct hda_codec *codec)
 
         }
 
-        codec_info(codec, "cs_8409_read_status_and_clear_interrupt 0x%08x end\n",retint);
+        codec_info(codec, "cs_8409_read_status_and_clear_interrupt 0x%08x end\n",pending_int);
 
-        return retint;
+        return pending_int;
 }
 
 static int cs42l83_read_status_and_clear_interrupt(struct hda_codec *codec)
@@ -4641,6 +4647,23 @@ static void cs_8409_interrupt_action(struct hda_codec *codec, int int_response)
         struct cs8409_apple_spec *spec = codec->spec;
 
         cs_8409_headset_button_event(codec, int_response);
+
+        /* Status polling can coalesce a stale tip-unplug with completion of
+         * button detection. Do not discard that completion while the physical
+         * jack remains present: the unplug handler otherwise does nothing,
+         * leaving detection unfinished. Preserve real removal priority and
+         * require the expected I2C register echo before trusting presence.
+         */
+        if ((int_response & TIP_SENSE_UNPLUG) &&
+            (int_response & BUTTON_DETECT_MAIN) &&
+            spec->jack_present == 1 && spec->have_mike) {
+                retval = cs42l83_headphone_sense(codec);
+                if ((retval & ~0xff) == 0x7700 && (retval & 0x80)) {
+                        dev_info(hda_codec_dev(codec),
+                                 "cs_8409_interrupt_action - coalesced unplug ignored: jack still present, completing button detection\n");
+                        int_response &= ~TIP_SENSE_UNPLUG;
+                }
+        }
 
         // so if Im analyzing the Dell code correctly
         // I think we should only do the snd_hda_jack_report_sync after all jack detection
