@@ -3,6 +3,7 @@
 #include <linux/bitops.h>
 
 #include <linux/version.h>
+#include <linux/suspend.h>
 
 //#include "hda_generic.h"
 
@@ -1445,12 +1446,52 @@ static int cs_8409_apple_init(struct hda_codec *codec)
 	return 0;
 }
 
+static int cs_8409_boot_setup(struct hda_codec *codec);
+
+// set by a PM notifier just before system suspend/hibernate so the next codec
+// resume re-runs the full boot setup; runtime (idle) resumes leave it clear.
+// File-scope rather than in the spec: Apple machines have a single CS8409, and
+// struct cs8409_spec comes from the kernel tree via patches/.
+static int cs_8409_apple_system_resume_pending;
+static int cs_8409_apple_pm_nb_registered;
+
+static int cs_8409_apple_pm_notify(struct notifier_block *nb, unsigned long action, void *data)
+{
+	// only a real system sleep (S3 deep / hibernate) powers off the amps
+	if (action == PM_SUSPEND_PREPARE || action == PM_HIBERNATION_PREPARE)
+		WRITE_ONCE(cs_8409_apple_system_resume_pending, 1);
+	return NOTIFY_DONE;
+}
+
+static struct notifier_block cs_8409_apple_pm_nb = {
+	.notifier_call = cs_8409_apple_pm_notify,
+};
+
 static int cs_8409_apple_resume(struct hda_codec *codec)
 {
+        struct cs8409_apple_spec *spec = codec->spec;
         myprintk("snd_hda_intel: cs_8409_apple_resume\n");
         // code copied from default resume ops
         snd_hda_codec_init(codec);       
 	snd_hda_regmap_sync(codec);
+
+        // After a system sleep the CS8409, MAX98706 amps and CS42L83 lose power,
+        // wiping the vendor/I2C/PLL/TDM programming done once at probe. Re-run
+        // the probe-time boot setup then, but not on runtime (idle) resumes,
+        // which keep that programming and happen on every playback start.
+        // Based on davidjo/snd_hda_macbookpro PR #198.
+        if (READ_ONCE(cs_8409_apple_system_resume_pending)) {
+                WRITE_ONCE(cs_8409_apple_system_resume_pending, 0);
+                myprintk("snd_hda_intel: cs_8409_apple_resume after system sleep - boot setup\n");
+                cs_8409_boot_setup(codec);
+                spec->headset_phase = 2;
+                spec->play_init = 0;
+                spec->capture_init = 0;
+                spec->play_init_count = 0;
+                spec->capture_init_count = 0;
+                spec->headset_play_format_setup_needed = 1;
+                spec->headset_capture_format_setup_needed = 1;
+        }
         myprintk("snd_hda_intel: end cs_8409_apple_resume\n");
         return 0;
 }
@@ -1760,6 +1801,11 @@ void cs_8409_apple_remove(struct hda_codec *codec)
 #endif
 
 	//del_timer(&cs_8409_hp_timer);
+
+	if (cs_8409_apple_pm_nb_registered) {
+		unregister_pm_notifier(&cs_8409_apple_pm_nb);
+		cs_8409_apple_pm_nb_registered = 0;
+	}
 
 	snd_hda_gen_remove(codec);
 }
@@ -3168,6 +3214,9 @@ static int cs8409_apple(struct hda_codec *codec)
 #else
        getnstimeofday(&(spec->first_play_time));
 #endif
+
+       if (!cs_8409_apple_pm_nb_registered && !register_pm_notifier(&cs_8409_apple_pm_nb))
+               cs_8409_apple_pm_nb_registered = 1;
 
        myprintk("snd_hda_intel: Post Patching for CS8409 Apple\n");
        //mycodec_info(codec, "Post Patching for CS8409 Apple\n");
