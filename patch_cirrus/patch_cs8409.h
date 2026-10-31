@@ -405,6 +405,7 @@ struct cs8409_spec {
 	// in the code we want blocked and the unsol response code
 	// so either code has to wait for other code to finish
 	struct mutex unsol_lock;
+	struct mutex i2ccodeblock_lock;
 
 	// add in specific nids for the intmike and linein as they seem to swap
 	// between macbook pros (14,3) and imacs (18,3)

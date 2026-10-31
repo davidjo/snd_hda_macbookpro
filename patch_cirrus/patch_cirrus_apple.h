@@ -474,6 +474,7 @@ struct cs8409_apple_spec {
 	// in the code we want blocked and the unsol response code
 	// so either code has to wait for other code to finish
 	struct mutex unsol_lock;
+	struct mutex i2ccodeblock_lock;
 
 	// add in specific nids for the intmike and linein as they seem to swap
 	// between macbook pros (14,3) and imacs (18,3)
@@ -760,7 +761,7 @@ static int cs_8409_playback_pcm_prepare(struct hda_pcm_stream *hinfo,
         mycodec_info(codec, "cs_8409_playback_pcm_prepare\n");
 
         // try full outer function lock for the moment
-        mutex_lock(&spec->unsol_lock);
+        mutex_lock(&spec->i2ccodeblock_lock);
 
         mycodec_info(codec, "cs_8409_playback_pcm_prepare: NID=0x%x, stream=0x%x, format=0x%x\n",
                   hinfo->nid, stream_tag, format);
@@ -787,7 +788,7 @@ static int cs_8409_playback_pcm_prepare(struct hda_pcm_stream *hinfo,
                 if (spec->gen.pcm_playback_hook)
                         spec->gen.pcm_playback_hook(hinfo, codec, substream, HDA_GEN_PCM_ACT_PREPARE);
 
-        mutex_unlock(&spec->unsol_lock);
+        mutex_unlock(&spec->i2ccodeblock_lock);
 
         mycodec_info(codec, "cs_8409_playback_pcm_prepare end\n");
         return err;
@@ -3059,7 +3060,7 @@ static int patch_cs8409_apple(struct hda_codec *codec)
         // prepare_mutex is used to lock the snd_hda_codec_prepare/snd_hda_codec_cleanup (hda_codec.c)
         // (also used in the alt versions of these functions eg alt_playback_pcm_open)
         // also not used in the capture open/close functions (eg capture_pcm_open) or the capture prepare/cleanup functions
-        mutex_init(&spec->unsol_lock);
+        mutex_init(&spec->i2ccodeblock_lock);
 
 
         spec->vendor_nid = CS8409_VENDOR_NID;

@@ -1389,17 +1389,17 @@ static void cs_8409_cs42l83_unsolicited_response(struct hda_codec *codec, unsign
 	// do we wait till cs_8409_interrupt_action to do this lock??
 	// we do get button interrupts here
 
-	if (mutex_is_locked(&spec->unsol_lock)) {
+	if (mutex_is_locked(&spec->i2ccodeblock_lock)) {
 		codec_info(codec, "cs_8409_cs42l83_unsolicited_response -     UNSOL LOCKED - response delayed\n");
 	} else {
 		codec_info(codec, "cs_8409_cs42l83_unsolicited_response -     UNSOL NOT LOCKED\n");
 	}
 
-	mutex_lock(&spec->unsol_lock);
+	mutex_lock(&spec->i2ccodeblock_lock);
 
 	cs_8409_cs42l83_unsolicited_response_finalize(codec, res);
 
-	mutex_unlock(&spec->unsol_lock);
+	mutex_unlock(&spec->i2ccodeblock_lock);
 }
 
 static void cs_8409_cs42l83_unsolicited_response_finalize(struct hda_codec *codec, unsigned int res)
@@ -1642,7 +1642,7 @@ static void cs_8409_pcm_playback_pre_prepare_hook(struct hda_pcm_stream *hinfo, 
 				// note that so far only the headphone chip seems to generate unsol responses usually
 				//spec->block_unsol = 1;
 				// lets try the full outer cs_8409_playback_pcm_prepare lock for the moment
-				//mutex_lock(&spec->unsol_lock);
+				//mutex_lock(&spec->i2ccodeblock_lock);
 				// we need to split this to deal with capture only setup
 				// and capture with play setup
 				// note this does mean we setup the mike in a different order to OSX
@@ -1669,7 +1669,7 @@ static void cs_8409_pcm_playback_pre_prepare_hook(struct hda_pcm_stream *hinfo, 
 				{
 					cs_8409_headplay_setup(codec);
 				}
-				//mutex_unlock(&spec->unsol_lock);
+				//mutex_unlock(&spec->i2ccodeblock_lock);
 			}
 			else {
 			        cs_8409_play_setup(codec);
@@ -1823,7 +1823,7 @@ static void cs_8409_playback_pcm_hook(struct hda_pcm_stream *hinfo, struct hda_c
 		myprintk("snd_hda_intel: command cs_8409_playback_pcm_hook jack_present %d\n",spec->jack_present);
 		// this is more equivalent to the cs_8409_playback_pcm_hook_cleanup_locked code
 		// and would block unsol responses during cs_8409_play_cleanup in addition to cs_8409_headplay_cleanup
-		mutex_lock(&spec->unsol_lock);
+		mutex_lock(&spec->i2ccodeblock_lock);
 		// for the moment have junky test here
 		if (spec->jack_present)
 		{
@@ -1832,15 +1832,15 @@ static void cs_8409_playback_pcm_hook(struct hda_pcm_stream *hinfo, struct hda_c
 			// note that so far only the headphone chip seems to generate unsol responses usually
 			//spec->block_unsol = 1;
 			// the big question is to lock here or to lock in the outer call
-			//mutex_lock(&spec->unsol_lock);
+			//mutex_lock(&spec->i2ccodeblock_lock);
 			// so dont think need to anything about capturing here
 			cs_8409_headplay_cleanup(codec);
-			//mutex_unlock(&spec->unsol_lock);
+			//mutex_unlock(&spec->i2ccodeblock_lock);
 			spec->headset_play_format_setup_needed = 1;
 		}
                 else
 		        cs_8409_play_cleanup(codec);
-		mutex_unlock(&spec->unsol_lock);
+		mutex_unlock(&spec->i2ccodeblock_lock);
 		myprintk("snd_hda_intel: command cs_8409_playback_pcm_hook done play down");
 		//spec->block_unsol = 0;
 		//if (!list_empty(&spec->unsol_list))
@@ -1927,7 +1927,7 @@ static void cs_8409_pcm_capture_pre_prepare_hook(struct hda_pcm_stream *hinfo, s
 			if (spec->jack_present) {
 				// NOTE - we may well not need this - not sure the capture prepare generates an unsol response
 				//spec->block_unsol = 1;
-				mutex_lock(&spec->unsol_lock);
+				mutex_lock(&spec->i2ccodeblock_lock);
 				if (spec->have_mike)
 				{
 					// so it seems if we have a headset mike we always enable the
@@ -1956,7 +1956,7 @@ static void cs_8409_pcm_capture_pre_prepare_hook(struct hda_pcm_stream *hinfo, s
 					cs_8409_capture_setup(codec);
 #endif
 				}
-				mutex_unlock(&spec->unsol_lock);
+				mutex_unlock(&spec->i2ccodeblock_lock);
 				// NOTE - still not fixed linein/lineout working - this may need
 				// changing here
 			}
@@ -2048,7 +2048,7 @@ static void cs_8409_capture_pcm_hook(struct hda_pcm_stream *hinfo, struct hda_co
 		myprintk("snd_hda_intel: command cs_8409_capture_pcm_hook jack_present %d\n",spec->jack_present);
 		// this is more equivalent to the cs_8409_capture_pcm_hook_cleanup_locked code
 		// and would block unsol responses during cs_8409_capture_cleanup in addition to cs_8409_headcapture_cleanup
-		mutex_lock(&spec->unsol_lock);
+		mutex_lock(&spec->i2ccodeblock_lock);
 		// for the moment have junky test here
 		if (spec->jack_present)
 		{
@@ -2056,7 +2056,7 @@ static void cs_8409_capture_pcm_hook(struct hda_pcm_stream *hinfo, struct hda_co
 			// for the moment I think this works for both MB 14,1 and 14,3 - same hda and headphone chip
 			// note that so far only the headphone chip seems to generate unsol responses usually
 			//spec->block_unsol = 1;
-			//mutex_lock(&spec->unsol_lock);
+			//mutex_lock(&spec->i2ccodeblock_lock);
 			if (spec->headset_capture_format_setup_needed == 0)
 			{
 				cs_8409_headcapture_cleanup(codec);
@@ -2070,11 +2070,11 @@ static void cs_8409_capture_pcm_hook(struct hda_pcm_stream *hinfo, struct hda_co
 					spec->headset_play_format_setup_needed = 1;
 				}
 			}
-			//mutex_unlock(&spec->unsol_lock);
+			//mutex_unlock(&spec->i2ccodeblock_lock);
 		}
                 else
 		        cs_8409_capture_cleanup(codec);
-		mutex_unlock(&spec->unsol_lock);
+		mutex_unlock(&spec->i2ccodeblock_lock);
 		myprintk("snd_hda_intel: command cs_8409_capture_pcm_hook done capture cleanup");
 		//spec->block_unsol = 0;
 		//if (!list_empty(&spec->unsol_list))
