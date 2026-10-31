@@ -1,8 +1,6 @@
 //#include <linux/ctype.h>
 #include <linux/timer.h>
 #include <linux/bitops.h>
-#include <linux/mutex.h>
-#include <linux/sched.h>
 
 #include <linux/version.h>
 
@@ -413,11 +411,11 @@ const struct hda_pcm_stream cs42l83_apple_pcm_analog_capture = {
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(5, 13, 0)
 
-struct unsol_item {
-        struct list_head list;
-        unsigned int idx;
-        unsigned int res;
-};
+//struct unsol_item {
+//        struct list_head list;
+//        unsigned int idx;
+//        unsigned int res;
+//};
 
 struct hda_cvt_setup_apple {
         hda_nid_t nid;
@@ -450,20 +448,31 @@ struct cs8409_apple_spec {
 	int (*spdif_sw_put)(struct snd_kcontrol *kcontrol,
 			    struct snd_ctl_elem_value *ucontrol);
 
-	// so it appears we have "concurrency" in the linux HDA code
-	// in that if unsolicited responses occur which perform extensive verbs
-	// the hda verbs are intermixed with eg extensive start playback verbs
-	// on OSX we appear to have blocks of verbs during which unsolicited responses
-	// are logged but the unsolicited verbs occur after the verb block
-	// this flag is used to flag such verb blocks and the list will store the
-	// responses
-	// we use a pre-allocated list - if we have more than 10 outstanding unsols
-	// we will drop
-	// not clear if mutexes would be the way to go
-	int block_unsol;
-	struct list_head unsol_list;
-	struct unsol_item unsol_items_prealloc[10];
-	int unsol_items_prealloc_used[10];
+	//// so it appears we have "concurrency" in the linux HDA code
+	//// in that if unsolicited responses occur which perform extensive verbs
+	//// the hda verbs are intermixed with eg extensive start playback verbs
+	//// on OSX we appear to have blocks of verbs during which unsolicited responses
+	//// are logged but the unsolicited verbs occur after the verb block
+	//// this flag is used to flag such verb blocks and the list will store the
+	//// responses
+	//// we use a pre-allocated list - if we have more than 10 outstanding unsols
+	//// we will drop
+	//// not clear if mutexes would be the way to go
+	//int block_unsol;
+	//struct list_head unsol_list;
+	//struct unsol_item unsol_items_prealloc[10];
+	//int unsol_items_prealloc_used[10];
+
+	// switching to mutex locks for prevention of parallel operation
+	// open/close operations seem to work under a pcm_mutex
+	// prepare/cleanup operations seem to work under a prepare_mutex
+	// I have been unable to find locking used for switching eg when headphones plugged in/out
+	// I guess I dont understand mutex locking and workqueues
+	// unsol responses are queued and run on a workqueue which apparently runs asynchronously to main thread
+	// so far looks like only way to block unsol responses is by having the same mutex lock
+	// in the code we want blocked and the unsol response code
+	// so either code has to wait for other code to finish
+	struct mutex unsol_lock;
 
 	// add in specific nids for the intmike and linein as they seem to swap
 	// between macbook pros (14,3) and imacs (18,3)
@@ -560,9 +569,6 @@ struct cs8409_apple_spec {
 	struct timespec first_play_time;
 #endif
 
-	// see cs_8409_apple_lock()
-	struct mutex apple_mutex;
-	struct task_struct *apple_mutex_owner;
 };
 #endif
 
@@ -700,58 +706,44 @@ void cs_8409_cs42l83_jack_report_sync(struct hda_codec *codec);
 
 void cs_8409_cs42l83_jack_report_hp_update(struct hda_codec *codec, int plugin);
 
-void cs_8409_cs42l83_jack_unsol_event(struct hda_codec *codec, unsigned int res);
+void cs_8409_cs42l83_jack_unsol_event_nouse(struct hda_codec *codec, unsigned int res);
 
 void cs_8409_apple_remove(struct hda_codec *codec);
 
+// comments provided by Francisco Beltran Millalen
+// (note any specific code comments relates to the patch provided by Francisco Beltran Millalen
+//       and are may not be applicable to this new total replacement of the block_unsol hack)
+
+// Every access to the CS42L83 and the amps goes through the CS8409 I2C engine, which is a
+// sequence of vendor verbs on node 0x47: set the coefficient index, read or write the
+// coefficient, and set the index back to 0 (cs_8409_vendor_coef_get/set).  Nothing serialised
+// the threads that drive it: the unsolicited event handler runs in a workqueue, the pcm
+// prepare and cleanup run in the thread that opened the stream.  When a stream started while
+// the headphones were being unplugged, the two interleaved, and a coefficient write meant for
+// the I2C address or data registers landed in coefficient 0 - the CS8409 control register
+// (measured: 252 such collisions in one unplug, coefficient 0 left at 0x0000 instead of
+// 0xb000).  The speakers then stayed silent and the jack interrupt stayed asserted, so later
+// plug events were lost too.  block_unsol does not help: it is a flag any path sets to 0.
+//
+// It is not taken in the init/resume callbacks: they do not use the I2C engine, and the codec
+// is runtime resumed by whichever thread first needs it, possibly while another one holds this
+// lock and waits for that resume, so taking it there could deadlock.
+//
 
 
-
-/* One lock for the jack handler and the pcm prepare/cleanup paths.
- *
- * Every access to the CS42L83 and the amps goes through the CS8409 I2C engine, which is a
- * sequence of vendor verbs on node 0x47: set the coefficient index, read or write the
- * coefficient, and set the index back to 0 (cs_8409_vendor_coef_get/set).  Nothing serialised
- * the threads that drive it: the unsolicited event handler runs in a workqueue, the pcm
- * prepare and cleanup run in the thread that opened the stream.  When a stream started while
- * the headphones were being unplugged, the two interleaved, and a coefficient write meant for
- * the I2C address or data registers landed in coefficient 0 - the CS8409 control register
- * (measured: 252 such collisions in one unplug, coefficient 0 left at 0x0000 instead of
- * 0xb000).  The speakers then stayed silent and the jack interrupt stayed asserted, so later
- * plug events were lost too.  block_unsol does not help: it is a flag any path sets to 0.
- *
- * The lock covers whole operations rather than single transactions, because the handler also
- * reads spec->playing/capturing and expects them not to change half way through an unplug.
- *
- * It is not taken in the init/resume callbacks: they do not use the I2C engine, and the codec
- * is runtime resumed by whichever thread first needs it, possibly while another one holds this
- * lock and waits for that resume, so taking it there could deadlock.  Anything added to those
- * callbacks that drives the I2C engine has to keep this in mind.
- *
- * The paths below do not call each other (the stored unsolicited responses are run through
- * the _finalize function, not the event handler), so the lock is never taken recursively;
- * the owner check is only a guard against a future change doing so.
- */
-static bool cs_8409_apple_lock(struct cs8409_apple_spec *spec)
-{
-	if (WARN_ON_ONCE(READ_ONCE(spec->apple_mutex_owner) == current))
-		return false;
-	mutex_lock(&spec->apple_mutex);
-	WRITE_ONCE(spec->apple_mutex_owner, current);
-	return true;
-}
-
-static void cs_8409_apple_unlock(struct cs8409_apple_spec *spec, bool locked)
-{
-	if (!locked)
-		return;
-	WRITE_ONCE(spec->apple_mutex_owner, NULL);
-	mutex_unlock(&spec->apple_mutex);
-}
 
 static void cs_8409_pcm_playback_pre_prepare_hook(struct hda_pcm_stream *hinfo, struct hda_codec *codec, 
                                unsigned int stream_tag, unsigned int format, struct snd_pcm_substream *substream,
                                int action);
+
+// overview of actual coding currently
+// we override the prepare function for both playback and capture
+// for playback we do NOT call snd_hda_multi_out_analog_prepare (yet it works!!)
+// for capture we do add the snd_hda_codec_setup_stream call
+// we do NOT override the cleanup functions - this means playback_pcm_cleanup and capture_pcm_cleanup
+// are called (which does call snd_hda_codec_cleanup_stream in both cases)
+// - but we do add code for cleanup in the hook functions cs_8409_prepare_pcm_hook and cs_8409_capture_pcm_hook
+// - set into pcm_playback_hook and pcm_capture_hook
 
 // this is a copy from playback_pcm_prepare in hda_generic.c
 // initially I needed to do the Apple setup BEFORE the snd_hda_multi_out_analog_prepare
@@ -785,13 +777,14 @@ static int cs_8409_playback_pcm_prepare(struct hda_pcm_stream *hinfo,
                                 unsigned int format,
                                 struct snd_pcm_substream *substream)
 {
-        struct hda_gen_spec *spec = codec->spec;
+        //struct hda_gen_spec *spec = codec->spec;
+        struct cs8409_apple_spec *spec = codec->spec;
         int err;
-        bool locked;
+
         mycodec_info(codec, "cs_8409_playback_pcm_prepare\n");
 
-        // the setup and the PREPARE hook as one step, see cs_8409_apple_lock()
-        locked = cs_8409_apple_lock(codec->spec);
+        // try full outer function lock for the moment
+        mutex_lock(&spec->unsol_lock);
 
         mycodec_info(codec, "cs_8409_playback_pcm_prepare: NID=0x%x, stream=0x%x, format=0x%x\n",
                   hinfo->nid, stream_tag, format);
@@ -815,9 +808,11 @@ static int cs_8409_playback_pcm_prepare(struct hda_pcm_stream *hinfo,
 	if (err)
                 { mycodec_dbg(codec, "cs_8409_playback_pcm_prepare err %d\n", err); }
         if (!err)
-                if (spec->pcm_playback_hook)
-                        spec->pcm_playback_hook(hinfo, codec, substream, HDA_GEN_PCM_ACT_PREPARE);
-        cs_8409_apple_unlock(codec->spec, locked);
+                if (spec->gen.pcm_playback_hook)
+                        spec->gen.pcm_playback_hook(hinfo, codec, substream, HDA_GEN_PCM_ACT_PREPARE);
+
+        mutex_unlock(&spec->unsol_lock);
+
         mycodec_info(codec, "cs_8409_playback_pcm_prepare end\n");
         return err;
 }
@@ -838,12 +833,8 @@ static int cs_8409_capture_pcm_prepare(struct hda_pcm_stream *hinfo,
                                struct snd_pcm_substream *substream)
 {
         struct cs8409_apple_spec *spec = codec->spec;
-        bool locked;
 
         mycodec_info(codec, "cs_8409_capture_pcm_prepare\n");
-
-        // see cs_8409_apple_lock()
-        locked = cs_8409_apple_lock(spec);
 
         mycodec_info(codec, "cs_8409_capture_pcm_prepare: NID=0x%x, stream=0x%x, format=0x%x\n",
                   hinfo->nid, stream_tag, format);
@@ -898,8 +889,6 @@ static int cs_8409_capture_pcm_prepare(struct hda_pcm_stream *hinfo,
 	// note this hook if defined also needs to switch between the 2 versions of input!!
         if (spec->gen.pcm_capture_hook)
                 spec->gen.pcm_capture_hook(hinfo, codec, substream, HDA_GEN_PCM_ACT_PREPARE);
-
-        cs_8409_apple_unlock(spec, locked);
 
         mycodec_info(codec, "cs_8409_capture_pcm_prepare end\n");
 
@@ -1135,12 +1124,74 @@ static void cs_8409_add_chmap_ctls(struct hda_codec *codec)
 static void cs_8409_set_extended_codec_verb(void);
 #endif
 
+// new version of init_input_src
+static void cs_8409_init_input_src(struct hda_codec *codec, int imux_idx)
+{
+	struct hda_gen_spec *spec = codec->spec;
+	struct hda_input_mux *imux = &spec->input_mux;
+	struct nid_path *path;
+	int i, c, nums;
+	//mycodec_dbg(codec, "cs_8409_init_input_src enter\n");
+	dev_info(hda_codec_dev(codec), "cs_8409_init_input_src enter\n");
+
+	nums = spec->num_adc_nids;
+
+	//mycodec_dbg(codec, "cs_8409_init_input_src num adc nids %d %d\n",nums,spec->dyn_adc_switch);
+	dev_info(hda_codec_dev(codec), "cs_8409_init_input_src num adc nids %d %d\n",nums,spec->dyn_adc_switch);
+
+	for (c = 0; c < nums; c++) {
+		//mycodec_dbg(codec, "cs_8409_init_input_src num_items %d\n",imux->num_items);
+		dev_info(hda_codec_dev(codec), "cs_8409_init_input_src num_items %d\n",imux->num_items);
+		for (i = 0; i < imux->num_items; i++) {
+			//path = get_input_path(codec, c, i);
+	                path = snd_hda_get_path_from_idx(codec, spec->input_paths[i][c]);
+			if (path) {
+				int in;
+				bool active = path->active;
+				//mycodec_dbg(codec, "cs_8409_init_input_src path active %d\n",active);
+				dev_info(hda_codec_dev(codec), "cs_8409_init_input_src path active %d\n",active);
+				for (in = path->depth - 1; in >= 0; in--) {
+					hda_nid_t tnid = path->path[in];
+					//mycodec_dbg(codec, "cs_8409_init_input_src path nid %d: 0x%02x\n",in,tnid);
+					dev_info(hda_codec_dev(codec), "cs_8409_init_input_src path nid %d: 0x%02x\n",in,tnid);
+				}
+                                // it appears that at this point cur_mux is not set so this test will never work
+                                //if (i == spec->gen.cur_mux[c]) {
+                                if (i == imux_idx) {
+                                        // check for bad cases
+                                        if (imux_idx == 0 && path->path[0] != 0x44) {
+		                                printk("snd_hda_intel: cs_8409_init_input_src id 0x%02x idx %d BAD INPUT MUX MATCH!!\n", path->path[0], imux_idx);
+                                        } else if (imux_idx == 1 && path->path[0] != 0x3c) {
+		                                printk("snd_hda_intel: cs_8409_init_input_src id 0x%02x idx %d BAD INPUT MUX MATCH!!\n", path->path[0], imux_idx);
+                                        }
+					//mycodec_dbg(codec, "cs_8409_init_input_src path nid 0x%02x activate\n",path->path[1]);
+					dev_info(hda_codec_dev(codec), "cs_8409_init_input_src path nid 0x%02x activate\n",path->path[1]);
+					snd_hda_activate_path(codec, path, true, false);
+				        //mycodec_dbg(codec, "cs_8409_init_input_src path active %d\n",path->active);
+				        dev_info(hda_codec_dev(codec), "cs_8409_init_input_src path active %d\n",path->active);
+				}
+			}
+			else {
+				//mycodec_dbg(codec, "cs_8409_init_input_src path NULL\n");
+				dev_info(hda_codec_dev(codec), "cs_8409_init_input_src path NULL\n");
+			}
+		}
+	}
+
+	//mycodec_dbg(codec, "init_input_src exit\n");
+	dev_info(hda_codec_dev(codec), "cs_8409_init_input_src exit\n");
+}
+
+
 
 static void cs_8409_dump_auto_config(struct hda_codec *codec, const char *label_string)
 {
 	struct cs8409_apple_spec *spec = codec->spec;
 	//struct cs8409_spec *spec = codec->spec;
+	struct nid_path *path = NULL;
+	struct hda_input_mux *imux = NULL;
 	int itm = 0;
+	int jmux = 0;
 
         myprintk("snd_hda_intel: dump %s\n", label_string);
 
@@ -1185,9 +1236,22 @@ static void cs_8409_dump_auto_config(struct hda_codec *codec, const char *label_
         }
 
         myprintk("snd_hda_intel: auto config inputs num_adc_nids %d\n", spec->gen.num_adc_nids);
+        imux = &spec->gen.input_mux;
         for (itm = 0; itm < spec->gen.num_adc_nids; itm++) {
-                myprintk("snd_hda_intel: auto config inputs adc_nids 0x%02x\n", spec->gen.adc_nids[itm]);
+                myprintk("snd_hda_intel: auto config inputs adc_nids %d 0x%02x\n", itm, spec->gen.adc_nids[itm]);
+                for (jmux = 0; jmux < imux->num_items; jmux++) {
+                    //path = get_input_path(codec, itm, imux);
+                    path = snd_hda_get_path_from_idx(codec, spec->gen.input_paths[jmux][itm]);
+                    if (path) {
+                        print_nid_path(codec, "adc path", path);
+                        dev_info(hda_codec_dev(codec), "itm %d jmux %d active %d\n", itm, jmux, path->active);
+                    }
+                }
         }
+
+        myprintk("snd_hda_intel: auto config inputs dyn_adc_switch %d\n",spec->gen.dyn_adc_switch);
+
+        myprintk("snd_hda_intel: auto config output alt_dac_nid %d\n",spec->gen.alt_dac_nid);
 
         myprintk("snd_hda_intel: auto config multiout is num_dacs %d\n", spec->gen.multiout.num_dacs);
         for (itm = 0; itm < spec->gen.multiout.num_dacs; itm++) {
@@ -1274,6 +1338,9 @@ static int cs_8409_apple_boot_init(struct hda_codec *codec)
 	//struct snd_kcontrol *kctl = NULL;
 	int pcmcnt = 0;
 	int ret_unsol_enable = 0;
+	struct hda_input_mux *imux = NULL;
+	struct nid_path *path;
+	int i, c, nums;
 
 	// so apparently if we do not define a resume function
 	// then this init function will be called on resume
@@ -1286,13 +1353,65 @@ static int cs_8409_apple_boot_init(struct hda_codec *codec)
 
 
         // NOTE that this function is called after the build pcm functions
+        //      this is the replacement for snd_hda_gen_init
+        //      which in the generic code is called (via patch_ops.init) just before the generic snd_hda_gen_build_controls
+
+        spec = codec->spec;
+
+        // debug prints for input setup
+        mycodec_dbg(codec, "mixer_nid %d\n", spec->gen.mixer_nid);
+        for (c = 0; c < 3; c++) {
+                mycodec_dbg(codec, "cur_mux %d %d\n", c, spec->gen.cur_mux[c]);
+        }
+        for (i = 0; i < 3; i++) {
+                mycodec_dbg(codec, "imux_pins %d 0x%02x %d\n", i, spec->gen.imux_pins[i], spec->gen.imux_pins[i]);
+        }
+        imux = &spec->gen.input_mux;
+        for (i = 0; i < imux->num_items; i++) {
+	        mycodec_dbg(codec, "input_mux %d label %s index %d\n", i, imux->items[i].label, imux->items[i].index);
+        }
+        mycodec_dbg(codec, "dyn_adc_switch %d adc nums %d imux num %d\n", spec->gen.dyn_adc_switch, spec->gen.num_adc_nids, imux->num_items);
+        nums = spec->gen.num_adc_nids;
+        for (c = 0; c < nums; c++) {
+            if (imux == NULL) {
+                mycodec_dbg(codec, "imux is NULL\n");
+            } else {
+                for (i = 0; i < imux->num_items; i++) {
+                    //path = get_input_path(codec, c, i);
+                    path = snd_hda_get_path_from_idx(codec, spec->gen.input_paths[i][c]);
+                    if (path) {
+                        print_nid_path(codec, "adc path", path);
+                        mycodec_dbg(codec, "c %d i %d active %d\n", c, i, path->active);
+                    }
+                }
+            }
+        }
+
+        // so this is very strange
+        // we have no active input paths BUT the internal microphone works!!
+        // (we do have input paths)
+        // we have created a function switch_input_src based on init_input_src
+        // which swaps inputs using snd_hda_activate_path
+        // so maybe all I need to do here is set the default path active
+
+        // this assumes the first index of the input_mux list is the internal mike
+        // as far as I can see have_mike is only set if we have a headset plugged in which has a mike
+        // DANGEROUS - assume 0th index is the internal mike and 1st index is the headset mike!!
+        // so far it appears at this point we no longer have an active input path
+        // but the switch_input_src needs an active path to work
+        // - so need to set an active input path
+        //if (spec->have_mike) {
+        //        cs_8409_init_input_src(codec, 1);
+        //} else {
+        //        cs_8409_init_input_src(codec, 0);
+        //}
+        cs_8409_init_input_src(codec, 0);
 
 
 	// dump the rates/format of the afg node
 	// so analog_playback_stream is still NULL here - maybe only defined when doing actual playback
 	// the info stream is now defined
-	spec = codec->spec;
-        hinfo = spec->gen.stream_analog_playback;
+	hinfo = spec->gen.stream_analog_playback;
 	if (hinfo != NULL)
 	{
 		mycodec_dbg(codec, "hinfo stream nid 0x%02x rates 0x%08x formats 0x%016llx\n",hinfo->nid,hinfo->rates,hinfo->formats);
@@ -1302,7 +1421,6 @@ static int cs_8409_apple_boot_init(struct hda_codec *codec)
 		mycodec_dbg(codec, "hinfo stream NULL\n");
 	}
 
-	// think this is what I need to fixup
 
         list_for_each_entry(info, &codec->pcm_list_head, list) {
                 int stream;
@@ -1565,10 +1683,12 @@ static int cs_8409_apple_build_controls(struct hda_codec *codec)
 int cs_8409_apple_build_pcms(struct hda_codec *codec)
 {
 	int retval;
-        struct hda_pcm *pcm;
-	//struct cs8409_apple_spec *spec = codec->spec;
-	//struct hda_pcm *info = NULL;
-	//struct hda_pcm_stream *hinfo = NULL;
+	struct hda_pcm *pcm;
+	struct cs8409_apple_spec *spec = codec->spec;
+	struct hda_pcm *info = NULL;
+	struct hda_pcm_stream *hinfo = NULL;
+	int i;
+	int stream;
 
 
         myprintk("snd_hda_intel: cs_8409_apple_build_pcms\n");
@@ -1579,11 +1699,93 @@ int cs_8409_apple_build_pcms(struct hda_codec *codec)
         // - cant figure out where the surround is generated from
         // (also cant see any way to disable the 2.1 without explicit recoding)
 
+        myprintk("snd_hda_intel: cs_8409_apple_build_pcms num_dacs %d\n", spec->gen.multiout.num_dacs);
+        myprintk("snd_hda_intel: cs_8409_apple_build_pcms num_adc_nids %d\n", spec->gen.num_adc_nids);
+
+        myprintk("snd_hda_intel: cs_8409_apple_build_pcms dyn_adc_switch %d\n",spec->gen.dyn_adc_switch);
 
         // to replace this with explicit code would require a lot of static function copying
         // from hda_generic.c (and maybe hda_codec.c)
         // current issue is the default code will add a 2.1 chmap for 4 channels - I want to remove that
 	retval =  snd_hda_gen_build_pcms(codec);
+
+
+        // we have the first issue here
+        // snd_hda_gen_build_pcms first sets up a stream
+        // a stream has a playback and capture stream defined - the SNDRV_PCM_STREAM_PLAYBACK index and the SNDRV_PCM_STREAM_CAPTURE index
+
+        // ah - maybe I have finally figured the issue
+        //      usually we only have a few output/input nids - in particular input nids
+        //      it appears snd_hda_gen_build_pcms assumes the first output (dac_nids)/input (adc_nids) nid we find are connected
+        //      so it sets 0 as the default index for the dac_nids index and the adc_nids index for the 1st stream
+        //      for the 8409 this is true for output - we only have one output nid (well because we have multichannel
+        //      output this is 2 sequential nids - but the second nid is not independent)
+        //      however for input we have 18 nids only 2 of which seem to be connected - and they are not the first 2!!
+        //      (maybe we should reset the pin configs as only 2 input nids are actually used)
+        //      so this messes with snd_hda_gen_build_pcms which assumes the 1st (0th index adc_nids) input nid is connected
+        //      snd_hda_gen_build_pcms also assumes if we have multiple input nids the second input is index 1 of adc_nids
+        //      - again NOT true for the 8409
+
+        //      (not still dont understand how the dynamic adc switching works)
+
+        // so now not sure Ive figured things out
+        // the headphone/headset output does not seem to be assigned to a pcm stream
+        // but it does work - it does have an active path
+        // the headset mike does not have an active path - if we leave dyn_adc_switch = 1 it also does not
+        // have a pcm stream
+        // - but if have dyn_adc_switch == 0 then we do have a stream - but not an active path
+        // (at least on boot)
+
+        // so the reason I think I reduced the nids to those connected was to ensure sequential nids
+        // however that path is only used if dyn_adc_switch is NOT set
+        // so we MUST ensure dyn_adc_switch is not set
+        // (not clear why I wasnt doing this before)
+
+
+        //struct hda_pcm {
+        //        char *name;
+        //        struct hda_pcm_stream stream[2];
+        //        unsigned int pcm_type;  /* HDA_PCM_TYPE_XXX */ 
+        //        int device;             /* device number to assign */
+        //        struct snd_pcm *pcm;    /* assigned PCM instance */
+        //        bool own_chmap;         /* codec driver provides own channel maps */
+        //        /* private: */
+        //        struct hda_codec *codec;
+        //        struct list_head list;
+        //        unsigned int disconnected:1;
+        //};
+
+        myprintk("snd_hda_intel: cs_8409_apple_build_pcms dyn_adc_switch %d\n",spec->gen.dyn_adc_switch);
+
+        // this is setup in build_pcms
+        // note that info here is the same as pcm pointer below - both pointers to hda_pcm structures
+        for (i = 0; i < 3; i++) {
+                info = spec->gen.pcm_rec[i];
+                if (info != NULL) {
+                        myprintk("snd_hda_intel: cs_8409_apple_build_pcms pcm_rec %d name %s\n", i, info->name);
+                        for (stream = 0; stream < 2; stream++) {
+                                struct hda_pcm_stream *hinfo = &info->stream[stream];
+                                mycodec_dbg(codec, "cs_8409_apple_build_pcms info stream %d pointer %p\n",stream,hinfo);
+                        }
+                } else {
+                        myprintk("snd_hda_intel: cs_8409_apple_build_pcms pcm_rec %d NULL\n", i);
+                }
+        }
+
+        // so there seems to be 1 pcm in this list with a playback and recording stream
+        list_for_each_entry(pcm, &codec->pcm_list_head, list) {
+                //struct snd_pcm_chmap *chmap;
+                //const struct snd_pcm_chmap_elem *elem;
+		if (pcm != NULL) {
+			myprintk("snd_hda_intel: cs_8409_apple_build_pcms list name %s\n", pcm->name);
+                        for (stream = 0; stream < 2; stream++) {
+                                struct hda_pcm_stream *hinfo = &pcm->stream[stream];
+			        mycodec_dbg(codec, "cs_8409_apple_build_pcms list info stream %d pointer %p\n",stream,hinfo);
+                        }
+                } else {
+			myprintk("snd_hda_intel: cs_8409_apple_build_pcms list pcm_rec NULL\n");
+                }
+        }
 
 
         list_for_each_entry(pcm, &codec->pcm_list_head, list) {
@@ -1594,9 +1796,9 @@ int cs_8409_apple_build_pcms(struct hda_codec *codec)
 			if (pcm->stream[SNDRV_PCM_STREAM_PLAYBACK].chmap != NULL) {
                                 const struct snd_pcm_chmap_elem *elem;
                                 elem = &pcm->stream[SNDRV_PCM_STREAM_PLAYBACK].chmap[0];
-				myprintk("snd_hda_intel: cs_8409_apple_build_pcms chmap chnls %d map %d %d\n", elem->channels, elem->map[0], elem->map[1]);
+				myprintk("snd_hda_intel: cs_8409_apple_build_pcms playback chmap chnls %d map %d %d\n", elem->channels, elem->map[0], elem->map[1]);
                                 elem = &pcm->stream[SNDRV_PCM_STREAM_PLAYBACK].chmap[1];
-				myprintk("snd_hda_intel: cs_8409_apple_build_pcms chmap chnls %d map %d %d %d %d\n", elem->channels, elem->map[0], elem->map[1], elem->map[2], elem->map[3]);
+				myprintk("snd_hda_intel: cs_8409_apple_build_pcms playback chmap chnls %d map %d %d %d %d\n", elem->channels, elem->map[0], elem->map[1], elem->map[2], elem->map[3]);
                         } else {
 				myprintk("snd_hda_intel: cs_8409_apple_build_pcms chmap NULL\n");
                         }
@@ -1709,20 +1911,11 @@ static void cs_8409_cs42l83_unsol_event_handler(struct hda_codec *codec, unsigne
 
 // so I think this is what gets called for any unsolicited event - including jack plug events
 // so anything we do to switch amp/headphone should be done from here
+// this was based on coding in the hda_generic.c
+// now realise that routine ignored any other unsolicited event and just activated on jack events 
+// but Apple handles this differently
 
-static void cs_8409_cs42l83_jack_unsol_event_locked(struct hda_codec *codec, unsigned int res);
-
-// the handler runs with the lock held, see cs_8409_apple_lock()
-void cs_8409_cs42l83_jack_unsol_event(struct hda_codec *codec, unsigned int res)
-{
-	struct cs8409_apple_spec *spec = codec->spec;
-	bool locked = cs_8409_apple_lock(spec);
-
-	cs_8409_cs42l83_jack_unsol_event_locked(codec, res);
-	cs_8409_apple_unlock(spec, locked);
-}
-
-static void cs_8409_cs42l83_jack_unsol_event_locked(struct hda_codec *codec, unsigned int res)
+void cs_8409_cs42l83_jack_unsol_event_nouse(struct hda_codec *codec, unsigned int res)
 {
         struct hda_jack_tbl *event;
         //int ret_unsol_enable = 0;
@@ -1842,7 +2035,7 @@ static const struct hda_codec_ops cs_8409_apple_ops = {
 	.build_pcms = cs_8409_apple_build_pcms,
 	.init = cs_8409_apple_init,
 	.remove = cs_8409_apple_remove,
-	.unsol_event = cs_8409_cs42l83_jack_unsol_event,
+	.unsol_event = cs_8409_cs42l83_unsol_event_handler,
 #ifdef CONFIG_PM
         .resume = cs_8409_apple_resume,
         .suspend = cs_8409_apple_suspend,
@@ -1863,6 +2056,10 @@ static const struct hda_codec_ops cs_8409_apple_ops = {
 static int cs_8409_apple_create_input_ctls_old(struct hda_codec *codec);
 
 static int cs_8409_apple_create_input_ctls(struct hda_codec *codec);
+
+static int cs_8409_apple_check_dyn_adc_switch(struct hda_codec *codec);
+
+static int cs_8409_apple_check_auto_mic_availability(struct hda_codec *codec);
 
 static void cs_8409_cs42l83_callback(struct hda_codec *codec, struct hda_jack_callback *event);
 
@@ -1910,6 +2107,13 @@ static int cs_8409_apple_parse_auto_config(struct hda_codec *codec)
 #endif
 #endif
 
+        // at some point we need to unset dyn_adc_switch
+        // lets do it here
+        //if (spec->gen.dyn_adc_switch) {
+        //        myprintk("snd_hda_intel: cs_8409_apple_parse_auto_config - RESETTING dyn_adc_switch!!!\n");
+        //        spec->gen.dyn_adc_switch = 0;
+        //}
+
 	// note that create_input_ctls is called towards the end of snd_hda_gen_parse_auto_config
 
 	// it appears the auto config assumes that inputs are connected to ADCs
@@ -1923,16 +2127,30 @@ static int cs_8409_apple_parse_auto_config(struct hda_codec *codec)
 	// note this has no bearing on the auto config - its for handling the unsol events properly
 
 
+
 #if LINUX_VERSION_CODE < KERNEL_VERSION(5, 13, 0)
 	// new routine to setup inputs - based on the hda_generic code
 	cs_8409_apple_create_input_ctls_old(codec);
 #else
+
+        // so this is very strange
+        // we have no active input paths BUT the internal microphone works!!
+        // (we do have input paths)
+
 	// as of 5.13 the definition of AUTO_CFG_MAX_INS has been increased to handle the 8409
 	// so the above may not be needed
 	// (without the above no input pins were recognised at all)
 	// need to check if fixed other input definitions in cs_8409_apple_create_input_ctls
 	// and redo the updated input definitions here
+        // now split functionality similar to main kernel code
+        // check_dyn_adc_switch is called after create_input_ctls in snd_hda_gen_parse_auto_config (there are other calls in between)
 	cs_8409_apple_create_input_ctls(codec);
+
+        cs_8409_apple_check_dyn_adc_switch(codec);
+
+        // it appears cur_mux is set in check_auto_mic_availability
+        // if this is set then init_input_src will set a path active
+        cs_8409_apple_check_auto_mic_availability(codec);
 #endif
 
 
@@ -2218,14 +2436,47 @@ static int cs_8409_apple_create_input_ctls_old(struct hda_codec *codec)
    as it doesnt seem to setup the inputs correctly
  */
 
+// make the code more consistent with base linux
+// snd_hda_gen_parse_auto_config calls create_input_ctls then after other calls check_dyn_adc_switch
+// at the moment the only path I see that sets inputs active requires a non-zero mixer_nid
+// - which we dont appear to have - via a call to new_analog_input
+
+static int cs_8409_apple_create_input_ctls(struct hda_codec *codec)
+{
+	struct hda_gen_spec *spec = codec->spec;
+	const struct auto_pin_cfg *cfg = &spec->autocfg;
+	hda_nid_t mixer = spec->mixer_nid;
+	struct hda_input_mux *imux = &spec->input_mux;
+
+	myprintk("snd_hda_intel: cs_8409_apple_create_input_ctls\n");
+
+	myprintk("snd_hda_intel: end cs_8409_apple_create_input_ctls\n");
+
+	return 0;
+}
+
 // the culprit function seems to be check_dyn_adc_switch in hda_generic.c
 // - it should reduce the adc_nids list down to the 2 connected input adcs - but it does not
 // - its current implementation appears to have a fundamental flaw
 // - it assumes adcs are in a non-null list that ends in null
-// but the 8409 has a random non-null element in an essentially null list
+// but the 8409 has random non-null elements in an essentially null list
 
+// NOTE check_dyn_adc_switch only reduces the adc_nids list if dyn_adc_switch is NOT set
+//      - which would suggest it was not previously being set
 
-static int cs_8409_apple_create_input_ctls(struct hda_codec *codec)
+// my current analysis is as follows:
+//      switching is performed by calling snd_hda_gen_mic_autoswitch
+//      mux_select seems to be the general function to switch between different input muxes
+//      mux_select additionally calls dyn_adc_pcm_resetup if dyn_adc_switch is set
+//      switching seems to be simply be calling snd_hda_codec_setup_stream with a new nid in dyn_adc_pcm_resetup
+
+// main kernel source comment - which seems to indicate input paths have been labelled active at this point 
+// - although actually only tests if have non-null path
+/* filter out invalid adc_nids that don't give all active input pins;
+ * if needed, check whether dynamic ADC-switching is available
+ */
+
+static int cs_8409_apple_check_dyn_adc_switch(struct hda_codec *codec)
 {
 	struct hda_gen_spec *spec = codec->spec;
 	const struct auto_pin_cfg *cfg = &spec->autocfg;
@@ -2235,8 +2486,80 @@ static int cs_8409_apple_create_input_ctls(struct hda_codec *codec)
 	int err;
 	unsigned int val;
 	int i, n, nums;
+        unsigned int ok_bits;
 
-	myprintk("snd_hda_intel: cs_8409_apple_create_input_ctls\n");
+	myprintk("snd_hda_intel: cs_8409_apple_check_dyn_adc_switch\n");
+
+        // debug print - Im not seeing 2 setups
+        for (n = 0; n < spec->num_adc_nids; n++) {
+                for (i = 0; i < imux->num_items; i++) {
+	                myprintk("snd_hda_intel: cs_8409_apple_check_dyn_adc_switch ok_bits n %d i %d nid 0x%02x path %d\n", n, i, spec->adc_nids[n], spec->input_paths[i][n]);
+                }
+        }
+
+        // code copied from check_dyn_adc_switch
+        nums = 0;
+        ok_bits = 0;
+        for (n = 0; n < spec->num_adc_nids; n++) {
+                for (i = 0; i < imux->num_items; i++) {
+	                myprintk("snd_hda_intel: cs_8409_apple_check_dyn_adc_switch ok_bits n %d i %d nid 0x%02x path %d\n", n, i, spec->adc_nids[n], spec->input_paths[i][n]);
+                        if (!spec->input_paths[i][n])
+                                break;
+                }
+                if (i >= imux->num_items) {
+                        ok_bits |= (1 << n);
+                        nums++;
+                }
+        }
+	myprintk("snd_hda_intel: cs_8409_apple_check_dyn_adc_switch ok_bits 0x%02x\n", ok_bits);
+
+
+        // original code
+
+        //nums = 0;
+        //ok_bits = 0;
+        //for (n = 0; n < spec->num_adc_nids; n++) {
+        //        for (i = 0; i < imux->num_items; i++) {
+        //                if (!spec->input_paths[i][n])
+        //                        break;     
+        //        }
+        //        if (i >= imux->num_items) {
+        //                ok_bits |= (1 << n);
+        //                nums++;
+        //        }
+        //}
+
+        //if (!ok_bits) {
+        //        /* check whether ADC-switch is possible */
+        //        for (i = 0; i < imux->num_items; i++) {
+        //                for (n = 0; n < spec->num_adc_nids; n++) {
+        //                        if (spec->input_paths[i][n]) {
+        //                                spec->dyn_adc_idx[i] = n;
+        //                                break;
+        //                        }
+        //                }
+        //        }
+
+        //        codec_dbg(codec, "enabling ADC switching\n");
+        //        spec->dyn_adc_switch = 1;
+        //} else if (nums != spec->num_adc_nids) {
+        //        /* shrink the invalid adcs and input paths */
+        //   - here is where the original reduction code was
+        //   - this was re-implemented below
+        //     as the original code does not handle the 8409 nid list
+        //     of random non-null elements in essentially null list
+        //}
+
+        // NOTA BENE - if ok_bits is 0 then dyn_adc_switch is set
+        //             and in this case the input nids are NOT reduced
+        //             this is significant because the index stored in dyn_adc_idx
+        //             is the original non-reduced index
+        //             so if we use the reduction code below with dyn_adc_switch set
+        //             this will make the indexes stored in dyn_adc_idx wrong
+
+        // assuming we have reset dyn_adc_switch previously!!
+        //spec->dyn_adc_switch = 0;
+
 
 	// determine for which input items we have a non-zero adc
 	nums = 0;
@@ -2274,10 +2597,28 @@ static int cs_8409_apple_create_input_ctls(struct hda_codec *codec)
 	}
 
 	for (n=0; n < spec->num_adc_nids; n++) {
-		myprintk("snd_hda_intel: cs_8409_apple_create_input_ctls adc nid 0x%02x\n", spec->adc_nids[n]);
+		myprintk("snd_hda_intel: cs_8409_apple_check_dyn_adc_switch adc nid 0x%02x\n", spec->adc_nids[n]);
 	}
 
-	myprintk("snd_hda_intel: end cs_8409_apple_create_input_ctls\n");
+	return 0;
+}
+
+static int cs_8409_apple_check_auto_mic_availability(struct hda_codec *codec)
+{
+	struct hda_gen_spec *spec = codec->spec;
+	const struct auto_pin_cfg *cfg = &spec->autocfg;
+	hda_nid_t mixer = spec->mixer_nid;
+
+	myprintk("snd_hda_intel: cs_8409_apple_check_auto_mic_availability\n");
+
+        // note that cur_mux index is the adc index ie the index into adc_nids
+        // its value is the index into the input_mux list
+        // currently the 1st adc_nids entry is the internal mike
+        // and the 1st input_mux is the internal mike
+        // as we are handling this stuff manually we dont really need to set this
+        //spec->gen.cur_mux[0] = 0
+
+	myprintk("snd_hda_intel: end cs_8409_apple_check_auto_mic_availability\n");
 
 	return 0;
 }
@@ -2405,6 +2746,8 @@ static const struct hda_pintbl imac_pincfgs[] = {
 
 static void cs_8409_cs42l83_unsolicited_response(struct hda_codec *codec, unsigned int res);
 
+// now think this function is no longer used - only used prior to 5.13
+
 static void cs_8409_cs42l83_callback(struct hda_codec *codec, struct hda_jack_callback *event)
 {
         struct cs8409_apple_spec *spec = codec->spec;
@@ -2420,18 +2763,44 @@ static void cs_8409_cs42l83_callback(struct hda_codec *codec, struct hda_jack_ca
         mycodec_info(codec, "cs_8409_cs42l83_callback end\n");
 }
 
+// now going to make this the primary unsol event handler
 
 static void cs_8409_cs42l83_unsol_event_handler(struct hda_codec *codec, unsigned int unsol_res)
 {
 	struct cs8409_apple_spec *spec = codec->spec;
 
-	mycodec_info(codec, "cs_8409_cs42l83_unsol_event_handler\n");
+        //int ret_unsol_enable = 0;
+        //int tag = (unsol_res >> AC_UNSOL_RES_TAG_SHIFT) & 0x7f;
+        int tag = (unsol_res & AC_UNSOL_RES_TAG) >> AC_UNSOL_RES_TAG_SHIFT;
+
+        // so we have confirmed that these unsol responses are not in linux kernel interrupt state
+        //if (in_interrupt())  
+        //      mycodec_info(codec, "cs_8409_cs42l83_unsol_event_handler - INTERRUPT\n");
+        //else
+        //      mycodec_info(codec, "cs_8409_cs42l83_unsol_event_handler - not interrupt\n");
+
+        //// read UNSOL enable data to see what current setup is
+        //ret_unsol_enable = snd_hda_codec_read(codec, codec->core.afg, 0, AC_VERB_GET_UNSOLICITED_RESPONSE, 0);
+        //mycodec_dbg(codec,"UNSOL event 0x01 at unsol is 0x%08x\n",ret_unsol_enable);
+        //ret_unsol_enable = snd_hda_codec_read(codec, 0x47, 0, AC_VERB_GET_UNSOLICITED_RESPONSE, 0);
+        //mycodec_dbg(codec,"UNSOL event 0x47 at unsol is 0x%08x\n",ret_unsol_enable);
+
+        // so it seems the low order byte of the res for the 8409 is a copy of the GPIO register state
+        //// - except that we dont seem to pass this to the callback functions!! - well that was for linux kernel version 4
+
+        codec_info(codec, "cs_8409_cs42l83_unsol_event_handler UNSOL 0x%08x tag 0x%02x\n",unsol_res,tag);
 
 
-	// print the stored unsol res which seems to be the GPIO pins state
-	mycodec_info(codec, "cs_8409_cs42l83_unsol_event_handler - event unsol_res 0x%08x\n",unsol_res);
+        // so far it appears Apple enables speakers and disables intmike and linein with no headphone
+        // intmike only enabled if perform capture
+        // dont have any linein enable examples
 
 	cs_8409_cs42l83_unsolicited_response(codec, unsol_res);
+
+
+        // we seem to get a weird UNSOL interrupt during initialization - we want to skip the following
+        if (((struct cs8409_spec*)(codec->spec))->headset_phase == 0)
+               return;
 
 
 	// now think timers not the way to go
@@ -2441,7 +2810,7 @@ static void cs_8409_cs42l83_unsol_event_handler(struct hda_codec *codec, unsigne
 
         // the delayed_work feature might be a way to go tho
 
-        mycodec_info(codec, "cs_8409_cs42l83_unsol_event_handler end\n");
+        codec_info(codec, "cs_8409_cs42l83_unsol_event_handler end\n");
 }
 
 
@@ -2469,32 +2838,6 @@ static void cs_8409_capture_pcm_hook(struct hda_pcm_stream *hinfo,
                                      struct hda_codec *codec,
                                      struct snd_pcm_substream *substream,
                                      int action);
-
-/* the PREPARE action already runs under the lock taken by
- * cs_8409_playback_pcm_prepare()/cs_8409_capture_pcm_prepare(); OPEN and CLOSE do not touch
- * the codec (and OPEN is called with the generic pcm_mutex held), so only CLEANUP takes it here.
- */
-static void cs_8409_playback_pcm_hook_cleanup_locked(struct hda_pcm_stream *hinfo,
-				struct hda_codec *codec, struct snd_pcm_substream *substream, int action)
-{
-	bool locked = false;
-
-	if (action == HDA_GEN_PCM_ACT_CLEANUP)
-		locked = cs_8409_apple_lock(codec->spec);
-	cs_8409_playback_pcm_hook(hinfo, codec, substream, action);
-	cs_8409_apple_unlock(codec->spec, locked);
-}
-
-static void cs_8409_capture_pcm_hook_cleanup_locked(struct hda_pcm_stream *hinfo,
-				struct hda_codec *codec, struct snd_pcm_substream *substream, int action)
-{
-	bool locked = false;
-
-	if (action == HDA_GEN_PCM_ACT_CLEANUP)
-		locked = cs_8409_apple_lock(codec->spec);
-	cs_8409_capture_pcm_hook(hinfo, codec, substream, action);
-	cs_8409_apple_unlock(codec->spec, locked);
-}
 
 // new attempt if we decide to use the existing fixup mechanism to handle setup
 
@@ -2721,9 +3064,21 @@ static int cs8409_apple(struct hda_codec *codec)
 
         //dump_stack();
 
+        // this is following the code from the Dell cs8409
+        // the cs8409_apple_alloc_spec function allocates the spec struct
+        // and calls snd_hda_gen_spec_init
+        // now interestingly snd_hda_gen_spec_init sets up a pcm_mutex
+        // - so we dont need to allocate this mutex
+
         spec = cs8409_apple_alloc_spec(codec);
         if (!spec)
                 return -ENOMEM;
+
+        // pcm_mutex is used to lock the playback_pcm_open and playback_pcm_close calls (hda_generic.c)
+        // prepare_mutex is used to lock the snd_hda_codec_prepare/snd_hda_codec_cleanup (hda_codec.c)
+        // (also used in the alt versions of these functions eg alt_playback_pcm_open)
+        // also not used in the capture open/close functions (eg capture_pcm_open) or the capture prepare/cleanup functions
+        mutex_init(&spec->unsol_lock);
 
 
         spec->vendor_nid = CS8409_VENDOR_NID;
@@ -2864,19 +3219,19 @@ static int cs8409_apple(struct hda_codec *codec)
 	//snd_hda_sequence_write(codec, cs8409_cs42l42_init_verbs);
 
 
-        //snd_array_for_each(&codec->init_pins, i, pin) {
-        //        hda_nid_t nid = pin->nid;
-        //        u32 cfg = pin->cfg;
-        //	myprintk("snd_hda_intel: print pincfg init    0x%02x: 0x%02x: 0x%08x\n", i, nid, cfg);
-	//}
-        //snd_array_for_each(&codec->driver_pins, i, pin) {
-        //        hda_nid_t nid = pin->nid;
-        //        u32 cfg = pin->cfg;
-        //	myprintk("snd_hda_intel: print pincfg driver  0x%02x: 0x%02x: 0x%08x\n", i, nid, cfg);
-	//}
+        snd_array_for_each(&codec->init_pins, i, pin) {
+                hda_nid_t nid = pin->nid;
+                u32 cfg = pin->cfg;
+                myprintk("snd_hda_intel: print pincfg init    0x%02x: 0x%02x: 0x%08x\n", i, nid, cfg);
+        }
+        snd_array_for_each(&codec->driver_pins, i, pin) {
+                hda_nid_t nid = pin->nid;
+                u32 cfg = pin->cfg;
+                myprintk("snd_hda_intel: print pincfg driver  0x%02x: 0x%02x: 0x%08x\n", i, nid, cfg);
+        }
 
-        //for (i = 0; i < codec->core.num_nodes; i++)
-        //	myprintk("snd_hda_intel: print wcaps pre  0x%02x 0x%08x\n", i, codec->wcaps[i]);
+        for (i = 0; i < codec->core.num_nodes; i++)
+        	myprintk("snd_hda_intel: print wcaps pre  0x%02x 0x%08x\n", i, codec->wcaps[i]);
 
 
         // as per Apple we need to fix the pin config for the linein nid (it defaults as no conn, Line Out which messes the auto config)
@@ -2928,8 +3283,9 @@ static int cs8409_apple(struct hda_codec *codec)
 
         //if (codec->core.subsystem_id == 0x106b1000 || codec->core.subsystem_id == 0x106b0f00 || codec->core.subsystem_id == 0x106b0e00) {
         //       snd_hda_apply_pincfgs(codec, imac_pincfgs);
-        //else
+        //} else {
         //       snd_hda_apply_pincfgs(codec, macbook_pro_pincfgs);
+        //}
 
 
         // note that the auto config doesnt issue any PIN_SENSE commands but it does use the PINCAP data
@@ -3004,16 +3360,12 @@ static int cs8409_apple(struct hda_codec *codec)
 
         // use this to cause unsolicited responses to be stored
         // but not run
-        spec->block_unsol = 0;
+        //spec->block_unsol = 0;
 
-        INIT_LIST_HEAD(&spec->unsol_list);
+        //INIT_LIST_HEAD(&spec->unsol_list);
 
-        // see cs_8409_apple_lock()
-        mutex_init(&spec->apple_mutex);
-        spec->apple_mutex_owner = NULL;
-
-        for (itm=0; itm<10; itm++)
-                { spec->unsol_items_prealloc_used[itm] = 0; }
+        //for (itm=0; itm<10; itm++)
+        //        { spec->unsol_items_prealloc_used[itm] = 0; }
 
 
         // for the moment set initial jack status to not present
@@ -3062,7 +3414,7 @@ static int cs8409_apple(struct hda_codec *codec)
         }
 
         myprintk("snd_hda_intel: intmike_nid     is 0x%02x\n", spec->intmike_nid);
-        myprintk("snd_hda_intel: intmike_acc_nid is 0x%02x\n", spec->intmike_adc_nid);
+        myprintk("snd_hda_intel: intmike_adc_nid is 0x%02x\n", spec->intmike_adc_nid);
 
 
         // ASP is Audio Serial Port
@@ -3201,10 +3553,9 @@ static int cs8409_apple(struct hda_codec *codec)
 	//spec->gen.stream_analog_capture = &cs42l83_apple_pcm_analog_capture;
 
 
-	// the cleanup of a stream also drives the I2C engine
-	spec->gen.pcm_playback_hook = cs_8409_playback_pcm_hook_cleanup_locked;
+	spec->gen.pcm_playback_hook = cs_8409_playback_pcm_hook;
 
-	spec->gen.pcm_capture_hook = cs_8409_capture_pcm_hook_cleanup_locked;
+	spec->gen.pcm_capture_hook = cs_8409_capture_pcm_hook;
 
 	spec->gen.automute_hook = cs_8409_automute;
 

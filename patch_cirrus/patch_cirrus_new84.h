@@ -53,7 +53,7 @@ static unsigned int hda_sync_power_state_8409(struct hda_codec *codec,
 {
         unsigned long end_time = jiffies + msecs_to_jiffies(500);
         unsigned int state, actual_state;
-	mycodec_info(codec, "hda_sync_power_state_8409 to 0x%04x\n",power_state);
+        mycodec_info(codec, "hda_sync_power_state_8409 nid 0x%02x to 0x%04x\n",nid,power_state);
 
         for (;;) {
                 state = snd_hda_codec_read(codec, nid, 0,
@@ -68,7 +68,7 @@ static unsigned int hda_sync_power_state_8409(struct hda_codec *codec,
                 /* wait until the codec reachs to the target state */
                 msleep(1);
         }
-	mycodec_info(codec, "hda_sync_power_state_8409 power state 0x%04x\n",state);
+        mycodec_info(codec, "hda_sync_power_state_8409 nid 0x%02x power state 0x%04x\n",nid,state);
         return state;
 }
 
@@ -703,10 +703,12 @@ get_hda_cvt_setup_apple_8409(struct hda_codec *codec, hda_nid_t nid)
 	return NULL;
 }
 
-static void cs_8409_dump_stream_format(struct hda_codec *codec, hda_nid_t nid)
+static void cs_8409_dump_stream_format(struct hda_codec *codec, hda_nid_t nid, char *msgtag)
 {
         struct hda_cvt_setup_apple *p = NULL;
         int i;
+        char *msgstrptr = NULL;
+        char *nullstr = "";
 
 	// use explicit search so we dont create one if doesnt exist
 
@@ -716,10 +718,16 @@ static void cs_8409_dump_stream_format(struct hda_codec *codec, hda_nid_t nid)
                         break;
         }
 
+        if (msgtag != NULL) {
+                 msgstrptr = msgtag;
+        } else {
+                 msgstrptr = nullstr;
+        }
+
         if (p != NULL)
-                { mycodec_dbg(codec, "cs_8409_dump_stream_format: NID=0x%x, codec cached values: stream=0x%x, channel=%d, format=0x%x\n", nid, p->stream_tag, p->channel_id, p->format_id); }
+                { mycodec_dbg(codec, "cs_8409_dump_stream_format: %s NID=0x%x, codec cached values: stream=0x%x, channel=%d, format=0x%x\n", msgstrptr, nid, p->stream_tag, p->channel_id, p->format_id); }
         else
-                { mycodec_dbg(codec, "cs_8409_dump_stream_format: NID=0x%x, codec cached values: NULL\n", nid); }
+                { mycodec_dbg(codec, "cs_8409_dump_stream_format: %s NID=0x%x, codec cached values: NULL\n", msgstrptr, nid); }
 }
 
 static void cs_8409_reset_stream_format(struct hda_codec *codec, hda_nid_t nid, int format, int doreset)
@@ -887,12 +895,14 @@ static void cs_8409_really_update_stream_format(struct hda_codec *codec, hda_nid
         else
                 { mycodec_info(codec, "cs_8409_really_update_stream_format new       tag 0x%08x chnl 0x%08x fmt 0x%08x\n", stream_tag_sv, channel_id_sv, format_id_sv); }
 
-        cs_8409_dump_stream_format(codec, nid);
+        cs_8409_dump_stream_format(codec, nid, "old");
 
         if (update_stream_id == 2)
             snd_hda_codec_setup_stream(codec, nid, stream_tag_sv, new_channel_id, format_id_sv);
         else
             snd_hda_codec_setup_stream(codec, nid, stream_tag_sv, channel_id_sv, format_id_sv);
+
+        cs_8409_dump_stream_format(codec, nid, "new");
 }
 
 // remove function from compile so get error when building if use it
@@ -905,7 +915,7 @@ static void cs_8409_setup_stream_format(struct hda_codec *codec, hda_nid_t nid, 
 
         mycodec_dbg(codec, "cs_8409_setup_stream_format nid 0x%02x\n",nid);
 
-        cs_8409_dump_stream_format(codec, nid);
+        cs_8409_dump_stream_format(codec, nid, "old");
 
         // this functions sets up the cached stream - get_hda_cvt_setup_8409 creates a struct if not yet defined
         // NOTA BENE we do not do the update here - we are relying that this will be done by a call to
@@ -919,7 +929,7 @@ static void cs_8409_setup_stream_format(struct hda_codec *codec, hda_nid_t nid, 
         p->channel_id = 0;
         p->format_id = format;
 
-        cs_8409_dump_stream_format(codec, nid);
+        cs_8409_dump_stream_format(codec, nid, "new");
 
         mycodec_dbg(codec, "end cs_8409_setup_stream_format\n");
 }
@@ -931,7 +941,7 @@ static void cs_8409_store_stream_format(struct hda_codec *codec, hda_nid_t nid, 
 
         mycodec_dbg(codec, "cs_8409_store_stream_format nid 0x%02x\n",nid);
 
-        cs_8409_dump_stream_format(codec, nid);
+        cs_8409_dump_stream_format(codec, nid, NULL);
 
         // this functions sets up our local cached stream save store
         // NOTA BENE we do not do the update here - we are relying that this will be done by a call to
@@ -947,7 +957,7 @@ static void cs_8409_store_stream_format(struct hda_codec *codec, hda_nid_t nid, 
                 papl->channel_id = 0;
                 papl->format_id = format;
 
-                mycodec_info(codec, "cs_8409_store_stream_format cached    tag 0x%08x chnl 0x%08x fmt 0x%08x\n", papl->stream_tag, papl->channel_id, papl->format_id);
+                mycodec_info(codec, "cs_8409_store_stream_format NID 0x%02x cached    tag 0x%08x chnl 0x%08x fmt 0x%08x\n", nid, papl->stream_tag, papl->channel_id, papl->format_id);
 	}
 	else
                 codec_err(codec, "cs_8409_store_stream_format bad nid 0x%02x FAIL!!\n", nid);
@@ -968,40 +978,49 @@ static void switch_input_src(struct hda_codec *codec)
 	struct hda_input_mux *imux = &spec->input_mux;
 	struct nid_path *path;
 	int i, c, nums;
-	mycodec_dbg(codec, "switch_input_src enter\n");
+	//mycodec_dbg(codec, "switch_input_src enter\n");
+	dev_info(hda_codec_dev(codec), "switch_input_src enter\n");
 
 	nums = spec->num_adc_nids;
 
-	mycodec_dbg(codec, "switch_input_src num adc nids %d %d\n",nums,spec->dyn_adc_switch);
+	//mycodec_dbg(codec, "switch_input_src num adc nids %d %d\n",nums,spec->dyn_adc_switch);
+	dev_info(hda_codec_dev(codec), "switch_input_src num adc nids %d %d\n",nums,spec->dyn_adc_switch);
 
 	for (c = 0; c < nums; c++) {
-		mycodec_dbg(codec, "switch_input_src num_items %d\n",imux->num_items);
+		//mycodec_dbg(codec, "switch_input_src num_items %d\n",imux->num_items);
+		dev_info(hda_codec_dev(codec), "switch_input_src num_items %d\n",imux->num_items);
 		for (i = 0; i < imux->num_items; i++) {
 			//path = get_input_path(codec, c, i);
 	                path = snd_hda_get_path_from_idx(codec, spec->input_paths[i][c]);
 			if (path) {
 				int in;
 				bool active = path->active;
-				mycodec_dbg(codec, "switch_input_src path active %d\n",active);
+				//mycodec_dbg(codec, "switch_input_src path active %d\n",active);
+				dev_info(hda_codec_dev(codec), "switch_input_src path active %d\n",active);
 				for (in = path->depth - 1; in >= 0; in--) {
 					hda_nid_t tnid = path->path[in];
-					mycodec_dbg(codec, "switch_input_src path nid %d: 0x%02x\n",in,tnid);
+					//mycodec_dbg(codec, "switch_input_src path nid %d: 0x%02x\n",in,tnid);
+					dev_info(hda_codec_dev(codec), "switch_input_src path nid %d: 0x%02x\n",in,tnid);
 				}
 				if (path->active) {
-					mycodec_dbg(codec, "switch_input_src path nid 0x%02x deactivate\n",path->path[1]);
+					//mycodec_dbg(codec, "switch_input_src path nid 0x%02x deactivate\n",path->path[1]);
+					dev_info(hda_codec_dev(codec), "switch_input_src path nid 0x%02x deactivate\n",path->path[1]);
 					snd_hda_activate_path(codec, path, false, false);
 				} else {
-					mycodec_dbg(codec, "switch_input_src path nid 0x%02x   activate\n",path->path[1]);
+					//mycodec_dbg(codec, "switch_input_src path nid 0x%02x   activate\n",path->path[1]);
+					dev_info(hda_codec_dev(codec), "switch_input_src path nid 0x%02x   activate\n",path->path[1]);
 					snd_hda_activate_path(codec, path, true, false);
 				}
 			}
 			else {
-				mycodec_dbg(codec, "switch_input_src path NULL\n");
+				//mycodec_dbg(codec, "switch_input_src path NULL\n");
+				dev_info(hda_codec_dev(codec), "switch_input_src path NULL\n");
 			}
 		}
 	}
 
-	mycodec_dbg(codec, "switch_input_src exit\n");
+	//mycodec_dbg(codec, "switch_input_src exit\n");
+	dev_info(hda_codec_dev(codec), "switch_input_src exit\n");
 }
 
 
@@ -1263,43 +1282,43 @@ void cs_8409_capture_cleanup(struct hda_codec *codec)
 }
 
 // routine to clear unsol list
-static void cs_8409_clear_external_device_unsolicited_responses(struct hda_codec *codec)
-{
-	struct cs8409_apple_spec *spec = codec->spec;
-	struct unsol_item *unsol_entry = NULL;
-	struct unsol_item *unsol_temp = NULL;
-	if (!list_empty(&spec->unsol_list)) {
-		codec_info(codec, "cs_8409_clear_external_device_unsolicited_responses UNSOL start\n");
-		list_for_each_entry_safe(unsol_entry, unsol_temp, &spec->unsol_list, list)
-		{
-			list_del_init(&unsol_entry->list);
-			spec->unsol_items_prealloc_used[unsol_entry->idx] = 0;
-			memset(unsol_entry, 0, sizeof(struct unsol_item));
-		}
-		codec_info(codec, "cs_8409_clear_external_device_unsolicited_responses UNSOL end\n");
-	}
-}
+//static void cs_8409_clear_external_device_unsolicited_responses(struct hda_codec *codec)
+//{
+//	struct cs8409_apple_spec *spec = codec->spec;
+//	struct unsol_item *unsol_entry = NULL;
+//	struct unsol_item *unsol_temp = NULL;
+//	if (!list_empty(&spec->unsol_list)) {
+//		codec_info(codec, "cs_8409_clear_external_device_unsolicited_responses UNSOL start\n");
+//		list_for_each_entry_safe(unsol_entry, unsol_temp, &spec->unsol_list, list)
+//		{
+//			list_del_init(&unsol_entry->list);
+//			spec->unsol_items_prealloc_used[unsol_entry->idx] = 0;
+//			memset(unsol_entry, 0, sizeof(struct unsol_item));
+//		}
+//		codec_info(codec, "cs_8409_clear_external_device_unsolicited_responses UNSOL end\n");
+//	}
+//}
 
 static void cs_8409_cs42l83_unsolicited_response_finalize(struct hda_codec *codec, unsigned int res);
 
-static void cs_8409_perform_external_device_unsolicited_responses(struct hda_codec *codec)
-{
-	struct cs8409_apple_spec *spec = codec->spec;
-	struct unsol_item *unsol_entry = NULL;
-	struct unsol_item *unsol_temp = NULL;
-	if (!list_empty(&spec->unsol_list)) {
-		codec_info(codec, "cs_8409_perform_external_device_unsolicited_responses UNSOL start\n");
-		list_for_each_entry_safe(unsol_entry, unsol_temp, &spec->unsol_list, list)
-		{
-			list_del_init(&unsol_entry->list);
-			// pigs this gets complicated - these might issue other unsol responses
-			cs_8409_cs42l83_unsolicited_response_finalize(codec, unsol_entry->res);
-			spec->unsol_items_prealloc_used[unsol_entry->idx] = 0;
-			memset(unsol_entry, 0, sizeof(struct unsol_item));
-		}
-		codec_info(codec, "cs_8409_perform_external_device_unsolicited_responses UNSOL end\n");
-	}
-}
+//static void cs_8409_perform_external_device_unsolicited_responses(struct hda_codec *codec)
+//{
+//	struct cs8409_apple_spec *spec = codec->spec;
+//	struct unsol_item *unsol_entry = NULL;
+//	struct unsol_item *unsol_temp = NULL;
+//	if (!list_empty(&spec->unsol_list)) {
+//		codec_info(codec, "cs_8409_perform_external_device_unsolicited_responses UNSOL start\n");
+//		list_for_each_entry_safe(unsol_entry, unsol_temp, &spec->unsol_list, list)
+//		{
+//			list_del_init(&unsol_entry->list);
+//			// pigs this gets complicated - these might issue other unsol responses
+//			cs_8409_cs42l83_unsolicited_response_finalize(codec, unsol_entry->res);
+//			spec->unsol_items_prealloc_used[unsol_entry->idx] = 0;
+//			memset(unsol_entry, 0, sizeof(struct unsol_item));
+//		}
+//		codec_info(codec, "cs_8409_perform_external_device_unsolicited_responses UNSOL end\n");
+//	}
+//}
 
 static void cs_8409_cs42l83_unsolicited_response(struct hda_codec *codec, unsigned int res)
 {
@@ -1316,46 +1335,71 @@ static void cs_8409_cs42l83_unsolicited_response(struct hda_codec *codec, unsign
 	// clashing with other verbs
 	// it may be that we get multiple interrupt flags to handle when we do read - not seen so far
 
-	if (spec->block_unsol)
-	{
-		int itm;
-		int new_itm = -1;
-		codec_info(codec, "cs_8409_cs42l83_unsolicited_response -     UNSOL BLOCKED\n");
-		for (itm=0; itm<10; itm++)
-			if (spec->unsol_items_prealloc_used[itm] == 0) { new_itm = itm; break; }
-		if (new_itm < 0)
-		{
-			codec_info(codec, "cs_8409_cs42l83_unsolicited_response - IGNORING UNSOL RESPONSE!!\n");
-			return;
-		}
-		spec->unsol_items_prealloc_used[new_itm] = 1;
-		memset(&(spec->unsol_items_prealloc[new_itm]), 0, sizeof(struct unsol_item));
-                spec->unsol_items_prealloc[new_itm].res = res;
-                spec->unsol_items_prealloc[new_itm].idx = new_itm;
-		list_add_tail(&(spec->unsol_items_prealloc[new_itm].list), &spec->unsol_list);
-		codec_info(codec, "cs_8409_cs42l83_unsolicited_response - UNSOL response stored\n");
-		return;
-        }
-        else
-		codec_info(codec, "cs_8409_cs42l83_unsolicited_response - NOT UNSOL BLOCKED\n");
+	//if (spec->block_unsol)
+	//{
+	//	int itm;
+	//	int new_itm = -1;
+	//	codec_info(codec, "cs_8409_cs42l83_unsolicited_response -     UNSOL BLOCKED\n");
+	//	for (itm=0; itm<10; itm++)
+	//		if (spec->unsol_items_prealloc_used[itm] == 0) { new_itm = itm; break; }
+	//	if (new_itm < 0)
+	//	{
+	//		codec_info(codec, "cs_8409_cs42l83_unsolicited_response - IGNORING UNSOL RESPONSE!!\n");
+	//		return;
+	//	}
+	//	spec->unsol_items_prealloc_used[new_itm] = 1;
+	//	memset(&(spec->unsol_items_prealloc[new_itm]), 0, sizeof(struct unsol_item));
+	//        spec->unsol_items_prealloc[new_itm].res = res;
+	//        spec->unsol_items_prealloc[new_itm].idx = new_itm;
+	//	list_add_tail(&(spec->unsol_items_prealloc[new_itm].list), &spec->unsol_list);
+	//	codec_info(codec, "cs_8409_cs42l83_unsolicited_response - UNSOL response stored\n");
+	//	return;
+	//}
+	//else
+	//	codec_info(codec, "cs_8409_cs42l83_unsolicited_response - NOT UNSOL BLOCKED\n");
 
-        // so it appears we need to block unsol responses while doing unsol responses
+	// so it appears we need to block unsol responses while doing unsol responses
 	// this is probably not the way to do this but still havent figured out how to use locking properly
 	// as this needs to be interruptible because some of these functions take a long time
 	// I think if we get here we cannot have been blocked so list maybe always empty
 	// whats not clear is if list_for_each_entry_safe is safe for addition also
-	spec->block_unsol = 1;
+	//spec->block_unsol = 1;
+
+	//cs_8409_cs42l83_unsolicited_response_finalize(codec, res);
+
+	//if (!list_empty(&spec->unsol_list))
+	//{
+	//	mycodec_info(codec, "cs_8409_cs42l83_unsolicited_response - performing blocked responses start\n");
+	//	cs_8409_perform_external_device_unsolicited_responses(codec);
+	//	mycodec_info(codec, "cs_8409_cs42l83_unsolicited_response - performing blocked responses end\n");
+	//}
+
+	//spec->block_unsol = 0;
+
+
+	// so it appears we need to use the same mutex lock in all functions that might run simultaneously
+	// (had thought maybe the work queue might not run if a mutex lock is active but doesnt look like it)
+	// the primary need for this is that it appears that the cs42l83_configure_int_mclk function
+	// activates an unsol response which causes other verbs to be sent in the middle of cs42l83_configure_int_mclk
+	// which messes things up
+
+	// not sure about this yet - we dont know if this is a plugin/plugout event yet
+	// - we dont actually know this till we call cs_8409_interrupt_action which determines
+	// the specific interrupt activated
+	// do we wait till cs_8409_interrupt_action to do this lock??
+	// we do get button interrupts here
+
+	if (mutex_is_locked(&spec->unsol_lock)) {
+		codec_info(codec, "cs_8409_cs42l83_unsolicited_response -     UNSOL LOCKED - response delayed\n");
+	} else {
+		codec_info(codec, "cs_8409_cs42l83_unsolicited_response -     UNSOL NOT LOCKED\n");
+	}
+
+	mutex_lock(&spec->unsol_lock);
 
 	cs_8409_cs42l83_unsolicited_response_finalize(codec, res);
 
-	if (!list_empty(&spec->unsol_list))
-	{
-		mycodec_info(codec, "cs_8409_cs42l83_unsolicited_response - performing blocked responses start\n");
-		cs_8409_perform_external_device_unsolicited_responses(codec);
-		mycodec_info(codec, "cs_8409_cs42l83_unsolicited_response - performing blocked responses end\n");
-	}
-
-	spec->block_unsol = 0;
+	mutex_unlock(&spec->unsol_lock);
 }
 
 static void cs_8409_cs42l83_unsolicited_response_finalize(struct hda_codec *codec, unsigned int res)
@@ -1534,6 +1578,15 @@ static void cs_8409_pcm_playback_pre_prepare_hook(struct hda_pcm_stream *hinfo, 
 {
 	struct cs8409_apple_spec *spec = codec->spec;
 
+	// stack trace for cs_8409_pcm_playback_pre_prepare_hook
+
+	//  cs_8409_playback_pcm_prepare+0xbe/0x2e0 [snd_hda_codec_cs8409]
+	//  snd_hda_codec_prepare+0x52/0x130 [snd_hda_codec]
+	//  azx_pcm_prepare+0x140/0x220 [snd_hda_codec]
+
+	// snd_hda_codec_prepare operates under the codec->bus->prepare_mutex
+	// dont see mutex for azx_pcm_prepare
+
 	if (action == HDA_GEN_PCM_ACT_PREPARE) {
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 8, 0)
 		struct timespec64 curtim;
@@ -1544,7 +1597,7 @@ static void cs_8409_pcm_playback_pre_prepare_hook(struct hda_pcm_stream *hinfo, 
 #endif
 		spec->play_init_count++;
 		myprintk("snd_hda_intel: command cs_8409_pcm_playback_pre_prepare_hook HOOK PREPARE init %d %d last %lld cur %lld",spec->play_init,spec->play_init_count,spec->last_play_time.tv_sec,curtim.tv_sec);
-                //dump_stack();
+		//dump_stack();
 		// for some reason this is being called twice within short time so setup is being done twice
 		// with no intervening cleanup
 		// which may be introducing glitches in the headset/headphone stream - which it is!!!
@@ -1574,6 +1627,7 @@ static void cs_8409_pcm_playback_pre_prepare_hook(struct hda_pcm_stream *hinfo, 
                         // save number of actual stream channels
                         spec->stream_channels = substream->runtime->channels;
 
+			// this is checking power for headset mike nids - this is debug print
 			hda_check_power_state(codec, 0x1a, 1);
 			hda_check_power_state(codec, 0x3c, 1);
 		}
@@ -1586,7 +1640,9 @@ static void cs_8409_pcm_playback_pre_prepare_hook(struct hda_pcm_stream *hinfo, 
 			{
 				// for the moment I think this works for both MB 14,1 and 14,3 - same hda and headphone chip
 				// note that so far only the headphone chip seems to generate unsol responses usually
-				spec->block_unsol = 1;
+				//spec->block_unsol = 1;
+				// lets try the full outer cs_8409_playback_pcm_prepare lock for the moment
+				//mutex_lock(&spec->unsol_lock);
 				// we need to split this to deal with capture only setup
 				// and capture with play setup
 				// note this does mean we setup the mike in a different order to OSX
@@ -1613,12 +1669,14 @@ static void cs_8409_pcm_playback_pre_prepare_hook(struct hda_pcm_stream *hinfo, 
 				{
 					cs_8409_headplay_setup(codec);
 				}
+				//mutex_unlock(&spec->unsol_lock);
 			}
 			else {
 			        cs_8409_play_setup(codec);
 			}
 			myprintk("snd_hda_intel: command cs_8409_pcm_playback_pre_prepare_hook setup play called");
 
+			// this is checking power for headset mike nids - this is debug print
 			hda_check_power_state(codec, 0x1a, 2);
 			hda_check_power_state(codec, 0x3c, 2);
 
@@ -1651,6 +1709,7 @@ static void cs_8409_pcm_playback_pre_prepare_hook(struct hda_pcm_stream *hinfo, 
 
 			spec->play_init = 1;
 		}
+		myprintk("snd_hda_intel: command cs_8409_pcm_playback_pre_prepare_hook HOOK PREPARE end\n");
 	}
 }
 
@@ -1673,9 +1732,53 @@ static void cs_8409_playback_pcm_hook(struct hda_pcm_stream *hinfo, struct hda_c
 	// certainly seems to handle S24_LE or S32_LE differences (OSX format is always S24_3LE)
 
 
+	// stack traces:
+	//
+	//   HDA_GEN_PCM_ACT_OPEN:
+	//   cs_8409_playback_pcm_hook+0x82/0x280 [snd_hda_codec_cs8409]
+	//   playback_pcm_open+0x7e/0xb0 [snd_hda_codec_generic]
+	//   azx_pcm_open+0x230/0x3d0 [snd_hda_codec]
+
+	//   HDA_GEN_PCM_ACT_PREPARE:
+	//   cs_8409_playback_pcm_prepare+0xbe/0x2e0 [snd_hda_codec_cs8409]
+	//   snd_hda_codec_prepare+0x52/0x130 [snd_hda_codec]
+	//   azx_pcm_prepare+0x140/0x220 [snd_hda_codec]
+
+	//   HDA_GEN_PCM_ACT_PREPARE:
+	//   cs_8409_playback_pcm_hook+0x1f2/0x280 [snd_hda_codec_cs8409]
+	//   cs_8409_playback_pcm_prepare+0x199/0x2e0 [snd_hda_codec_cs8409]
+	//   snd_hda_codec_prepare+0x52/0x130 [snd_hda_codec]
+	//   azx_pcm_prepare+0x140/0x220 [snd_hda_codec]
+
+	//   HDA_GEN_PCM_ACT_CLEANUP:
+	//   cs_8409_playback_pcm_hook+0xad/0x280 [snd_hda_codec_cs8409]
+	//   playback_pcm_cleanup+0x59/0x80 [snd_hda_codec_generic]
+	//   snd_hda_codec_cleanup+0x3f/0x70 [snd_hda_codec]
+	//   azx_pcm_hw_free+0x6e/0xc0 [snd_hda_codec]
+
+	//   HDA_GEN_PCM_ACT_CLOSE:
+	//   cs_8409_playback_pcm_hook+0x258/0x280 [snd_hda_codec_cs8409]
+	//   playback_pcm_close+0x5e/0x90 [snd_hda_codec_generic]
+	//   azx_pcm_close+0x85/0x130 [snd_hda_codec]
+
+	// so bit more understanding
+	// azx_pcm_open calls hinfo->ops.open
+	// azx_pcm_close calls hinfo->ops.close
+	// but azx_pcm_prepare does not do a direct call of ops.prepare
+	// it calls snd_hda_codec_prepare which then calls hinfo->ops.prepare
+
+	// ah - we have replaced hinfo->ops.prepare with cs_8409_playback_pcm_prepare (or cs_8409_capture_pcm_prepare)
+	// so we never call the playback_pcm_prepare function
+
+	// note that open/close run under the spec->pcm_mutex
+	// prepare/cleanup run under codec->bus->prepare_mutex
+
+
 	if (action == HDA_GEN_PCM_ACT_OPEN) {
 		//struct hda_cvt_setup_apple *p = NULL;
 		myprintk("snd_hda_intel: command cs_8409_playback_pcm_hook open");
+
+		//dump_stack();
 
 		spec->play_init_count = 0;
 
@@ -1694,47 +1797,57 @@ static void cs_8409_playback_pcm_hook(struct hda_pcm_stream *hinfo, struct hda_c
 		getnstimeofday(&curtim);
 #endif
 		myprintk("snd_hda_intel: command cs_8409_playback_pcm_hook HOOK PREPARE init %d %d last %lld cur %lld",spec->play_init,spec->play_init_count,spec->last_play_time.tv_sec,curtim.tv_sec);
-                //dump_stack();
+		//dump_stack();
 		//int power_chk = 0;
 		//power_chk = snd_hda_codec_read(codec, codec->core.afg, 0, AC_VERB_GET_POWER_STATE, 0);
 		//myprintk("snd_hda_intel: command cs_8409_playback_pcm_hook power check 0x01 2 %d", power_chk);
 		// this is where we need to finally unset the block_unsol
 		// - which also means this is where we should check for unsolicited responses
-		spec->block_unsol = 0;
-		if (!list_empty(&spec->unsol_list))
-		{
-			codec_info(codec, "cs_8409_playback_pcm_hook - performing UNSOL responses\n");
-			cs_8409_perform_external_device_unsolicited_responses(codec);
-			//cs_8409_clear_external_device_unsolicited_responses(codec);
-		}
+		//spec->block_unsol = 0;
+		//if (!list_empty(&spec->unsol_list))
+		//{
+		//	codec_info(codec, "cs_8409_playback_pcm_hook - performing UNSOL responses\n");
+		//	cs_8409_perform_external_device_unsolicited_responses(codec);
+		//	//cs_8409_clear_external_device_unsolicited_responses(codec);
+		// now using mutex locks the unsol responses (which are queued) should be handled by the workqueue
+		//}
 		spec->playing = 1;
 		myprintk("snd_hda_intel: command cs_8409_playback_pcm_hook HOOK PREPARE end");
 	} else if (action == HDA_GEN_PCM_ACT_CLEANUP) {
 		// so this also comes AFTER the stream format, frequency cleanup verbs are sent for the pcm stream
 		int power_chk = 0;
 		myprintk("snd_hda_intel: command cs_8409_playback_pcm_hook HOOK CLEANUP");
+                //dump_stack();
         	power_chk = snd_hda_codec_read(codec, codec->core.afg, 0, AC_VERB_GET_POWER_STATE, 0);
 		myprintk("snd_hda_intel: command cs_8409_playback_pcm_hook power check 0x01 3 %d", power_chk);
 		myprintk("snd_hda_intel: command cs_8409_playback_pcm_hook jack_present %d\n",spec->jack_present);
+		// this is more equivalent to the cs_8409_playback_pcm_hook_cleanup_locked code
+		// and would block unsol responses during cs_8409_play_cleanup in addition to cs_8409_headplay_cleanup
+		mutex_lock(&spec->unsol_lock);
 		// for the moment have junky test here
 		if (spec->jack_present)
 		{
+			// NOTE - we may well not need this - not sure the playback cleanup generates an unsol response
 			// for the moment I think this works for both MB 14,1 and 14,3 - same hda and headphone chip
 			// note that so far only the headphone chip seems to generate unsol responses usually
-			spec->block_unsol = 1;
+			//spec->block_unsol = 1;
+			// the big question is to lock here or to lock in the outer call
+			//mutex_lock(&spec->unsol_lock);
 			// so dont think need to anything about capturing here
 			cs_8409_headplay_cleanup(codec);
+			//mutex_unlock(&spec->unsol_lock);
 			spec->headset_play_format_setup_needed = 1;
 		}
                 else
 		        cs_8409_play_cleanup(codec);
+		mutex_unlock(&spec->unsol_lock);
 		myprintk("snd_hda_intel: command cs_8409_playback_pcm_hook done play down");
-		spec->block_unsol = 0;
-		if (!list_empty(&spec->unsol_list))
-		{
-			codec_info(codec, "cs_8409_playback_pcm_hook - performing UNSOL responses\n");
-			cs_8409_perform_external_device_unsolicited_responses(codec);
-		}
+		//spec->block_unsol = 0;
+		//if (!list_empty(&spec->unsol_list))
+		//{
+		//	codec_info(codec, "cs_8409_playback_pcm_hook - performing UNSOL responses\n");
+		//	cs_8409_perform_external_device_unsolicited_responses(codec);
+		//}
 		spec->play_init_count = 0;
 		// not sure of this position yet
 		spec->playing = 0;
@@ -1743,6 +1856,7 @@ static void cs_8409_playback_pcm_hook(struct hda_pcm_stream *hinfo, struct hda_c
 		myprintk("snd_hda_intel: command cs_8409_playback_pcm_hook HOOK CLEANUP end");
 	} else if (action == HDA_GEN_PCM_ACT_CLOSE) {
 		myprintk("snd_hda_intel: command cs_8409_playback_pcm_hook close");
+		//dump_stack();
 		myprintk("snd_hda_intel: command cs_8409_playback_pcm_hook close end");
 	}
 
@@ -1757,7 +1871,7 @@ static void cs_8409_pcm_capture_pre_prepare_hook(struct hda_pcm_stream *hinfo, s
 
 	if (action == HDA_GEN_PCM_ACT_PREPARE) {
 		spec->capture_init_count++;
-		myprintk("snd_hda_intel: command cs_8409_pcm_capture_pre_prepare_hook HOOK PREPARE init %d %d",spec->capture_init,spec->capture_init_count);
+		myprintk("snd_hda_intel: command cs_8409_pcm_capture_pre_prepare_hook HOOK PREPARE nid 0x%02x init %d %d",hinfo->nid,spec->capture_init,spec->capture_init_count);
 
 		// for some reason this is being called twice within short time
 		// well great apparently its a feature this function can be called multiple times!!
@@ -1781,23 +1895,50 @@ static void cs_8409_pcm_capture_pre_prepare_hook(struct hda_pcm_stream *hinfo, s
 
 		// I think this is the same for intmike or headset mike
 		//cs_8409_setup_stream_format(codec, hinfo->nid, stream_tag, format);
+
+                // it looks as though the above maybe the issue
+                // it appears hinfo->nid is now always the internal mike
+                // as far as I can see have_mike is only 1 if headset is plugged in - with mike of course
+                // so it may be an issue of dyn_adc_switch path vs Alt Analog path
+                if (hinfo->nid == 0x22) {
+                        if (spec->have_mike) {
+		                myprintk("snd_hda_intel: command cs_8409_pcm_capture_pre_prepare_hook hinfo nid is JACK INTERNAL MIC 0x%02x\n",hinfo->nid);
+                        } else {
+		                myprintk("snd_hda_intel: command cs_8409_pcm_capture_pre_prepare_hook hinfo nid is OK INTERNAL MIC 0x%02x\n",hinfo->nid);
+                        }
+                } else if (hinfo->nid == 0x1a) {
+		        myprintk("snd_hda_intel: command cs_8409_pcm_capture_pre_prepare_hook hinfo nid is HEAD MIC 0x%02x\n",hinfo->nid);
+                } else {
+		        myprintk("snd_hda_intel: command cs_8409_pcm_capture_pre_prepare_hook hinfo nid is UNKNOWN 0x%02x\n",hinfo->nid);
+                }
+                //if (spec->have_mike) {
+		//        cs_8409_store_stream_format(codec, 0x1a, stream_tag, format);
+                //} else {
+		//        cs_8409_store_stream_format(codec, hinfo->nid, stream_tag, format);
+                //}
 		cs_8409_store_stream_format(codec, hinfo->nid, stream_tag, format);
 
 		// ensure the setup is only done once
 		if (spec->capture_init_count == 1) {
 
+		        myprintk("snd_hda_intel: command cs_8409_pcm_capture_pre_prepare_hook hinfo nid 0x%02x jack present %d have mike %d\n",hinfo->nid, spec->jack_present, spec->have_mike);
+
 			// for the moment have junky test here
 			if (spec->jack_present) {
-				spec->block_unsol = 1;
+				// NOTE - we may well not need this - not sure the capture prepare generates an unsol response
+				//spec->block_unsol = 1;
+				mutex_lock(&spec->unsol_lock);
 				if (spec->have_mike)
 				{
 					// so it seems if we have a headset mike we always enable the
 					// headphones even if just capturing
+		                        myprintk("snd_hda_intel: command cs_8409_pcm_capture_pre_prepare_hook HOOK PREPARE play format setup %d",spec->headset_play_format_setup_needed);
 					if (spec->headset_play_format_setup_needed)
 					{
 						cs_8409_headplay_setup(codec);
 						spec->headset_play_format_setup_needed = 0;
 					}
+		                        myprintk("snd_hda_intel: command cs_8409_pcm_capture_pre_prepare_hook HOOK PREPARE capture format setup %d",spec->headset_capture_format_setup_needed);
 					if (spec->headset_capture_format_setup_needed)
 					{
 						cs_8409_headcapture_setup(codec);
@@ -1815,6 +1956,7 @@ static void cs_8409_pcm_capture_pre_prepare_hook(struct hda_pcm_stream *hinfo, s
 					cs_8409_capture_setup(codec);
 #endif
 				}
+				mutex_unlock(&spec->unsol_lock);
 				// NOTE - still not fixed linein/lineout working - this may need
 				// changing here
 			}
@@ -1889,12 +2031,12 @@ static void cs_8409_capture_pcm_hook(struct hda_pcm_stream *hinfo, struct hda_co
 		myprintk("snd_hda_intel: command cs_8409_capture_pcm_hook HOOK PREPARE init %d",spec->capture_init);
 		// this is where we need to finally unset the block_unsol
 		// - which also means this is where we should check for unsolicited responses
-		spec->block_unsol = 0;
-		if (!list_empty(&spec->unsol_list))
-		{
-			codec_info(codec, "cs_8409_capture_pcm_hook - performing UNSOL responses\n");
-			cs_8409_perform_external_device_unsolicited_responses(codec);
-		}
+		//spec->block_unsol = 0;
+		//if (!list_empty(&spec->unsol_list))
+		//{
+		//	codec_info(codec, "cs_8409_capture_pcm_hook - performing UNSOL responses\n");
+		//	cs_8409_perform_external_device_unsolicited_responses(codec);
+		//}
 		spec->capturing = 1;
 		myprintk("snd_hda_intel: command cs_8409_capture_pcm_hook HOOK PREPARE end");
 	} else if (action == HDA_GEN_PCM_ACT_CLEANUP) {
@@ -1904,12 +2046,17 @@ static void cs_8409_capture_pcm_hook(struct hda_pcm_stream *hinfo, struct hda_co
 		power_chk = snd_hda_codec_read(codec, codec->core.afg, 0, AC_VERB_GET_POWER_STATE, 0);
 		myprintk("snd_hda_intel: command cs_8409_capture_pcm_hook power check 0x01 3 %d", power_chk);
 		myprintk("snd_hda_intel: command cs_8409_capture_pcm_hook jack_present %d\n",spec->jack_present);
+		// this is more equivalent to the cs_8409_capture_pcm_hook_cleanup_locked code
+		// and would block unsol responses during cs_8409_capture_cleanup in addition to cs_8409_headcapture_cleanup
+		mutex_lock(&spec->unsol_lock);
 		// for the moment have junky test here
 		if (spec->jack_present)
 		{
+			// NOTE - we may well not need this - not sure the capture prepare generates an unsol response
 			// for the moment I think this works for both MB 14,1 and 14,3 - same hda and headphone chip
 			// note that so far only the headphone chip seems to generate unsol responses usually
-			spec->block_unsol = 1;
+			//spec->block_unsol = 1;
+			//mutex_lock(&spec->unsol_lock);
 			if (spec->headset_capture_format_setup_needed == 0)
 			{
 				cs_8409_headcapture_cleanup(codec);
@@ -1923,16 +2070,18 @@ static void cs_8409_capture_pcm_hook(struct hda_pcm_stream *hinfo, struct hda_co
 					spec->headset_play_format_setup_needed = 1;
 				}
 			}
+			//mutex_unlock(&spec->unsol_lock);
 		}
                 else
 		        cs_8409_capture_cleanup(codec);
-		myprintk("snd_hda_intel: command cs_8409_capture_pcm_hook done capture down");
-		spec->block_unsol = 0;
-		if (!list_empty(&spec->unsol_list))
-		{
-			codec_info(codec, "cs_8409_capture_pcm_hook - performing UNSOL responses\n");
-			cs_8409_perform_external_device_unsolicited_responses(codec);
-		}
+		mutex_unlock(&spec->unsol_lock);
+		myprintk("snd_hda_intel: command cs_8409_capture_pcm_hook done capture cleanup");
+		//spec->block_unsol = 0;
+		//if (!list_empty(&spec->unsol_list))
+		//{
+		//	codec_info(codec, "cs_8409_capture_pcm_hook - performing UNSOL responses\n");
+		//	cs_8409_perform_external_device_unsolicited_responses(codec);
+		//}
 		spec->capture_init_count = 0;
 		// not sure of this position yet
 		spec->capturing = 0;
