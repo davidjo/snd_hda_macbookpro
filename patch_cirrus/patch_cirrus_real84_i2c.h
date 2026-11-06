@@ -4,6 +4,14 @@
 // re-define this here so can turn this off for this file specifically
 #define mycodec_i2c_local_info mycodec_i2c_info
 
+// Headphone attenuation applied in the CS42L83 mixer (registers 0x2301/0x2303).
+// Apple programs 0 dB and does all volume scaling in CoreAudio; on Linux the only
+// volume is the ALSA softvol (-51..0 dB), so 0 dB here makes headphones far too loud.
+// 1 dB steps, 0..62 (0x3f would be mute). Applied each time headphone playback starts.
+static int hp_attenuation = 24;
+module_param(hp_attenuation, int, 0644);
+MODULE_PARM_DESC(hp_attenuation, "Headphone attenuation in dB (0-62, default 24)");
+
 static void cs42l83_headset_button_detect_interrupts_off(struct hda_codec *codec)
 {
         //int retval;
@@ -1168,8 +1176,8 @@ static void cs42l83_setup_audio_output(struct hda_codec *codec)
 
         cs_8409_vendor_i2cWrite(codec, 0x90, 0x2a04, 0x0000, 1); // snd_hda
         cs_8409_vendor_i2cWrite(codec, 0x90, 0x2a07, 0x0020, 1); // snd_hda
-        cs_8409_vendor_i2cWrite(codec, 0x90, 0x2301, 0x0000, 1); // snd_hda
-        cs_8409_vendor_i2cWrite(codec, 0x90, 0x2303, 0x0000, 1); // snd_hda
+        cs_8409_vendor_i2cWrite(codec, 0x90, 0x2301, clamp(hp_attenuation, 0, 62), 1); // snd_hda
+        cs_8409_vendor_i2cWrite(codec, 0x90, 0x2303, clamp(hp_attenuation, 0, 62), 1); // snd_hda
         cs_8409_vendor_i2cWrite(codec, 0x90, 0x2a02, 0x0002, 1); // snd_hda
         cs_8409_vendor_i2cWrite(codec, 0x90, 0x2a05, 0x0002, 1); // snd_hda
 
