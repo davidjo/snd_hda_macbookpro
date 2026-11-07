@@ -2280,7 +2280,7 @@ static int cs_8409_boot_setup_real(struct hda_codec *codec)
 
                 // so I think we need to enable unsol response at this stage and block it till end of this function
                 // - because we seem to get an UNSOL response in the middle of this code
-                //spec->block_unsol = 1;
+                ////spec->block_unsol = 1;
 
 		// so far we do not seem to get any UNSOL responses here if headset plugged in
 		// - only after unplug do they restart
@@ -2430,11 +2430,11 @@ static int cs_8409_boot_setup_real(struct hda_codec *codec)
                         // I think we need to block here - because clearing the interrupts causes interrupts!!
                         // this is similar to cs_8409_cs42l83_unsolicited_response where we block
                         // before calling the perform function
-                        //spec->block_unsol = 1;
+                        ////spec->block_unsol = 1;
 
-                        //cs_8409_perform_external_device_unsolicited_responses(codec);
+                        ////cs_8409_perform_external_device_unsolicited_responses(codec);
 
-                        //spec->block_unsol = 0;
+                        ////spec->block_unsol = 0;
 
                 }
                 else
@@ -2909,14 +2909,16 @@ static int cs_8409_boot_setup_real(struct hda_codec *codec)
 				// we get some calls to cs42l83_read_status_and_clear_interrupt/cs42l83_disambiguate_ur_from_int here
 				// clear out any stored unsol responses
 
+                                // now using mutexes dont think we need this
+
                                 // I think we need to block here - because clearing the interrupts causes interrupts!!
                                 // this is similar to cs_8409_cs42l83_unsolicited_response where we block
                                 // before calling the perform function
-                                spec->block_unsol = 1;
+                                //spec->block_unsol = 1;
 
-                                cs_8409_perform_external_device_unsolicited_responses(codec);
+                                //cs_8409_perform_external_device_unsolicited_responses(codec);
 
-                                spec->block_unsol = 0;
+                                //spec->block_unsol = 0;
 
                         }
 
@@ -2927,7 +2929,7 @@ static int cs_8409_boot_setup_real(struct hda_codec *codec)
                 }
 
 
-                spec->block_unsol = 0;
+                //spec->block_unsol = 0;
 
                 dev_info(hda_codec_dev(codec), "cs_8409_boot_setup_real boot CURRENT IMPLEMENTATION END!!\n");
 
@@ -3159,8 +3161,9 @@ static void cs_8409_play_real(struct hda_codec *codec)
 
         // so I have seen an UNSOL response in cs_8409_playstop_real
         // which suggests need to block responses here
-        spec->block_unsol = 1;
+        //spec->block_unsol = 1;
 
+        // this is now going to run under mutex lock set in cs_8409_pcm_playback_pre_prepare_hook so nothing needed here
 
         //cs_8409_play_data(codec);
 
@@ -3185,10 +3188,13 @@ static void cs_8409_play_real(struct hda_codec *codec)
         play_sync_converters_on(codec);
 
 
+        // this is now going to run under mutex lock set in cs_8409_pcm_playback_pre_prepare_hook so nothing needed here
 
-        cs_8409_perform_external_device_unsolicited_responses(codec);
+        // dont think we need this - the unsol responses should be run by the workqueue
 
-        spec->block_unsol = 0;
+        //cs_8409_perform_external_device_unsolicited_responses(codec);
+
+        //spec->block_unsol = 0;
 
 
         mycodec_info(codec, "command cs_8409_play_real end");
@@ -3231,7 +3237,9 @@ static void cs_8409_playstop_real(struct hda_codec *codec)
 
         // so I have seen an UNSOL response in cs_8409_playstop_real
         // which suggests need to block responses here
-        spec->block_unsol = 1;
+	//spec->block_unsol = 1;
+
+        // this is now going to run under mutex lock set in cs_8409_pcm_playback_pre_prepare_hook so nothing needed here
 
 
         mycodec_info(codec, "command cs_8409_playstop_real start");
@@ -3248,9 +3256,13 @@ static void cs_8409_playstop_real(struct hda_codec *codec)
         cs_8409_inputs_power_nids_off(codec);
 
 
-        cs_8409_perform_external_device_unsolicited_responses(codec);
+        // this is now going to run under mutex lock set in cs_8409_pcm_playback_pre_prepare_hook so nothing needed here
 
-        spec->block_unsol = 0;
+        // dont think we need this - the unsol responses should be run by the workqueue
+
+        //cs_8409_perform_external_device_unsolicited_responses(codec);
+
+        //spec->block_unsol = 0;
 
 
         mycodec_info(codec, "command cs_8409_playstop_real end");
@@ -3266,7 +3278,9 @@ static void cs_8409_capture_real(struct hda_codec *codec)
 
         // so I have seen an UNSOL response in cs_8409_playstop_real
         // which suggests need to block responses here
-        spec->block_unsol = 1;
+        //spec->block_unsol = 1;
+
+        // this is now going to run under mutex lock set in cs_8409_pcm_capture_pre_prepare_hook so nothing needed here
 
 
         //cs_8409_capture_data(codec);
@@ -3304,9 +3318,13 @@ static void cs_8409_capture_real(struct hda_codec *codec)
         //cs_8409_linein_volume_setup - (no change)
 
 
-        cs_8409_perform_external_device_unsolicited_responses(codec);
+        // this is now going to run under mutex lock set in cs_8409_pcm_capture_pre_prepare_hook so nothing needed here
 
-        spec->block_unsol = 0;
+        // dont think we need this - the unsol responses should be run by the workqueue
+
+        //cs_8409_perform_external_device_unsolicited_responses(codec);
+
+        //spec->block_unsol = 0;
 
 
         mycodec_info(codec, "command cs_8409_capture_real end");
@@ -3361,7 +3379,9 @@ static void cs_8409_capturestop_real(struct hda_codec *codec)
 
         // so I have seen an UNSOL response in cs_8409_playstop_real
         // which suggests need to block responses here
-        spec->block_unsol = 1;
+        //spec->block_unsol = 1;
+
+        // this is now going to run under mutex lock set in cs_8409_pcm_capture_pre_prepare_hook so nothing needed here
 
 
         mycodec_info(codec, "command cs_8409_capturestop_real start");
@@ -3417,9 +3437,13 @@ static void cs_8409_capturestop_real(struct hda_codec *codec)
         //cs_8409_disable_amps34
 
 
-        cs_8409_perform_external_device_unsolicited_responses(codec);
+        // this is now going to run under mutex lock set in cs_8409_pcm_capture_pre_prepare_hook so nothing needed here
 
-        spec->block_unsol = 0;
+        // dont think we need this - the unsol responses should be run by the workqueue
+
+        //cs_8409_perform_external_device_unsolicited_responses(codec);
+
+        //spec->block_unsol = 0;
 
 
         mycodec_info(codec, "command cs_8409_capturestop_real end");

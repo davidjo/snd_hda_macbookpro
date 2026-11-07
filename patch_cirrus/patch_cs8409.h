@@ -304,11 +304,11 @@ struct cs8409_cir_param {
 
 
 #ifdef APPLE_CODECS
-struct unsol_item {
-	struct list_head list;
-	unsigned int idx;
-	unsigned int res;
-};
+//struct unsol_item {
+//	struct list_head list;
+//	unsigned int idx;
+//	unsigned int res;
+//};
 struct hda_cvt_setup_apple {
 	hda_nid_t nid;
 	u8 stream_tag;
@@ -381,20 +381,31 @@ struct cs8409_spec {
 	int (*spdif_sw_put)(struct snd_kcontrol *kcontrol,
 			    struct snd_ctl_elem_value *ucontrol);
 
-	// so it appears we have "concurrency" in the linux HDA code
-	// in that if unsolicited responses occur which perform extensive verbs
-	// the hda verbs are intermixed with eg extensive start playback verbs
-	// on OSX we appear to have blocks of verbs during which unsolicited responses
-	// are logged but the unsolicited verbs occur after the verb block
-	// this flag is used to flag such verb blocks and the list will store the
-	// responses
-	// we use a pre-allocated list - if we have more than 10 outstanding unsols
-	// we will drop
-	// not clear if mutexes would be the way to go
-	int block_unsol;
-	struct list_head unsol_list;
-	struct unsol_item unsol_items_prealloc[10];
-	int unsol_items_prealloc_used[10];
+	//// so it appears we have "concurrency" in the linux HDA code
+	//// in that if unsolicited responses occur which perform extensive verbs
+	//// the hda verbs are intermixed with eg extensive start playback verbs
+	//// on OSX we appear to have blocks of verbs during which unsolicited responses
+	//// are logged but the unsolicited verbs occur after the verb block
+	//// this flag is used to flag such verb blocks and the list will store the
+	//// responses
+	//// we use a pre-allocated list - if we have more than 10 outstanding unsols
+	//// we will drop
+	//// not clear if mutexes would be the way to go
+	//int block_unsol;
+	//struct list_head unsol_list;
+	//struct unsol_item unsol_items_prealloc[10];
+	//int unsol_items_prealloc_used[10];
+
+	// so it appears unsol responses are queued by the hda system
+        // switching to mutex locks for prevention of parallel operation
+	// I have been unable to find locking used for switching eg when headphones plugged in/out
+	// I guess I dont understand mutex locking and workqueues
+	// unsol responses are queued and run on a workqueue which apparently runs asynchronously to main thread
+	// so far looks like only way to block unsol responses is by having the same mutex lock
+	// in the code we want blocked and the unsol response code
+	// so either code has to wait for other code to finish
+	struct mutex unsol_lock;
+	struct mutex i2ccodeblock_lock;
 
 	// add in specific nids for the intmike and linein as they seem to swap
 	// between macbook pros (14,3) and imacs (18,3)

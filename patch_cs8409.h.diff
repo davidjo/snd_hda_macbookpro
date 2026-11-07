@@ -1,5 +1,5 @@
---- a/codecs/cirrus/cs8409.h.orig	2025-09-15 12:53:58.000000000 +0100
-+++ b/codecs/cirrus/cs8409.h	2025-11-01 20:14:30.053248236 +0000
+--- a/codecs/cirrus/cs8409.h.orig       2025-09-15 12:53:58.000000000 +0100
++++ b/codecs/cirrus/cs8409.h    2025-11-01 20:14:30.053248236 +0000
 @@ -19,198 +19,204 @@
  #include "hda_jack.h"
  #include "../generic.h"
@@ -397,11 +397,11 @@
  
 +
 +#ifdef APPLE_CODECS
-+struct unsol_item {
-+       struct list_head list;
-+       unsigned int idx;
-+       unsigned int res;
-+};
++//struct unsol_item {
++//	struct list_head list;
++//	unsigned int idx;
++//	unsigned int res;
++//};
 +struct hda_cvt_setup_apple {
 +       hda_nid_t nid;
 +       u8 stream_tag;
@@ -420,12 +420,12 @@
  	unsigned int hp_jack_in:1;
  	unsigned int mic_jack_in:1;
 +#ifdef APPLE_CODECS
-+       unsigned int linein_jack_in:1;
++        unsigned int linein_jack_in:1;
 +#endif
  	unsigned int suspended:1;
  	unsigned int paged:1;
  	unsigned int last_page;
-@@ -342,6 +368,133 @@
+@@ -342,6 +368,140 @@
  	unsigned int init_done:1;
  	unsigned int build_ctrl_done:1;
  
@@ -445,20 +445,31 @@
 +       int (*spdif_sw_put)(struct snd_kcontrol *kcontrol,
 +                           struct snd_ctl_elem_value *ucontrol);
 +
-+       // so it appears we have "concurrency" in the linux HDA code
-+       // in that if unsolicited responses occur which perform extensive verbs
-+       // the hda verbs are intermixed with eg extensive start playback verbs
-+       // on OSX we appear to have blocks of verbs during which unsolicited responses
-+       // are logged but the unsolicited verbs occur after the verb block
-+       // this flag is used to flag such verb blocks and the list will store the
-+       // responses
-+       // we use a pre-allocated list - if we have more than 10 outstanding unsols
-+       // we will drop
-+       // not clear if mutexes would be the way to go
-+       int block_unsol;
-+       struct list_head unsol_list;
-+       struct unsol_item unsol_items_prealloc[10];
-+       int unsol_items_prealloc_used[10];
++       //// so it appears we have "concurrency" in the linux HDA code
++       //// in that if unsolicited responses occur which perform extensive verbs
++       //// the hda verbs are intermixed with eg extensive start playback verbs
++       //// on OSX we appear to have blocks of verbs during which unsolicited responses
++       //// are logged but the unsolicited verbs occur after the verb block
++       //// this flag is used to flag such verb blocks and the list will store the
++       //// responses
++       //// we use a pre-allocated list - if we have more than 10 outstanding unsols
++       //// we will drop
++       //// not clear if mutexes would be the way to go
++       //int block_unsol;
++       //struct list_head unsol_list;
++       //struct unsol_item unsol_items_prealloc[10];
++       //int unsol_items_prealloc_used[10];
++
++       // so it appears unsol responses are queued by the hda system
++       // switching to mutex locks for prevention of parallel operation
++       // I have been unable to find locking used for switching eg when headphones plugged in/out
++       // I guess I dont understand mutex locking and workqueues
++       // unsol responses are queued and run on a workqueue which apparently runs asynchronously to main thread
++       // so far looks like only way to block unsol responses is by having the same mutex lock
++       // in the code we want blocked and the unsol response code
++       // so either code has to wait for other code to finish
++       struct mutex unsol_lock;
++       struct mutex i2ccodeblock_lock;
 +
 +       // add in specific nids for the intmike and linein as they seem to swap
 +       // between macbook pros (14,3) and imacs (18,3)
@@ -547,10 +558,6 @@
 +       // some initial plays that I dont understand - so skip any setup
 +       // till sometime after the first play
 +       struct timespec64 first_play_time;
-+       // serialises the jack handler with the pcm prepare/cleanup paths
-+       // (they share the codec's I2C engine) - see cs_8409_apple_lock() in cirrus_apple.h
-+       struct mutex apple_mutex;
-+       struct task_struct *apple_mutex_owner;
 +
 +
 +#endif
