@@ -3671,9 +3671,13 @@ static int cs42l83_read_status_and_clear_interrupt(struct hda_codec *codec)
         // - the other registers seem to be flagged as status registers
         // 0x1b7b is listed in figure 4-45 as an interrupt register but otherwise undocumented!!
 
+        mycodec_info(codec, "cs42l83_read_status_and_clear_interrupt pre power up\n");
+
         // moved to above
         //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_POWER_STATE, 0x00000000); // 0x00170500
         hda_set_node_power_state(codec, codec->core.afg, AC_PWRST_D0);
+
+        mycodec_info(codec, "cs42l83_read_status_and_clear_interrupt post power up\n");
 
         // note that a lot of i2cPagedRead followed by i2cPagedWrite are likely AppleHDATDMDevice::maskWriteReg
         // ie read from register and mask of bits and set certain bits without affecting others
@@ -4934,6 +4938,23 @@ static void cs_8409_headset_plugin_event(struct hda_codec *codec)
 
         // this is NOT a debug sleep - it occurs on all plugin events on OSX for some reason
         msleep(1800);
+
+        // it appears under linux this long sleep causes a suspend action
+        // so we need to wait for the resume action to finish here
+        // otherwise the resume code runs while the cs42l83_headphone_sense cs_8409_vendor_i2cRead call runs
+        if (spec->codec_suspended == 1)
+        {
+                // debug power state print
+                int power_state = snd_hda_codec_read(codec, codec->core.afg, 0, AC_VERB_GET_POWER_STATE, 0);
+                mycodec_info(codec, "cs_8409_headset_plugin_event afg power state %d\n", power_state);
+                // it appears I need some form of actual verb to run to start the resume function
+                // lets just do a junky gpio status call
+                // otherwise cs_8409_wait_for_resume just counts out and not until the first verb
+                // is run in cs_8409_plugin_complete_detect (which is an i2c call cs42l83_headphone_sense)
+                // given that the resume function may be setting up the subcodec its not clear what that would mean
+                retval = read_gpio_status_check(codec);
+                cs_8409_wait_for_resume(codec, 2, 20);
+        }
 
         //retval = snd_hda_codec_read_check(codec, codec->core.afg, 0, AC_VERB_GET_POWER_STATE, 0x00000000, 0x00000000, 1069); // 0x001f0500
         //hda_set_node_power_state(codec, codec->core.afg, AC_PWRST_D0);

@@ -482,6 +482,13 @@ struct cs8409_apple_spec {
 	struct mutex unsol_lock;
 	struct mutex i2ccodeblock_lock;
 
+	// for some reason resume seems to be running after an unsol response starts
+	// - but we need resume to run before most of unsol response
+	// adding variables to detect when suspend/resume run
+	// these will be set in suspend and unset in resume
+	int codec_suspended;
+	int subcodec_suspended;
+
 	// add in specific nids for the intmike and linein as they seem to swap
 	// between macbook pros (14,3) and imacs (18,3)
 	int intmike_nid;
@@ -1547,7 +1554,7 @@ static int cs_8409_apple_boot_init(struct hda_codec *codec)
 	cs_8409_set_extended_codec_verb();
 #endif
 
-        myprintk("snd_hda_intel: end cs_8409_apple_boot_init\n");
+	myprintk("snd_hda_intel: end cs_8409_apple_boot_init\n");
 
 	return 0;
 }
@@ -1629,12 +1636,48 @@ static int cs_8409_apple_init(struct hda_codec *codec)
 	return 0;
 }
 
+static int cs_8409_wait_for_resume(struct hda_codec *codec, int msleeptim, int trycount);
+
+// so far it appears when we have an unsol response it runs in parallel with the resume code
+// - we need to wait for the resume to finish before continuing
+// cant think of a better way of doing this yet
+static int cs_8409_wait_for_resume(struct hda_codec *codec, int msleeptim, int trycount)
+{
+        struct cs8409_apple_spec *spec = codec->spec;
+        int retval = 0;
+        int loopcnt = 0;
+
+        mycodec_info(codec, "cs_8409_wait_for_resume start\n");
+        mycodec_info(codec, "cs_8409_wait_for_resume power_save_node %d\n", codec->power_save_node);
+
+        if (spec->codec_suspended > 0)
+        {
+                while (loopcnt < trycount)
+                {
+                        if (spec->codec_suspended == 0)
+                                break;
+                        msleep(msleeptim);
+                        loopcnt++;
+                }
+                mycodec_info(codec, "cs_8409_wait_for_resume - count %d\n",loopcnt);
+        }
+
+
+        mycodec_info(codec, "cs_8409_wait_for_resume end\n");
+
+        return 0;
+}
+
 static int cs_8409_apple_resume(struct hda_codec *codec)
 {
         myprintk("snd_hda_intel: cs_8409_apple_resume\n");
+        struct cs8409_apple_spec *spec = codec->spec;
+        myprintk("snd_hda_intel: cs_8409_apple_resume codec_suspended %d\n", spec->codec_suspended);
         // code copied from default resume ops
         snd_hda_codec_init(codec);       
 	snd_hda_regmap_sync(codec);
+        spec->codec_suspended = 0;
+        //spec->subcodec_suspended = 0;
         myprintk("snd_hda_intel: end cs_8409_apple_resume\n");
         return 0;
 }
@@ -1643,6 +1686,9 @@ static int cs_8409_apple_suspend(struct hda_codec *codec)
 {
         myprintk("snd_hda_intel: cs_8409_apple_suspend\n");
         // no additional code for this so just dummy it
+        struct cs8409_apple_spec *spec = codec->spec;
+        spec->codec_suspended = 1;
+        //spec->subcodec_suspended = 1;
         return 0;
 }
 
@@ -2752,6 +2798,8 @@ static const struct hda_pintbl imac_pincfgs[] = {
 };
 
 
+static int read_gpio_status_check(struct hda_codec *codec);
+
 static void cs_8409_cs42l83_unsolicited_response(struct hda_codec *codec, unsigned int res);
 
 // now think this function is no longer used - only used prior to 5.13
@@ -2775,7 +2823,19 @@ static void cs_8409_cs42l83_callback(struct hda_codec *codec, struct hda_jack_ca
 
 static void cs_8409_cs42l83_unsol_event_handler(struct hda_codec *codec, unsigned int unsol_res)
 {
-	struct cs8409_apple_spec *spec = codec->spec;
+        struct cs8409_apple_spec *spec = codec->spec;
+        int retval;
+        int power_state;
+
+        // stack trace for cs_8409_cs42l83_unsol_event_handler
+
+        // this is apparently running under the snd_hdac_bus_process_unsol_events workqueue
+
+        // cs_8409_cs42l83_unsol_event_handler+0x17/0xf0 [snd_hda_codec_cs8409]
+        // hda_codec_unsol_event+0x42/0x60 [snd_hda_codec]
+        // snd_hdac_bus_process_unsol_events+0xb9/0x130 [snd_hda_core]
+        // process_one_work+0x181/0x3a0
+
 
         //int ret_unsol_enable = 0;
         //int tag = (unsol_res >> AC_UNSOL_RES_TAG_SHIFT) & 0x7f;
@@ -2787,16 +2847,52 @@ static void cs_8409_cs42l83_unsol_event_handler(struct hda_codec *codec, unsigne
         //else
         //      mycodec_info(codec, "cs_8409_cs42l83_unsol_event_handler - not interrupt\n");
 
+        // so it seems the low order byte of the res for the 8409 is a copy of the GPIO register state
+        //// - except that we dont seem to pass this to the callback functions!! - well that was for linux kernel version 4
+
+        codec_info(codec, "cs_8409_cs42l83_unsol_event_handler UNSOL 0x%08x tag 0x%02x\n",unsol_res,tag);
+
+        // NOTA BENE - definitely do not run any i2c code before this - and maybe no hda verbs aswell
+        // it appears this runs in parallel with the resume function
+        // - but we need the resume function to have finished before continuing
+        // now try waiting for the codec_suspended variable to be 0
+        // Im hoping the msleep will allow the task to switch to the resume function
+        // - at the moment the resume function seems to be called some random time after this function starts
+        // (thats with apparently no power down done ie power_save_node is 0)
+        // if the read_gpio_status_check and cs_8409_wait_for_resume functions are not defined here (or commented)
+
+        // the current behaviour seems to be that the resume function is called some random time after the
+        // the next few verbs
+        // first verb seems to be a read_gpio_status_check - either in cs_8409_external_device_unsolicited_response
+        // or in cs_8409_read_status_and_clear_interrupt - called from cs_8409_external_device_unsolicited_response
+        // (call stack is:
+        //                 cs_8409_cs42l83_unsolicited_response
+        //                 cs_8409_cs42l83_unsolicited_response_finalize
+        //                 cs_8409_external_device_unsolicited_response
+        //                 cs_8409_read_status_and_clear_interrupt)
+
+        // see if adding an hda verb call here gets the resume function called
+        // not according to the logs where 2 or 3 read_gpio_status_checks from the above call stack
+        // do not trigger the resume function
+        retval = read_gpio_status_check(codec);
+
+        // debug check power state
+        // if I have this function call then dont really need the above read_gpio_status_check call
+        power_state = snd_hda_codec_read(codec, codec->core.afg, 0, AC_VERB_GET_POWER_STATE, 0);
+        codec_info(codec, "cs_8409_cs42l83_unsol_event_handler afg power state %d\n", power_state);
+
+        // however for some reason this does wait for the resume function
+        // - unlike in cs_8409_headset_plugin_event
+        // where without a read_gpio_status_check before the cs_8409_wait_for_resume
+        // the cs_8409_wait_for_resume just exits efter hitting the loop count - in this case 20
+        cs_8409_wait_for_resume(codec, 2, 20);
+
+
         //// read UNSOL enable data to see what current setup is
         //ret_unsol_enable = snd_hda_codec_read(codec, codec->core.afg, 0, AC_VERB_GET_UNSOLICITED_RESPONSE, 0);
         //mycodec_dbg(codec,"UNSOL event 0x01 at unsol is 0x%08x\n",ret_unsol_enable);
         //ret_unsol_enable = snd_hda_codec_read(codec, 0x47, 0, AC_VERB_GET_UNSOLICITED_RESPONSE, 0);
         //mycodec_dbg(codec,"UNSOL event 0x47 at unsol is 0x%08x\n",ret_unsol_enable);
-
-        // so it seems the low order byte of the res for the 8409 is a copy of the GPIO register state
-        //// - except that we dont seem to pass this to the callback functions!! - well that was for linux kernel version 4
-
-        codec_info(codec, "cs_8409_cs42l83_unsol_event_handler UNSOL 0x%08x tag 0x%02x\n",unsol_res,tag);
 
 
         // so far it appears Apple enables speakers and disables intmike and linein with no headphone
@@ -2978,18 +3074,32 @@ static int cs8409_cs42l83_exec_verb(struct hdac_device *dev, unsigned int cmd, u
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 13, 0)
         struct sub_codec *cs42l83 = spec->scodecs[CS8409_CODEC0];
 #endif
+        //dump_stack();
+
+        // call stack:
+        // cs8409_cs42l83_exec_verb+0xa3/0x110 [snd_hda_codec_cs8409]
+        // ? __pfx_hda_codec_runtime_resume+0x10/0x10 [snd_hda_codec]
+        // snd_hdac_codec_read+0x53/0xb0 [snd_hda_core]
+        // read_pin_sense+0x49/0xd0 [snd_hda_codec]
+        // jack_detect_update+0xfc/0x120 [snd_hda_codec]
+        // snd_hda_jack_report_sync+0x52/0xe0 [snd_hda_codec]
+        // hda_call_codec_resume+0xfc/0x180 [snd_hda_codec]
+        // hda_codec_runtime_resume+0x30/0x80 [snd_hda_codec]
+        // ? __pfx_hda_codec_runtime_resume+0x10/0x10 [snd_hda_codec]
+
 
         unsigned int nid = ((cmd >> 20) & 0x07f);
         unsigned int verb = ((cmd >> 8) & 0x0fff);
 
-	// we have confirmed this is being called
-	//myprintk("snd_hda_intel: cs 8409 exec verb 0x%04x 0x%x\n", nid, verb);
+        // we have confirmed this is being called
+        //myprintk("snd_hda_intel: cs 8409 exec verb 0x%04x 0x%x\n", nid, verb);
 
 #ifdef APPLE_PINSENSE_FIXUP
         // or we could have a single function and the following
         if (nid == CS8409_CS42L83_HP_PIN_NID) {
 		//myprintk("snd_hda_intel: cs 8409 exec verb 0x%04x 0x%x\n", nid, verb);
                 if (verb == AC_VERB_GET_PIN_SENSE) {
+                        //dump_stack();
 			//myprintk("snd_hda_intel: cs 8409 exec verb pin sense 0x%04x %d\n", nid, cs42l83->hp_jack_in);
                         //*res = (cs42l83->hp_jack_in) ? AC_PINSENSE_PRESENCE : 0;
                         // initially use my jack_present flag integer
@@ -3000,6 +3110,7 @@ static int cs8409_cs42l83_exec_verb(struct hdac_device *dev, unsigned int cmd, u
         } else if (nid == CS8409_CS42L83_HP_MIC_PIN_NID) {
 		//myprintk("snd_hda_intel: cs 8409 exec verb 0x%04x 0x%x\n", nid, verb);
                 if (verb == AC_VERB_GET_PIN_SENSE) {
+                        //dump_stack();
 			//myprintk("snd_hda_intel: cs 8409 exec verb pin sense 0x%04x %d\n", nid, cs42l83->mic_jack_in);
                         //*res = (cs42l83->mic_jack_in) ? AC_PINSENSE_PRESENCE : 0;
                         // initially use my jack_present flag integer
@@ -3010,6 +3121,7 @@ static int cs8409_cs42l83_exec_verb(struct hdac_device *dev, unsigned int cmd, u
         } else if (nid == spec->linein_nid) {
                 //myprintk("snd_hda_intel: cs 8409 exec verb 0x%04x 0x%x\n", nid, verb);
                 if (verb == AC_VERB_GET_PIN_SENSE) {
+                        //dump_stack();
                         //myprintk("snd_hda_intel: cs 8409 exec verb pin sense 0x%04x %d\n", nid, cs42l83->linein_jack_in);
                         //*res = (cs42l83->linein_jack_in) ? AC_PINSENSE_PRESENCE : 0;
                         // initially use my jack_present flag integer
@@ -3020,6 +3132,14 @@ static int cs8409_cs42l83_exec_verb(struct hdac_device *dev, unsigned int cmd, u
         }
 #endif
 
+
+        //if (res == NULL)
+        //        { myprintk("snd_hda_intel: cs 8409 exec verb 0x%04x 0x%x res NULL\n", nid, verb); }
+        //else
+        //        { myprintk("snd_hda_intel: cs 8409 exec verb 0x%04x 0x%x res 0x%x\n", nid, verb, *res); }
+
+        // NOTA BENE - using the code from the Dell module spec->exec_verb stores the original codec->core.exec_verb function
+        //             pointer so this will call that original function for most verbs
         return spec->exec_verb(dev, cmd, flags, res);
 }
 
@@ -3087,6 +3207,10 @@ static int cs8409_apple(struct hda_codec *codec)
         // (also used in the alt versions of these functions eg alt_playback_pcm_open)
         // also not used in the capture open/close functions (eg capture_pcm_open) or the capture prepare/cleanup functions
         mutex_init(&spec->i2ccodeblock_lock);
+
+        // init the suspend flag variables
+        spec->codec_suspended = -1;
+        spec->subcodec_suspended = -1;
 
 
         spec->vendor_nid = CS8409_VENDOR_NID;

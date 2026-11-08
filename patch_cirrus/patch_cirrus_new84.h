@@ -1026,7 +1026,7 @@ static void switch_input_src(struct hda_codec *codec)
 
 
 
-static int read_gpio_status_check(struct hda_codec *codec);
+//static int read_gpio_status_check(struct hda_codec *codec);
 
 #ifdef USE_DATA
 

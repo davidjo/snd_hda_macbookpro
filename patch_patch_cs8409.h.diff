@@ -430,7 +430,7 @@ index d0b725c..d8b5232 100644
  	unsigned int suspended:1;
  	unsigned int paged:1;
  	unsigned int last_page;
-@@ -339,6 +365,140 @@
+@@ -339,6 +365,147 @@
  	unsigned int init_done:1;
  	unsigned int build_ctrl_done:1;
  
@@ -466,7 +466,7 @@ index d0b725c..d8b5232 100644
 +	//int unsol_items_prealloc_used[10];
 +
 +	// so it appears unsol responses are queued by the hda system
-+        // switching to mutex locks for prevention of parallel operation
++	// switching to mutex locks for prevention of parallel operation
 +	// I have been unable to find locking used for switching eg when headphones plugged in/out
 +	// I guess I dont understand mutex locking and workqueues
 +	// unsol responses are queued and run on a workqueue which apparently runs asynchronously to main thread
@@ -475,6 +475,13 @@ index d0b725c..d8b5232 100644
 +	// so either code has to wait for other code to finish
 +	struct mutex unsol_lock;
 +	struct mutex i2ccodeblock_lock;
++
++	// for some reason resume seems to be running after an unsol response starts
++	// - but we need resume to run before most of unsol response
++	// adding variables to detect when suspend/resume run
++	// these will be set in suspend and unset in resume
++	int codec_suspended;
++	int subcodec_suspended;
 +
 +	// add in specific nids for the intmike and linein as they seem to swap
 +	// between macbook pros (14,3) and imacs (18,3)
