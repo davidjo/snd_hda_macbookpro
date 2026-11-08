@@ -49,6 +49,13 @@
 #endif
 #endif
 
+#ifdef MYSOUNDDEBUGI2C
+#define myprintk_i2c_dbg(fmt, args...) \
+        printk(fmt, ##args)
+#else
+#define myprintk_i2c_dbg(...)
+#endif
+
 
 /*
 

@@ -2,7 +2,7 @@ diff --git a/patch_cirrus/patch_cirrus_apple.h b/patch_cirrus/patch_cirrus_apple
 index 398618c..0abda63 100644
 --- a/patch_cirrus/patch_cirrus_apple.h
 +++ b/patch_cirrus/patch_cirrus_apple.h
-@@ -157,7 +157,6 @@ struct sub_codec cs8409_cs42l83_codec = {
+@@ -164,7 +164,6 @@
          .hp_jack_in = 0,
          .mic_jack_in = 0,
          .linein_jack_in = 0,

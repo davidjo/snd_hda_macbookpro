@@ -255,7 +255,7 @@ static unsigned int cs_8409_vendor_i2cRead(struct hda_codec *codec, unsigned int
 	unsigned int retval;
 	int rdcnt;
 
-        myprintk_dbg("snd_hda_intel: i2cRead 0x%04x 0x%04x: %d",i2c_address,i2c_reg,paged);
+        myprintk_i2c_dbg("snd_hda_intel: i2cRead 0x%04x 0x%04x: %d",i2c_address,i2c_reg,paged);
 
 	hda_set_node_power_state_dbg(codec, codec->core.afg, AC_PWRST_D0, 0);
 	// exit on error
@@ -337,7 +337,7 @@ sleep2:
 	cs_8409_vendor_enableI2Cclock(codec, 0x0);
 	// exit on error
 
-        myprintk_dbg("snd_hda_intel: i2cRead 0x%04x 0x%04x:  0x%04x end",i2c_address,i2c_reg,retval);
+        myprintk_i2c_dbg("snd_hda_intel: i2cRead 0x%04x 0x%04x:  0x%04x end",i2c_address,i2c_reg,retval);
 
 	//hda_set_node_power_state(codec, codec->core.afg, AC_PWRST_D3);
 	// exit on error
@@ -354,7 +354,7 @@ static unsigned int cs_8409_vendor_i2cWrite(struct hda_codec *codec, unsigned in
 	unsigned int i2c_reg_data;
 	int rdcnt;
 
-        myprintk_dbg("snd_hda_intel: i2cWrite 0x%04x 0x%04x: 0x%04x %d",i2c_address,i2c_reg,i2c_data,paged);
+        myprintk_i2c_dbg("snd_hda_intel: i2cWrite 0x%04x 0x%04x: 0x%04x %d",i2c_address,i2c_reg,i2c_data,paged);
 
 	hda_set_node_power_state(codec, codec->core.afg, AC_PWRST_D0);
 	// exit on error
@@ -432,7 +432,7 @@ sleep2:
 	cs_8409_vendor_enableI2Cclock(codec, 0x0);
 	// exit on error
 
-        myprintk_dbg("snd_hda_intel: i2cWrite 0x%04x 0x%04x: 0x%04x %d end",i2c_address,i2c_reg,i2c_data,paged);
+        myprintk_i2c_dbg("snd_hda_intel: i2cWrite 0x%04x 0x%04x: 0x%04x %d end",i2c_address,i2c_reg,i2c_data,paged);
 
 	//hda_set_node_power_state(codec, codec->core.afg, AC_PWRST_D3);
 	// exit on error
@@ -453,7 +453,7 @@ static unsigned int cs_8409_vendor_i2cWriteMask(struct hda_codec *codec, unsigne
 	mask_val = (retval & ~i2c_mask);
 	mask_val |= (i2c_data & i2c_mask);
 
-        myprintk_dbg("snd_hda_intel: i2cWriteMask 0x%04x 0x%04x: 0x%04x (0x%04x 0x%04x 0x%04x)  %d",i2c_address,i2c_reg,mask_val,retval,i2c_data,i2c_mask,paged);
+        myprintk_i2c_dbg("snd_hda_intel: i2cWriteMask 0x%04x 0x%04x: 0x%04x (0x%04x 0x%04x 0x%04x)  %d",i2c_address,i2c_reg,mask_val,retval,i2c_data,i2c_mask,paged);
 
         retval = cs_8409_vendor_i2cWrite(codec, i2c_address, i2c_reg, mask_val, paged);
 
