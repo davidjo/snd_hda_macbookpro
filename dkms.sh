@@ -40,5 +40,9 @@ pushd $cur_dir > /dev/null
 # note that this will store the original base kernel module under  /var/lib/dkms
 # and needs dkms remove to be called to restore that original module back to the base kernel modules
 dkms install -c dkms.conf --force -m $dkms_name
+rc=$?
 
 popd > /dev/null
+
+# report dkms's own result, not popd's
+exit $rc
