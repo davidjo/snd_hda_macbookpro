@@ -1642,7 +1642,16 @@ static int cs_8409_apple_resume(struct hda_codec *codec)
 {
         myprintk("snd_hda_intel: cs_8409_apple_resume\n");
         struct cs8409_apple_spec *spec = codec->spec;
-        myprintk("snd_hda_intel: cs_8409_apple_resume codec_suspended %d\n", spec->codec_suspended);
+        // check pm event option
+        if (codec->core.dev.power.power_state.event == PM_EVENT_ON)
+                { myprintk("snd_hda_intel: cs_8409_apple_resume pm event %d power is on\n", codec->core.dev.power.power_state.event); }
+        else if (codec->core.dev.power.power_state.event == PM_EVENT_RESUME)
+                { myprintk("snd_hda_intel: cs_8409_apple_resume pm event %d resume\n", codec->core.dev.power.power_state.event); }
+        else if (codec->core.dev.power.power_state.event == PM_EVENT_RESTORE)
+                { myprintk("snd_hda_intel: cs_8409_apple_resume pm event %d restore\n", codec->core.dev.power.power_state.event); }
+        else
+                { myprintk("snd_hda_intel: cs_8409_apple_resume pm event %d UNKNOWN!!\n", codec->core.dev.power.power_state.event); }
+	myprintk("snd_hda_intel: cs_8409_apple_resume codec_suspended %d\n", spec->codec_suspended);
         // code copied from default resume patch ops
 	if (codec->patch_ops.init)
 	        codec->patch_ops.init(codec);
