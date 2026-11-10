@@ -62,16 +62,18 @@ if [[ $dkms_action == 'install' ]]; then
     [[ -e $update_dir/snd-hda-codec-cs8409.ko ]] && rm $update_dir/snd-hda-codec-cs8409.ko && echo "removed $update_dir/snd-hda-codec-cs8409.ko"
 
     # run dkms install script
-    bash dkms.sh
+    if ! bash dkms.sh; then
+        echo "dkms install failed"
+        exit 1
+    fi
 
-    # note that Ubuntu, Debian, Fedora and others (see dkms man page) install to updates/dkms
-    # and ignore DEST_MODULE_LOCATION
-    # we DO want updates so that the original module is not overwritten
-    # (although the original module should be copied to under /var/lib/dkms if needed for other distributions)
-    update_dir="/lib/modules/${UNAME}/updates/dkms"
-    echo -e "\ncontents of $update_dir"
-    ls -lA $update_dir
-    exit
+    # dkms keeps the kernel's own module (archived under /var/lib/dkms) so dkms remove can
+    # restore it. Where dkms puts the new one depends on the distribution and dkms version
+    # (updates/dkms on Ubuntu and Debian, extra on Fedora with dkms 3.x), so ask modinfo
+    # which file the kernel will load instead of listing a fixed directory
+    echo -e "\ninstalled module for ${UNAME}:"
+    modinfo -k "${UNAME}" -n snd-hda-codec-cs8409
+    exit 0
 
 elif [[ $dkms_action == 'remove' ]]; then
 
