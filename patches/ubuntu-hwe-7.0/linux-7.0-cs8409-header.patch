@@ -1,0 +1,48 @@
+--- a/codecs/cirrus/cs8409.h
++++ b/codecs/cirrus/cs8409.h
+@@ -18,6 +18,7 @@
+ #include "hda_auto_parser.h"
+ #include "hda_jack.h"
+ #include "../generic.h"
++#include "../side-codecs/hda_component.h"
+ 
+ //#ifdef APPLE_CODECS
+ //#include <linux/ctype.h>
+@@ -277,6 +278,8 @@
+ 	CS8409_DOLPHIN,
+ 	CS8409_DOLPHIN_FIXUPS,
+ 	CS8409_ODIN,
++	CS8409_CDB35L56_FOUR_HD,
++	CS8409_CDB35L56_FOUR_HD_FIXUP,
+ };
+ 
+ enum {
+@@ -367,6 +370,7 @@
+ 	unsigned int capture_started:1;
+ 	unsigned int init_done:1;
+ 	unsigned int build_ctrl_done:1;
++	unsigned int speaker_muted:1;
+ 
+ #ifdef APPLE_CODECS
+ 
+@@ -496,6 +500,10 @@
+ 			 unsigned int *res);
+ 	/* unsol_event op override */
+ 	void (*unsol_event)(struct hda_codec *codec, unsigned int res);
++
++	/* component binding */
++	struct component_match *match;
++	struct hda_component_parent comps;
+ };
+ 
+ extern const struct snd_kcontrol_new cs42l42_dac_volume_mixer;
+@@ -523,4 +531,9 @@
+ void cs8409_cs42l42_fixups(struct hda_codec *codec, const struct hda_fixup *fix, int action);
+ void dolphin_fixups(struct hda_codec *codec, const struct hda_fixup *fix, int action);
+ 
++extern const struct cs8409_cir_param cs8409_cdb35l56_four_hw_cfg[];
++extern const struct hda_verb cs8409_cdb35l56_four_init_verbs[];
++void cs8409_cdb35l56_four_autodet_fixup(struct hda_codec *codec,
++					const struct hda_fixup *fix, int action);
++
+ #endif
