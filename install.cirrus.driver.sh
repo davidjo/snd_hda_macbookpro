@@ -187,6 +187,11 @@ else
 
 	set +e
 
+	# Debian kernel versions carry a distribution suffix (eg 7.2.12+deb14).
+	# Strip it so we get the matching point release source rather than
+	# falling back to the x.y.0 base version.
+	kernel_version=${kernel_version%%+*}
+
 	# attempt to download linux-x.x.x.tar.xz kernel
 	wget -c https://cdn.kernel.org/pub/linux/kernel/v$major_version.x/linux-$kernel_version.tar.xz -P $build_dir
 
