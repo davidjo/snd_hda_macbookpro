@@ -37,24 +37,14 @@ revpart2=$(echo $revision | cut -d '-' -f2)
 revpart3=$(echo $revision | cut -d '-' -f3)
 
 
+# the module name and location for dkms are now chosen per kernel in dkms.conf itself
+# (rewriting dkms.conf here tied it to the kernel running at install time, which broke
+# the dkms build when the distro later updated the kernel to 6.17 or later)
 if [ $major_version -eq 5 -a $minor_version -lt 13 ]; then
-    if [ -e dkms.conf.orig ]; then
-        sed -i 's/^BUILT_MODULE_NAME\[0\].*$/BUILT_MODULE_NAME[0]="snd-hda-codec-cirrus"/' dkms.conf
-    else
-        sed -i.orig 's/^BUILT_MODULE_NAME\[0\].*$/BUILT_MODULE_NAME[0]="snd-hda-codec-cirrus"/' dkms.conf
-    fi
     PATCH_CIRRUS=true
 else
-    if [ -e dkms.conf.orig ]; then
-        sed -i 's/^BUILT_MODULE_NAME\[0\].*$/BUILT_MODULE_NAME[0]="snd-hda-codec-cs8409"/' dkms.conf
-    else
-        sed -i.orig 's/^BUILT_MODULE_NAME\[0\].*$/BUILT_MODULE_NAME[0]="snd-hda-codec-cs8409"/' dkms.conf
-    fi
     PATCH_CIRRUS=false
 fi
-
-sed -i 's/^BUILT_MODULE_LOCATION\[0\].*$/BUILT_MODULE_LOCATION[0]="build\/hda"/' dkms.conf
-sed -i 's/^PRE_BUILD.*$/PRE_BUILD="install.cirrus.driver.pre617.sh -k $kernelver --dkms"/' dkms.conf
 
 
 if [[ $dkms_action == 'install' ]]; then
