@@ -203,8 +203,12 @@ else
 
 	set +e
 
-	# attempt to download linux-x.x.x.tar.xz kernel
-	wget -c https://cdn.kernel.org/pub/linux/kernel/v$major_version.x/linux-$kernel_version.tar.xz -P $build_dir
+	# Debian ships a stable point-release (e.g. 6.12.94) whose source is NOT on
+	# kernel.org. Building against the x.y.0 tarball can yield a struct-layout ABI
+	# mismatch vs the running snd_hda_codec_generic.ko (e.g. auto_pin_cfg grew +72B
+	# in 6.12.x), corrupting cross-module hook offsets. Prefer the matching
+	# linux-source-X.Y package when present (apt install linux-source-X.Y).
+	[ -f /usr/src/linux-source-${major_version}.${minor_version}.tar.xz ] || wget -c https://cdn.kernel.org/pub/linux/kernel/v$major_version.x/linux-$kernel_version.tar.xz -P $build_dir
 
 	if [[ $? -ne 0 ]]; then
 		echo "Failed to download linux-$kernel_version.tar.xz"
@@ -214,14 +218,19 @@ else
 		echo ""
    		# if first attempt fails, attempt to download linux-x.x.tar.xz kernel
    		kernel_version=$major_version.$minor_version
-   		wget -c https://cdn.kernel.org/pub/linux/kernel/v$major_version.x/linux-$kernel_version.tar.xz -P $build_dir
+   		[ -f /usr/src/linux-source-${major_version}.${minor_version}.tar.xz ] || wget -c https://cdn.kernel.org/pub/linux/kernel/v$major_version.x/linux-$kernel_version.tar.xz -P $build_dir
 
 		[[ $? -ne 0 ]] && echo "kernel could not be downloaded...exiting" && exit
 	fi
 
 	set -e
 
-	tar --strip-components=3 -xvf $build_dir/linux-$kernel_version.tar.xz --directory=build/ linux-$kernel_version/sound/pci/hda
+	if [ -f /usr/src/linux-source-${major_version}.${minor_version}.tar.xz ]; then
+		echo "Using /usr/src/linux-source-${major_version}.${minor_version}.tar.xz (matches the running kernel point-release)"
+		tar --strip-components=3 -xf /usr/src/linux-source-${major_version}.${minor_version}.tar.xz --directory=build/ linux-source-${major_version}.${minor_version}/sound/pci/hda
+	else
+		tar --strip-components=3 -xvf $build_dir/linux-$kernel_version.tar.xz --directory=build/ linux-$kernel_version/sound/pci/hda
+	fi
 
 fi
 

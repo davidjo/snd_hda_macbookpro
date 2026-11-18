@@ -76,6 +76,16 @@ dnf install gcc kernel-devel make patch wget
 ```
 apt install gcc linux-headers-generic make patch wget
 ```
+**debian package install**  
+```
+apt install gcc linux-headers-$(uname -r) make patch wget
+# IMPORTANT on Debian: also install the matching kernel SOURCE package.
+# Debian ships a stable point-release kernel (e.g. 6.12.94) whose source is NOT on
+# kernel.org. Installing linux-source-X.Y makes the module build against your exact
+# running kernel; without it the build falls back to the kernel.org x.y.0 tarball,
+# which can have a different struct layout and GP-fault on boot (see issue #193).
+apt install linux-source-$(uname -r | cut -d. -f1-2)
+```
 **arch package install**
 ```
 pacman -S gcc linux-headers make patch wget
