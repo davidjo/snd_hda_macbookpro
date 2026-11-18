@@ -74,8 +74,14 @@ dnf install gcc kernel-devel make patch wget
 ```
 **ubuntu package install**  
 ```
-apt install gcc linux-headers-generic make patch wget
+apt install gcc linux-headers-generic make patch wget git bzip2
 ```
+
+For Ubuntu HWE kernels 6.17 and later, the installer fetches the matching
+Ubuntu kernel source tag from Launchpad and caches its `sound/hda` files in
+`/usr/src`. This requires network access on the first build for each kernel
+package version. A source tag must match the installed `linux-image` package;
+the installer stops if it cannot find one.
 **arch package install**
 ```
 pacman -S gcc linux-headers make patch wget
@@ -119,4 +125,3 @@ sudo ./install.cirrus.driver.sh -i
 ```
 sudo ./install.cirrus.driver.sh -r
 ```
-

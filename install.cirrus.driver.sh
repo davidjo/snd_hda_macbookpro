@@ -162,9 +162,12 @@ if [ $isubuntu -ge 1 ]; then
 	# to be significantly modified from the mainline kernel sources generally with backports from later kernels
 	# (so far the actual debian kernels seem to be close to mainline kernels)
 
-	# NOTA BENE this will likely NOT work for Ubuntu hwe kernels which are even more highly
-        #           modified with extensive backports from later kernel versions
-        #           (and in any case there is no linux-source-... package for hwe kernels)
+	# HWE kernels have no matching linux-source package. Prepare sound/hda from
+	# the source tag matching the installed kernel package before extracting it.
+	ubuntu_hwe_hda_dir="/usr/src/linux-hwe-${major_version}.${minor_version}-headers-${UNAME%-*}/sound/hda"
+	if [ -d "$ubuntu_hwe_hda_dir" ]; then
+		bash "$cur_dir/prepare.ubuntu.hwe.source.sh" "$UNAME"
+	fi
 
 	if [ ! -e /usr/src/linux-source-$kernel_version.tar.bz2 ]; then
 
