@@ -1,6 +1,13 @@
 # SPDX-License-Identifier: GPL-2.0
 subdir-ccflags-y += -I$(src)/../../common
 
+# kernel 7.3.6 (stable backport of "ALSA: hda: Use linked list for jack table")
+# turned codec->jacktbl from a struct snd_array into a linked list
+# detect it from the headers rather than by version, as it may be backported elsewhere
+ifneq ($(shell grep -s jacktbl_last $(srctree)/include/sound/hda_codec.h),)
+ccflags-y += -DHDA_JACKTBL_LIST
+endif
+
 #snd-hda-codec-cs420x-y :=	cs420x.o
 #snd-hda-codec-cs421x-y :=	cs421x.o
 snd-hda-codec-cs8409-y :=	cs8409.o cs8409-tables.o
