@@ -28,6 +28,9 @@ done
 UNAME=${TARGET_UNAME:-${1:-$(uname -r)}}
 
 kernel_version=$(echo $UNAME | cut -d '-' -f1)  #ie 5.2.7
+# strip any distribution suffix after '+', ie Debian 7.3.6+deb14 -> 7.3.6
+# otherwise the kernel.org download fails and we silently fall back to the x.y base release
+kernel_version=${kernel_version%%+*}
 major_version=$(echo $kernel_version | cut -d '.' -f1)
 minor_version=$(echo $kernel_version | cut -d '.' -f2)
 major_minor=${major_version}${minor_version}
